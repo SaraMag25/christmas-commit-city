@@ -1,47 +1,40 @@
 import { useState } from 'react'
-import { ExternalLink, Gift, Heart, Sparkles, Trees, X } from 'lucide-react'
+import { Check, ExternalLink, Gift, Heart, Share2, Sparkles, Trees, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { CREATOR_CAMPAIGN } from '../../config/pixCampaign'
 import { resolveTreeStage } from '../../config/treeLevels'
 import type { CityTree } from '../../types/city'
+import { AvatarBadge } from '../common/AvatarBadge'
 
 interface TreeDetailsPanelProps {
   tree: CityTree
   onClose: () => void
+  onOpenGiftCatalog: (tree: CityTree) => void
 }
 
-function AvatarBadge({ username, name, avatarUrl }: { username: string; name: string; avatarUrl: string }) {
-  const [imgError, setImgError] = useState(false)
-  const initials = name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-
-  if (imgError) {
-    return (
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm border-2 border-amber-400 bg-[#174636] font-pixel-title text-sm text-amber-200">
-        {initials || username.slice(0, 2).toUpperCase()}
-      </div>
-    )
-  }
-
-  return (
-    <img
-      src={avatarUrl}
-      alt={`Avatar de ${name}`}
-      onError={() => setImgError(true)}
-      className="h-14 w-14 shrink-0 rounded-sm border-2 border-amber-400 bg-[#0d1833] object-cover"
-    />
-  )
-}
-
-export function TreeDetailsPanel({ tree, onClose }: TreeDetailsPanelProps) {
+export function TreeDetailsPanel({
+  tree,
+  onClose,
+  onOpenGiftCatalog,
+}: TreeDetailsPanelProps) {
+  const [copied, setCopied] = useState(false)
   const stage = resolveTreeStage(tree.contribution_count)
+
+  const handleCopyShareLink = async () => {
+    const shareUrl = `${window.location.origin}/tree/${tree.profile.github_username}`
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      // Clipboard may be blocked in restricted browsers; fallback silently.
+    }
+  }
 
   return (
     <aside
       aria-label={`Detalhes da árvore de ${tree.profile.github_username}`}
-      className="fixed inset-x-3 bottom-14 z-30 max-h-[75vh] overflow-y-auto pixel-night-panel rounded-sm p-4 sm:inset-x-auto sm:bottom-16 sm:right-4 sm:top-20 sm:w-96 sm:max-h-none"
+      className="fixed inset-x-3 bottom-14 z-30 max-h-[75vh] overflow-y-auto pixel-night-panel rounded-sm p-4 sm:inset-x-auto sm:bottom-16 sm:right-4 sm:top-24 sm:w-96 sm:max-h-none"
     >
       <div className="flex items-start justify-between gap-3 border-b border-amber-500/30 pb-3">
         <div className="flex items-center gap-3">
@@ -122,7 +115,7 @@ export function TreeDetailsPanel({ tree, onClose }: TreeDetailsPanelProps) {
             &ldquo;{CREATOR_CAMPAIGN.message}&rdquo;
           </p>
           <p className="mt-2 text-[10px] text-sky-200/90">
-            A funcionalidade completa de QR Code Pix e barra de progresso será integrada na Fase 7.
+            QR Code Pix e barra de progresso da campanha serão integrados na Fase 7.
           </p>
         </div>
       ) : (
@@ -148,7 +141,7 @@ export function TreeDetailsPanel({ tree, onClose }: TreeDetailsPanelProps) {
 
         {tree.gifts.length === 0 ? (
           <p className="mt-2 rounded-sm border border-dashed border-slate-600/80 p-2.5 text-[11px] text-slate-400">
-            Esta árvore ainda não recebeu presentes. Na Fase 6 você poderá enviar enfeites e recados!
+            Esta árvore ainda não recebeu presentes.
           </p>
         ) : (
           <ul className="mt-2 space-y-1.5">
@@ -170,13 +163,33 @@ export function TreeDetailsPanel({ tree, onClose }: TreeDetailsPanelProps) {
         )}
       </div>
 
-      {/* Phase roadmap teaser */}
-      <div className="mt-4 flex items-center gap-2 rounded-sm border border-slate-700/80 bg-[#070d1f]/70 px-2.5 py-2 text-[10px] text-slate-300">
-        <Trees className="h-4 w-4 shrink-0 text-emerald-400" />
-        <span>
-          Página individual <code className="text-amber-300">/tree/{tree.profile.github_username}</code>{' '}
-          e envio de presentes chegam nas próximas fases.
-        </span>
+      {/* Actions */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Link
+          to={`/tree/${tree.profile.github_username}`}
+          className="pixel-btn pixel-btn-pine rounded-sm px-3 py-2 text-[11px] font-bold"
+        >
+          <Trees className="h-3.5 w-3.5" />
+          <span>Página da Árvore</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={() => onOpenGiftCatalog(tree)}
+          className="pixel-btn pixel-btn-red rounded-sm px-3 py-2 text-[11px] font-bold"
+        >
+          <Gift className="h-3.5 w-3.5" />
+          <span>Presentear</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCopyShareLink}
+          className="pixel-btn pixel-btn-wood col-span-2 rounded-sm px-3 py-1.5 text-[11px]"
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Share2 className="h-3.5 w-3.5" />}
+          <span>{copied ? 'Link copiado!' : 'Copiar link compartilhável'}</span>
+        </button>
       </div>
     </aside>
   )

@@ -1,6 +1,12 @@
 import { resolveTreeStage } from '../config/treeLevels'
 import { CITY_MAP_CONFIG } from '../config/cityMapConfig'
-import type { CityCommunityStats, CityTree, GiftItem } from '../types/city'
+import type {
+  CityCommunityStats,
+  CityTree,
+  GiftItem,
+  GiftRarity,
+  TreeMessage,
+} from '../types/city'
 
 export const MOCK_GIFTS_CATALOG: readonly GiftItem[] = [
   {
@@ -275,6 +281,61 @@ export const MOCK_CITY_TREES: readonly CityTree[] = [
     gridY: 22,
   }),
 ]
+
+export const MOCK_TREE_MESSAGES: readonly TreeMessage[] = [
+  {
+    id: 'msg-1',
+    tree_id: 'creator-ufc',
+    sender_name: 'Carlos Eduardo',
+    message: 'Que projeto lindo, Sara! Sucesso na reta final da Engenharia de Computação na UFC!',
+    created_at: '2026-11-20T09:15:00Z',
+  },
+  {
+    id: 'msg-2',
+    tree_id: 'creator-ufc',
+    sender_name: 'Mariana Costa',
+    message: 'Amei a vibe Stardew Valley natalina! Feliz Natal para toda a comunidade dev.',
+    created_at: '2026-11-20T11:40:00Z',
+  },
+  {
+    id: 'msg-3',
+    tree_id: 'dev-1',
+    sender_name: 'Rafael Lima',
+    message: '642 commits este ano?! Essa árvore virou um farol na praça!',
+    created_at: '2026-11-20T10:12:00Z',
+  },
+  {
+    id: 'msg-4',
+    tree_id: 'dev-2',
+    sender_name: 'Beatriz Alves',
+    message: 'Saudações natalinas de Fortaleza! Boas festas!',
+    created_at: '2026-11-20T08:50:00Z',
+  },
+]
+
+export function getTreeByUsername(username: string): CityTree | undefined {
+  const normalized = username.trim().toLowerCase()
+  return MOCK_CITY_TREES.find(
+    (tree) => tree.profile.github_username.toLowerCase() === normalized,
+  )
+}
+
+export function getMessagesByTreeId(treeId: string): TreeMessage[] {
+  return MOCK_TREE_MESSAGES.filter((msg) => msg.tree_id === treeId)
+}
+
+const RARITY_WEIGHT: Record<GiftRarity, number> = {
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 5,
+}
+
+export function computeTreeDecorationScore(tree: CityTree): number {
+  const uniqueGiftTypes = new Set(tree.gifts.map((g) => g.gift_slug)).size
+  const raritySum = tree.gifts.reduce((acc, gift) => acc + RARITY_WEIGHT[gift.rarity], 0)
+  return tree.tree_level * 2 + uniqueGiftTypes * 3 + raritySum
+}
 
 export function computeCommunityStats(trees: readonly CityTree[]): CityCommunityStats {
   return trees.reduce<CityCommunityStats>(

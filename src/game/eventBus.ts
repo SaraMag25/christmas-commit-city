@@ -1,4 +1,4 @@
-import type { CityTree } from '../types/city'
+import type { CityTree, VillagePropDialogue } from '../types/city'
 
 type Listener<T> = (payload: T) => void
 
@@ -7,7 +7,9 @@ export interface GameEventMap {
   'city:trees-updated': readonly CityTree[]
   'city:tree-hovered': CityTree | null
   'city:tree-selected': CityTree
+  'city:focus-tree': string
   'city:focus-creator': undefined
+  'city:prop-interacted': VillagePropDialogue
   'city:zoom-in': undefined
   'city:zoom-out': undefined
   'city:reset-camera': undefined

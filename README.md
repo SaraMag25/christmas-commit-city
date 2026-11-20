@@ -47,9 +47,9 @@ src/
 ├── config/       # Paleta, dimensões do mapa, estágios de árvore e campanha UFC
 ├── types/        # Contratos TypeScript alinhados ao modelo de dados
 ├── data/         # Dados fictícios iniciais para visualização da cidade
-├── game/         # Cena Phaser, gerador pixel art procedural, neve e árvore clicável
-├── components/   # HUD natalina e painéis em estilo RPG retrô
-└── pages/        # Páginas da aplicação
+├── game/         # Cena Phaser, gerador pixel art compartilhado, neve e interações
+├── components/   # HUD natalina, explorador de árvores e painéis RPG retrô
+└── pages/        # Vila interativa (/), perfil individual (/tree/:username) e rankings (/rankings)
 ```
 
 ---

@@ -68,6 +68,19 @@ export interface CityTree {
   last_synced_at: string
 }
 
+export interface TreeMessage {
+  id: string
+  tree_id: string
+  sender_name: string
+  message: string
+  created_at: string
+}
+
+export interface VillagePropDialogue {
+  title: string
+  text: string
+}
+
 export interface CityCommunityStats {
   totalTrees: number
   totalContributions: number

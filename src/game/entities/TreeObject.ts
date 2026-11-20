@@ -139,6 +139,10 @@ export class TreeObject {
     return this.treeData.id
   }
 
+  get data(): CityTree {
+    return this.treeData
+  }
+
   get worldX(): number {
     return (this.treeData.tree_position.gridX + 0.5) * CITY_MAP_CONFIG.tileSize
   }

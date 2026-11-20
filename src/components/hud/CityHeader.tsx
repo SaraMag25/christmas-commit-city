@@ -1,13 +1,14 @@
-import { Heart, HelpCircle, Sparkles, Trees } from 'lucide-react'
-import { GitHubIcon } from '../icons/GitHubIcon'
+import { Heart, HelpCircle, Sparkles, Trees, Trophy } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { CityCommunityStats } from '../../types/city'
+import { GitHubIcon } from '../icons/GitHubIcon'
 
 interface CityHeaderProps {
   stats: CityCommunityStats
   onOpenConnectModal: () => void
   onOpenHowItWorks: () => void
-  onFocusCreatorTree: () => void
-  onShowWelcome: () => void
+  onFocusCreatorTree?: () => void
+  onShowWelcome?: () => void
 }
 
 export function CityHeader({
@@ -17,12 +18,33 @@ export function CityHeader({
   onFocusCreatorTree,
   onShowWelcome,
 }: CityHeaderProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isHome = location.pathname === '/'
+  const isRankings = location.pathname === '/rankings'
+
+  const handleBrandClick = () => {
+    if (isHome && onShowWelcome) {
+      onShowWelcome()
+    } else {
+      navigate('/')
+    }
+  }
+
+  const handleCreatorClick = () => {
+    if (isHome && onFocusCreatorTree) {
+      onFocusCreatorTree()
+    } else {
+      navigate('/?focus=SaraMag25')
+    }
+  }
+
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-30 p-3 sm:p-4">
       <div className="pointer-events-auto mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-3 py-2.5 pixel-night-panel rounded-sm">
         <button
           type="button"
-          onClick={onShowWelcome}
+          onClick={handleBrandClick}
           className="flex items-center gap-2.5 text-left transition hover:brightness-110 cursor-pointer"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-sm border-2 border-amber-400 bg-[#0f2e24] text-amber-300 shadow-inner">
@@ -38,8 +60,8 @@ export function CityHeader({
           </div>
         </button>
 
-        {/* Live community stats bar (mock data in Phase 1) */}
-        <div className="hidden items-center gap-3 rounded-sm border border-amber-500/30 bg-[#070d1f]/75 px-3 py-1.5 text-xs lg:flex">
+        {/* Live community stats bar */}
+        <div className="hidden items-center gap-3 rounded-sm border border-amber-500/30 bg-[#070d1f]/75 px-3 py-1.5 text-xs xl:flex">
           <span className="flex items-center gap-1.5 text-emerald-300">
             <Trees className="h-3.5 w-3.5" />
             <strong>{stats.totalTrees}</strong> árvores
@@ -55,7 +77,27 @@ export function CityHeader({
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <nav aria-label="Navegação principal" className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <Link
+            to="/"
+            className={`pixel-btn rounded-sm px-2.5 py-1.5 text-[11px] ${
+              isHome ? 'pixel-btn-pine font-bold' : 'pixel-btn-wood'
+            }`}
+          >
+            <Trees className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">Cidade</span>
+          </Link>
+
+          <Link
+            to="/rankings"
+            className={`pixel-btn rounded-sm px-2.5 py-1.5 text-[11px] ${
+              isRankings ? 'pixel-btn-pine font-bold' : 'pixel-btn-wood'
+            }`}
+          >
+            <Trophy className="h-3.5 w-3.5 text-amber-300" />
+            <span className="hidden sm:inline">Rankings</span>
+          </Link>
+
           <button
             type="button"
             onClick={onOpenHowItWorks}
@@ -63,16 +105,16 @@ export function CityHeader({
             title="Como funciona e estágios das árvores"
           >
             <HelpCircle className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Como funciona</span>
+            <span className="hidden lg:inline">Como funciona</span>
           </button>
 
           <button
             type="button"
-            onClick={onFocusCreatorTree}
+            onClick={handleCreatorClick}
             className="pixel-btn pixel-btn-gold rounded-sm px-2.5 py-1.5 text-[11px] font-bold"
           >
             <Heart className="h-3.5 w-3.5 fill-current" />
-            <span>Campanha UFC</span>
+            <span className="hidden sm:inline">Campanha UFC</span>
           </button>
 
           <button
@@ -81,9 +123,10 @@ export function CityHeader({
             className="pixel-btn pixel-btn-red rounded-sm px-3 py-1.5 text-[11px] font-bold"
           >
             <GitHubIcon className="h-3.5 w-3.5" />
-            <span>Conectar com GitHub</span>
+            <span className="hidden sm:inline">Conectar com GitHub</span>
+            <span className="sm:hidden">GitHub</span>
           </button>
-        </div>
+        </nav>
       </div>
     </header>
   )

@@ -43,7 +43,7 @@ export function CameraControls({
           </div>
         ) : (
           <div className="hidden rounded-sm border border-amber-500/30 bg-[#070d1f]/75 px-3 py-1.5 text-[11px] text-slate-300 sm:block">
-            Arraste para explorar a vila · Role para zoom · Clique em uma árvore
+            Arraste ou use WASD/setas · Role para zoom · Clique em árvores ou personagens
           </div>
         )}
       </div>

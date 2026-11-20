@@ -27,6 +27,13 @@ export class CityScene extends Phaser.Scene {
   private camStartScrollY = 0
   private initialPinchDist: number | null = null
   private initialPinchZoom = 1
+  private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null
+  private wasdKeys: {
+    w: Phaser.Input.Keyboard.Key
+    a: Phaser.Input.Keyboard.Key
+    s: Phaser.Input.Keyboard.Key
+    d: Phaser.Input.Keyboard.Key
+  } | null = null
   private unsubscribers: Array<() => void> = []
 
   constructor() {
@@ -156,11 +163,41 @@ export class CityScene extends Phaser.Scene {
           bench: 'deco-bench',
           caretaker: 'deco-caretaker',
         }
-        this.add
+        const sprite = this.add
           .image(cx, by, keyMap[deco.type])
           .setOrigin(0.5, 1)
           .setScale(pixelScale)
           .setDepth(by)
+
+        if (deco.type === 'caretaker' || deco.type === 'signpost' || deco.type === 'snowman') {
+          const dialogueByType = {
+            caretaker: {
+              title: 'Cuidador da Vila',
+              text: 'Estou regando novos pinheiros! Cada commit no GitHub faz as árvores crescerem na praça.',
+            },
+            signpost: {
+              title: 'Placa da Praça Central',
+              text: 'Praça da UFC ao centro · Lago Congelado a sudoeste · Use WASD, setas ou arraste para explorar.',
+            },
+            snowman: {
+              title: 'Boneco de Neve',
+              text: 'Feliz Natal! Clique em qualquer árvore para ver seus commits ou enviar presentes visuais.',
+            },
+          } as const
+          const dialogue = dialogueByType[deco.type]
+          sprite.setInteractive({ useHandCursor: true })
+          sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+            const moved = Phaser.Math.Distance.Between(
+              pointer.downX,
+              pointer.downY,
+              pointer.upX,
+              pointer.upY,
+            )
+            if (moved < 10) {
+              gameEventBus.emit('city:prop-interacted', dialogue)
+            }
+          })
+        }
       }
     })
   }
@@ -265,6 +302,16 @@ export class CityScene extends Phaser.Scene {
         camera.setZoom(Phaser.Math.Clamp(nextZoom, 0.55, 2.2))
       },
     )
+
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys()
+      this.wasdKeys = {
+        w: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W, false),
+        a: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A, false),
+        s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S, false),
+        d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D, false),
+      }
+    }
   }
 
   private registerBusListeners(): void {
@@ -283,12 +330,30 @@ export class CityScene extends Phaser.Scene {
       gameEventBus.on('city:reset-camera', () => {
         this.centerOnPlaza(false)
       }),
+      gameEventBus.on('city:focus-tree', (identifier) => {
+        const normalized = identifier.trim().toLowerCase()
+        let target = this.treeObjects.get(identifier)
+        if (!target) {
+          for (const obj of this.treeObjects.values()) {
+            if (obj.data.profile.github_username.toLowerCase() === normalized) {
+              target = obj
+              break
+            }
+          }
+        }
+        if (!target) return
+        this.highlightSelectedTree(target.id)
+        this.cameras.main.pan(target.worldX, target.worldY - 36, 520, 'Sine.easeInOut')
+        this.cameras.main.zoomTo(1.25, 520, 'Sine.easeInOut')
+        gameEventBus.emit('city:tree-selected', target.data)
+      }),
       gameEventBus.on('city:focus-creator', () => {
         const creator = this.treeObjects.get('creator-ufc')
         if (!creator) return
         this.highlightSelectedTree(creator.id)
         this.cameras.main.pan(creator.worldX, creator.worldY - 30, 500, 'Sine.easeInOut')
         this.cameras.main.zoomTo(1.25, 500, 'Sine.easeInOut')
+        gameEventBus.emit('city:tree-selected', creator.data)
       }),
     )
 
@@ -302,6 +367,7 @@ export class CityScene extends Phaser.Scene {
     const timeSec = time / 1000
     const deltaSec = delta / 1000
 
+    this.handleKeyboardPan(deltaSec)
     this.snowSystem?.update(timeSec, deltaSec)
 
     // Alternate Christmas tree bulb phase every 720ms
@@ -315,6 +381,27 @@ export class CityScene extends Phaser.Scene {
     const lampPulse = 0.58 + 0.1 * Math.sin(timeSec * 2.5)
     for (const halo of this.lampGlows) {
       halo.setAlpha(lampPulse)
+    }
+  }
+
+  private handleKeyboardPan(deltaSec: number): void {
+    const activeTag = document.activeElement?.tagName
+    if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return
+
+    const cam = this.cameras.main
+    const panSpeed = 360 / cam.zoom
+    let vx = 0
+    let vy = 0
+
+    if (this.cursors?.left.isDown || this.wasdKeys?.a.isDown) vx -= 1
+    if (this.cursors?.right.isDown || this.wasdKeys?.d.isDown) vx += 1
+    if (this.cursors?.up.isDown || this.wasdKeys?.w.isDown) vy -= 1
+    if (this.cursors?.down.isDown || this.wasdKeys?.s.isDown) vy += 1
+
+    if (vx !== 0 || vy !== 0) {
+      const length = Math.hypot(vx, vy)
+      cam.scrollX += (vx / length) * panSpeed * deltaSec
+      cam.scrollY += (vy / length) * panSpeed * deltaSec
     }
   }
 }
