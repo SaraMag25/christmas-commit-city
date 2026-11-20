@@ -4,32 +4,32 @@ import type { TreePosition } from '../../types/city'
 export interface VillageBuildingPlacement {
   gridX: number
   gridY: number
-  variant: 'red' | 'pine'
+  variant: 'storybook' | 'mushroom-pine' | 'mushroom-red' | 'stump'
 }
 
 export interface VillageDecorationPlacement {
   gridX: number
   gridY: number
-  type: 'lamp' | 'snowman' | 'signpost' | 'gift-pile'
+  type: 'lamp' | 'snowman' | 'signpost' | 'gift-pile' | 'bench' | 'caretaker'
 }
 
 /**
- * Curated cottage placements along the snowy village lanes.
- * Each cottage spans 3x3 tiles anchored at top-left (gridX, gridY).
+ * Curated storybook cottage placements along the snowy village lanes.
+ * Each cottage spans roughly a 3x3 lot anchored along bottom-center.
  */
 export const VILLAGE_COTTAGES: readonly VillageBuildingPlacement[] = [
-  { gridX: 6, gridY: 5, variant: 'red' },
-  { gridX: 11, gridY: 5, variant: 'pine' },
-  { gridX: 22, gridY: 5, variant: 'red' },
-  { gridX: 27, gridY: 5, variant: 'pine' },
-  { gridX: 6, gridY: 16, variant: 'pine' },
-  { gridX: 28, gridY: 16, variant: 'red' },
-  { gridX: 11, gridY: 21, variant: 'red' },
-  { gridX: 23, gridY: 21, variant: 'pine' },
+  { gridX: 6, gridY: 5, variant: 'storybook' },
+  { gridX: 11, gridY: 5, variant: 'mushroom-pine' },
+  { gridX: 22, gridY: 5, variant: 'stump' },
+  { gridX: 27, gridY: 5, variant: 'mushroom-red' },
+  { gridX: 6, gridY: 16, variant: 'mushroom-pine' },
+  { gridX: 28, gridY: 16, variant: 'storybook' },
+  { gridX: 11, gridY: 21, variant: 'stump' },
+  { gridX: 23, gridY: 21, variant: 'mushroom-red' },
 ]
 
 export const VILLAGE_DECORATIONS: readonly VillageDecorationPlacement[] = [
-  // Central Plaza corners
+  // Central Plaza corner lanterns
   { gridX: 15, gridY: 11, type: 'lamp' },
   { gridX: 21, gridY: 11, type: 'lamp' },
   { gridX: 15, gridY: 16, type: 'lamp' },
@@ -39,8 +39,14 @@ export const VILLAGE_DECORATIONS: readonly VillageDecorationPlacement[] = [
   { gridX: 26, gridY: 13, type: 'lamp' },
   { gridX: 18, gridY: 8, type: 'lamp' },
   { gridX: 18, gridY: 20, type: 'lamp' },
-  // Festive snowmen & gifts
-  { gridX: 16, gridY: 12, type: 'snowman' },
+  // Cozy benches (inspired by ref_0 & ref_1)
+  { gridX: 16, gridY: 11, type: 'bench' },
+  { gridX: 20, gridY: 11, type: 'bench' },
+  { gridX: 6, gridY: 21, type: 'bench' },
+  // Cute winter caretaker NPC tending a pine sapling (inspired by ref_4)
+  { gridX: 19, gridY: 14, type: 'caretaker' },
+  // Festive snowmen, signs & gifts
+  { gridX: 16, gridY: 15, type: 'snowman' },
   { gridX: 20, gridY: 15, type: 'gift-pile' },
   { gridX: 17, gridY: 15, type: 'signpost' },
   { gridX: 9, gridY: 7, type: 'snowman' },
@@ -50,7 +56,6 @@ export const VILLAGE_DECORATIONS: readonly VillageDecorationPlacement[] = [
 
 /**
  * Curated non-overlapping plots for community developer trees.
- * Index 0 is reserved for neighbors near the plaza; subsequent trees expand outward.
  */
 export const CURATED_TREE_PLOTS: readonly TreePosition[] = [
   { gridX: 13, gridY: 11 },
@@ -69,16 +74,12 @@ export const CURATED_TREE_PLOTS: readonly TreePosition[] = [
   { gridX: 31, gridY: 10 },
   { gridX: 14, gridY: 18 },
   { gridX: 22, gridY: 18 },
-  { gridX: 5, gridY: 21 },
+  { gridX: 7, gridY: 22 },
   { gridX: 30, gridY: 21 },
   { gridX: 3, gridY: 12 },
   { gridX: 33, gridY: 12 },
 ]
 
-/**
- * Deterministic string hash used for giving every developer tree a distinct
- * visual identity and fallback plot coordinate when curated plots fill up.
- */
 export function hashUsername(username: string): number {
   let hash = 2166136261
   for (let i = 0; i < username.length; i += 1) {
@@ -107,5 +108,9 @@ export function isPlazaTile(gridX: number, gridY: number): boolean {
 }
 
 export function isFrozenPondTile(gridX: number, gridY: number): boolean {
-  return gridX >= 2 && gridX <= 5 && gridY >= 16 && gridY <= 18
+  return gridX >= 2 && gridX <= 5 && gridY >= 21 && gridY <= 23
+}
+
+export function isPierTile(gridX: number, gridY: number): boolean {
+  return (gridX === 4 || gridX === 5) && gridY === 22
 }

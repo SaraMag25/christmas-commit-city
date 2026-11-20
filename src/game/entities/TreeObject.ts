@@ -50,8 +50,8 @@ export class TreeObject {
     // Warm festive glow underneath illuminated & special trees
     if (treeData.tree_level >= 4 || treeData.is_creator_special) {
       this.glowSprite = scene.add
-        .image(worldX, worldY - 12 * pixelScale, 'deco-glow')
-        .setScale(treeData.is_creator_special ? pixelScale * 1.45 : pixelScale * 1.05)
+        .image(worldX, worldY - 16 * pixelScale, 'deco-glow')
+        .setScale(treeData.is_creator_special ? pixelScale * 1.55 : pixelScale * 1.15)
         .setAlpha(treeData.is_creator_special ? 0.8 : 0.55)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(worldY - 2)
@@ -117,7 +117,7 @@ export class TreeObject {
   private drawSelectionRing(color: number): void {
     this.selectionRing.clear()
     this.selectionRing.lineStyle(2, color, 0.95)
-    this.selectionRing.strokeEllipse(this.worldX, this.worldY - 4, 52, 20)
+    this.selectionRing.strokeEllipse(this.worldX, this.worldY - 4, 60, 22)
   }
 
   private drawGiftOrnaments(worldX: number, worldY: number, scale: number): void {

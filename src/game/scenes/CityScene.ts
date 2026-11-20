@@ -6,6 +6,7 @@ import { TreeObject } from '../entities/TreeObject'
 import { gameEventBus } from '../eventBus'
 import {
   isFrozenPondTile,
+  isPierTile,
   isPlazaTile,
   isRoadTile,
   VILLAGE_COTTAGES,
@@ -91,7 +92,9 @@ export class CityScene extends Phaser.Scene {
     for (let y = skyRows; y < rows; y += 1) {
       for (let x = 0; x < cols; x += 1) {
         let textureKey = (x + y) % 2 === 0 ? 'tile-snow-0' : 'tile-snow-1'
-        if (isFrozenPondTile(x, y)) {
+        if (isPierTile(x, y)) {
+          textureKey = 'tile-pier'
+        } else if (isFrozenPondTile(x, y)) {
           textureKey = 'tile-ice'
         } else if (isPlazaTile(x, y)) {
           textureKey = 'tile-plaza'
@@ -109,21 +112,27 @@ export class CityScene extends Phaser.Scene {
   }
 
   private drawCottagesAndDecorations(tileSize: number, pixelScale: number): void {
+    const cottageTextureMap = {
+      storybook: 'cottage-storybook',
+      'mushroom-pine': 'cottage-mushroom-pine',
+      'mushroom-red': 'cottage-mushroom-red',
+      stump: 'cottage-stump',
+    } as const
+
     VILLAGE_COTTAGES.forEach((cottage) => {
-      const wx = cottage.gridX * tileSize
-      const wy = cottage.gridY * tileSize
-      const key = cottage.variant === 'red' ? 'cottage-red' : 'cottage-pine'
-      const depth = wy + tileSize * 3
+      const centerX = (cottage.gridX + 1.5) * tileSize
+      const bottomY = (cottage.gridY + 3) * tileSize
+      const key = cottageTextureMap[cottage.variant]
 
-      this.add.image(wx, wy, key).setOrigin(0, 0).setScale(pixelScale).setDepth(depth)
+      this.add.image(centerX, bottomY, key).setOrigin(0.5, 1).setScale(pixelScale).setDepth(bottomY)
 
-      // Subtle warm glow radiating from cottage windows
+      // Subtle warm glow radiating from cottage doorway & yard lanterns
       this.add
-        .image(wx + tileSize * 1.5, wy + tileSize * 2.1, 'deco-glow')
-        .setScale(pixelScale * 1.35)
+        .image(centerX, bottomY - tileSize * 0.75, 'deco-glow')
+        .setScale(pixelScale * 1.45)
         .setAlpha(0.35)
         .setBlendMode(Phaser.BlendModes.ADD)
-        .setDepth(depth + 1)
+        .setDepth(bottomY + 1)
     })
 
     VILLAGE_DECORATIONS.forEach((deco) => {
@@ -144,6 +153,8 @@ export class CityScene extends Phaser.Scene {
           snowman: 'deco-snowman',
           signpost: 'deco-signpost',
           'gift-pile': 'deco-gift-pile',
+          bench: 'deco-bench',
+          caretaker: 'deco-caretaker',
         }
         this.add
           .image(cx, by, keyMap[deco.type])

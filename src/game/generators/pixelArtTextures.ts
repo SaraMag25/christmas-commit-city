@@ -72,6 +72,15 @@ const ICE_PALETTE: PaletteMap = {
   w: '#f8fafc',
 }
 
+const PIER_PALETTE: PaletteMap = {
+  a: '#38bdf8',
+  b: '#0284c7',
+  w: '#8c5835',
+  d: '#523018',
+  l: '#b57a4c',
+  s: '#f8fafc',
+}
+
 function generateGroundTextures(scene: Phaser.Scene): void {
   drawMatrix(
     scene,
@@ -192,81 +201,287 @@ function generateGroundTextures(scene: Phaser.Scene): void {
     ],
     ICE_PALETTE,
   )
+
+  drawMatrix(
+    scene,
+    'tile-pier',
+    [
+      'aaaaaaaaaaaaaaaa',
+      'aaaaaaaaaaaaaaaa',
+      'ssddddddddddddss',
+      'slllllllllllllls',
+      'dwwwwwwwwwwwwwwd',
+      'dwwdwwwdwwwdwwwd',
+      'llllllllllllllll',
+      'dwwwwwwwwwwwwwwd',
+      'dwwdwwwdwwwdwwwd',
+      'llllllllllllllll',
+      'dwwwwwwwwwwwwwwd',
+      'ssddddddddddddss',
+      'bbddddaaaaaddddb',
+      'bbddddaaaaaddddb',
+      'aaaaaaaaaaaaaaaa',
+      'aaaaaaaaaaaaaaaa',
+    ],
+    PIER_PALETTE,
+  )
 }
 
-function generateCottageTexture(
-  scene: Phaser.Scene,
-  key: string,
-  roofMain: string,
-  roofDark: string,
-): void {
-  // 48x48 pixel cozy Stardew-style winter cottage
-  createCanvasTexture(scene, key, 48, 48, (ctx) => {
+/**
+ * Storybook rounded shingle cottage (56x56) inspired by cozy fairy-tale cottages
+ * with arched wooden doorway, festive eaves garland, warm windows and twin yard lanterns.
+ */
+function generateStorybookCottage(scene: Phaser.Scene): void {
+  createCanvasTexture(scene, 'cottage-storybook', 56, 56, (ctx) => {
     const px = (x: number, y: number, w: number, h: number, color: string) => {
       ctx.fillStyle = color
-      ctx.fillRect(x, y, w, h)
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
     }
 
-    // Chimney on the right
-    px(33, 2, 7, 13, '#475569')
-    px(34, 3, 5, 11, '#64748b')
-    px(32, 1, 9, 2, '#f8fafc') // snow cap on chimney
+    // Winding stone chimney + snow cap
+    px(38, 4, 7, 15, '#3b2110')
+    px(39, 5, 5, 13, '#64748b')
+    px(37, 3, 9, 2, '#f8fafc')
 
-    // Pitched snowy roof (rows 5..24)
-    for (let row = 0; row < 20; row += 1) {
-      const inset = Math.max(0, 16 - row)
-      const width = 48 - inset * 2
-      px(inset, 5 + row, width, 1, row % 3 === 0 ? roofDark : roofMain)
+    // Rounded bell-shaped shingle roof (rows 6..28)
+    for (let r = 0; r < 23; r += 1) {
+      const curve = Math.pow((22 - r) / 22, 1.35)
+      const hw = Math.round(25 - curve * 19)
+      const left = 28 - hw
+      const width = hw * 2
+      px(left - 1, 6 + r, width + 2, 1, '#45120b')
+      const rowCol = r % 4 === 0 ? '#9a2a1e' : r % 2 === 0 ? '#c2412d' : '#dc5b3e'
+      px(left, 6 + r, width, 1, rowCol)
+      // Shingle staggered highlights
+      for (let sx = left + (r % 2) * 3; sx < left + width - 2; sx += 5) {
+        px(sx, 6 + r, 2, 1, r % 4 === 0 ? '#7c1d13' : '#e87a54')
+      }
     }
-    // Snow trim along roof ridge & eaves
-    px(16, 5, 16, 2, '#f8fafc')
-    px(14, 7, 4, 2, '#e2e8f0')
-    px(30, 7, 4, 2, '#e2e8f0')
-    px(0, 23, 48, 3, '#f8fafc')
-    px(0, 26, 48, 1, '#cbd5e1')
+    // Snow cap at roof crest & scalloped snowy eaves
+    px(22, 5, 12, 2, '#f8fafc')
+    px(20, 7, 4, 2, '#e2e8f0')
+    px(32, 7, 4, 2, '#e2e8f0')
+    px(2, 27, 52, 3, '#f8fafc')
+    px(3, 30, 50, 1, '#cbd5e1')
 
-    // Wooden log cabin walls
-    px(4, 27, 40, 18, '#6b4226')
-    px(4, 27, 40, 2, '#4a2c18')
-    px(4, 43, 40, 2, '#3b2110')
-    // Log beams
-    for (let y = 30; y <= 41; y += 3) {
-      px(4, y, 40, 1, '#523018')
+    // Dormer window in roof
+    px(23, 13, 10, 9, '#45120b')
+    px(24, 14, 8, 7, '#fef3c7')
+    px(25, 15, 6, 5, '#fbbf24')
+    px(27, 15, 2, 5, '#523018')
+    px(22, 12, 12, 2, '#f8fafc')
+
+    // Warm cream & timber walls
+    px(8, 30, 40, 20, '#4a2c18')
+    px(9, 31, 38, 18, '#f5e6d3')
+    px(9, 31, 5, 18, '#e5ceb4')
+    px(42, 31, 5, 18, '#e5ceb4')
+    px(9, 31, 38, 2, '#6b4226')
+
+    // Arched storybook door + wreath
+    px(13, 35, 12, 14, '#4a2c18')
+    px(14, 34, 10, 1, '#4a2c18')
+    px(15, 35, 8, 14, '#7c4d2b')
+    px(16, 36, 6, 13, '#9c6644')
+    px(18, 37, 1, 12, '#6b4226')
+    px(20, 42, 1, 2, '#fbbf24') // doorknob
+    px(17, 38, 4, 3, '#15803d') // wreath
+    px(18, 39, 2, 1, '#dc2626')
+
+    // Cozy glowing bay window on the right
+    px(30, 35, 13, 10, '#4a2c18')
+    px(31, 36, 11, 8, '#fbbf24')
+    px(32, 37, 9, 6, '#fef08a')
+    px(36, 36, 1, 8, '#523018')
+    px(31, 39, 11, 1, '#523018')
+    px(29, 45, 15, 2, '#f8fafc') // snow window box
+
+    // Ivy & Christmas flower garland draping on left roof
+    for (const [gx, gy, col] of [
+      [8, 20, '#166534'],
+      [9, 21, '#22c55e'],
+      [11, 22, '#166534'],
+      [10, 23, '#f472b6'],
+      [13, 24, '#22c55e'],
+      [14, 25, '#dc2626'],
+      [16, 26, '#166534'],
+      [42, 23, '#166534'],
+      [43, 25, '#dc2626'],
+    ] as const) {
+      px(gx, gy, 2, 2, col)
     }
-    // Corner posts
-    px(4, 27, 3, 18, '#3b2110')
-    px(41, 27, 3, 18, '#3b2110')
 
-    // Cozy front door + Christmas wreath
-    px(20, 31, 8, 14, '#3b2110')
-    px(21, 32, 6, 13, '#8c5835')
-    px(25, 38, 1, 2, '#fbbf24') // brass handle
-    // Mini wreath on door
-    px(22, 34, 4, 3, '#15803d')
-    px(23, 35, 2, 1, '#dc2626')
-
-    // Left & right warm glowing windows
-    const drawWindow = (wx: number, wy: number) => {
-      px(wx, wy, 9, 8, '#3b2110')
-      px(wx + 1, wy + 1, 7, 6, '#fbbf24')
-      px(wx + 2, wy + 2, 5, 4, '#fef08a')
-      px(wx + 4, wy + 1, 1, 6, '#523018')
-      px(wx + 1, wy + 3, 7, 1, '#523018')
-      // Snow sill
-      px(wx - 1, wy + 8, 11, 2, '#f8fafc')
+    // Cobblestone doorstep & snow base + twin warm garden lanterns
+    px(12, 49, 14, 4, '#94a3b8')
+    px(14, 50, 10, 3, '#cbd5e1')
+    px(4, 49, 8, 3, '#f8fafc')
+    px(44, 49, 8, 3, '#f8fafc')
+    // Left & right mini fairy lanterns
+    for (const lx of [6, 48]) {
+      px(lx, 44, 1, 6, '#4a2c18')
+      px(lx - 1, 41, 3, 3, '#fef08a')
+      px(lx, 42, 1, 1, '#ffffff')
     }
-    drawWindow(9, 31)
-    drawWindow(30, 31)
+  })
+}
 
-    // Snow drift at base
-    px(2, 44, 16, 3, '#f8fafc')
-    px(30, 44, 16, 3, '#f8fafc')
-    px(19, 45, 10, 2, '#94a3b8') // stone doorstep
+/**
+ * Woodland mushroom-roof winter cottage (56x56) directly inspired by PIXEL MUSHROOM HOUSE.jpeg
+ * with curved spotted pine/cranberry cap, twisting vine chimney and twin glowing lanterns.
+ */
+function generateMushroomCottage(scene: Phaser.Scene, key: string, capMain: string, capDark: string, capSpot: string): void {
+  createCanvasTexture(scene, key, 56, 56, (ctx) => {
+    const px = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
+    }
+
+    // Curved twisting wooden chimney with festive vine & berries
+    px(36, 4, 7, 13, '#4a2c18')
+    px(37, 5, 5, 11, '#8c5835')
+    px(38, 6, 3, 9, '#b57a4c')
+    px(35, 3, 9, 2, '#f8fafc')
+    px(36, 8, 6, 1, '#15803d')
+    px(37, 12, 6, 1, '#15803d')
+    px(35, 7, 2, 2, '#dc2626')
+    px(42, 11, 2, 2, '#fbbf24')
+
+    // Mushroom cap dome (rows 9..30)
+    for (let r = 0; r < 22; r += 1) {
+      const t = r / 21
+      const hw = Math.round(6 + Math.sin(t * Math.PI * 0.68) * 20)
+      const left = 28 - hw
+      const width = hw * 2
+      px(left - 1, 9 + r, width + 2, 1, '#091f17')
+      px(left, 9 + r, width, 1, r > 17 ? capDark : capMain)
+    }
+    // Snow patches / toadstool spots on the mushroom cap
+    for (const [sx, sy, sw, sh] of [
+      [23, 12, 5, 4],
+      [13, 18, 4, 3],
+      [33, 17, 5, 4],
+      [24, 21, 6, 4],
+      [8, 24, 4, 3],
+      [42, 23, 4, 3],
+    ] as const) {
+      px(sx, sy, sw, sh, capSpot)
+      px(sx + 1, sy, Math.max(1, sw - 2), 1, '#ffffff')
+    }
+    // Scalloped snow rim on cap bottom
+    px(3, 29, 50, 2, '#f8fafc')
+
+    // Rounded warm cottage stem walls
+    px(10, 31, 36, 19, '#4a2c18')
+    px(11, 31, 34, 18, '#d4b483')
+    px(11, 31, 4, 18, '#b59461')
+    px(41, 31, 4, 18, '#b59461')
+
+    // Wide arched woodland green/wood plank door
+    px(21, 35, 14, 14, '#1e3a24')
+    px(22, 34, 12, 1, '#1e3a24')
+    px(23, 35, 10, 14, '#2d5a36')
+    px(25, 35, 1, 14, '#1e3a24')
+    px(28, 35, 1, 14, '#1e3a24')
+    px(31, 35, 1, 14, '#1e3a24')
+    px(27, 42, 2, 2, '#fbbf24')
+
+    // Glowing round cabin window
+    px(13, 36, 6, 6, '#3b2110')
+    px(14, 37, 4, 4, '#fef08a')
+    px(15, 37, 1, 4, '#523018')
+    px(14, 38, 4, 1, '#523018')
+
+    // Hanging festive vines & lights
+    for (const [vx, vy, col] of [
+      [5, 31, '#22c55e'],
+      [6, 33, '#fbbf24'],
+      [49, 31, '#22c55e'],
+      [48, 33, '#dc2626'],
+    ] as const) {
+      px(vx, vy, 2, 2, col)
+    }
+
+    // Twin glowing garden lanterns + stone stepping path
+    px(22, 49, 12, 5, '#78716c')
+    px(23, 50, 10, 3, '#a8a29e')
+    for (const lx of [14, 41]) {
+      px(lx, 44, 1, 6, '#3b2110')
+      px(lx - 1, 41, 3, 3, '#fef08a')
+      px(lx, 42, 1, 1, '#ffffff')
+    }
+    // Snowy bushes flanking entrance
+    px(5, 47, 11, 4, '#166534')
+    px(6, 46, 9, 2, '#f8fafc')
+    px(40, 47, 11, 4, '#166534')
+    px(41, 46, 9, 2, '#f8fafc')
+  })
+}
+
+/**
+ * Giant snowy tree-stump cabin (56x56) inspired by jpeg(5) stump house.
+ */
+function generateStumpCabin(scene: Phaser.Scene): void {
+  createCanvasTexture(scene, 'cottage-stump', 56, 56, (ctx) => {
+    const px = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
+    }
+
+    // Snow-topped wood-grain stump top (y = 14..22)
+    px(14, 14, 28, 8, '#3b2110')
+    px(15, 15, 26, 6, '#e2e8f0')
+    px(17, 16, 22, 4, '#f8fafc')
+    // Jagged bark rim sticking up
+    px(13, 12, 3, 6, '#6b4226')
+    px(39, 11, 4, 7, '#6b4226')
+    px(25, 10, 3, 5, '#523018')
+
+    // Flared tree trunk walls (y = 21..50)
+    for (let r = 0; r < 30; r += 1) {
+      const flare = Math.max(0, Math.floor((r - 16) / 2))
+      const left = 13 - flare
+      const width = 30 + flare * 2
+      px(left - 1, 21 + r, width + 2, 1, '#261409')
+      px(left, 21 + r, width, 1, '#6b4226')
+      for (let bx = left + 3; bx < left + width - 3; bx += 5) {
+        px(bx, 21 + r, 2, 1, '#523018')
+      }
+    }
+
+    // Glowing four-pane window on left
+    px(16, 29, 10, 10, '#3b2110')
+    px(17, 30, 8, 8, '#fbbf24')
+    px(18, 31, 6, 6, '#fef08a')
+    px(20, 30, 2, 8, '#523018')
+    px(17, 33, 8, 2, '#523018')
+    px(15, 39, 12, 2, '#f8fafc')
+
+    // Arched honey-wood door on right
+    px(30, 32, 11, 17, '#3b2110')
+    px(31, 31, 9, 1, '#3b2110')
+    px(32, 32, 7, 17, '#d97706')
+    px(33, 33, 5, 16, '#fbbf24')
+    px(37, 40, 1, 2, '#78350f')
+    // Mini wreath
+    px(34, 35, 3, 3, '#15803d')
+    px(35, 36, 1, 1, '#dc2626')
+
+    // Cute snowy shelf mushrooms on bark
+    px(9, 34, 5, 3, '#f8fafc')
+    px(10, 36, 3, 1, '#cbd5e1')
+    px(42, 29, 5, 3, '#f8fafc')
+    px(43, 31, 3, 1, '#cbd5e1')
+
+    // Stepping stone path & snow mounds
+    px(29, 49, 13, 4, '#94a3b8')
+    px(31, 50, 9, 2, '#cbd5e1')
+    px(5, 48, 12, 4, '#f8fafc')
+    px(42, 48, 9, 4, '#f8fafc')
   })
 }
 
 function generateDecorTextures(scene: Phaser.Scene): void {
-  // Streetlamp (16x28)
+  // Vintage glowing streetlamp (16x28)
   createCanvasTexture(scene, 'deco-lamp', 16, 28, (ctx) => {
     const px = (x: number, y: number, w: number, h: number, color: string) => {
       ctx.fillStyle = color
@@ -278,7 +493,56 @@ function generateDecorTextures(scene: Phaser.Scene): void {
     px(4, 2, 8, 6, '#475569')
     px(5, 3, 6, 4, '#fbbf24')
     px(6, 4, 4, 2, '#fef08a')
-    px(5, 1, 6, 1, '#f8fafc') // snow on top
+    px(5, 1, 6, 1, '#f8fafc')
+  })
+
+  // Cozy wooden park bench (24x16) inspired by ref_0 & ref_1
+  createCanvasTexture(scene, 'deco-bench', 24, 16, (ctx) => {
+    const px = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color
+      ctx.fillRect(x, y, w, h)
+    }
+    // Shadow
+    px(3, 14, 18, 2, 'rgba(15, 23, 42, 0.3)')
+    // Iron legs
+    px(4, 9, 2, 6, '#1e293b')
+    px(18, 9, 2, 6, '#1e293b')
+    // Backrest wooden slats + snow dusting
+    px(2, 4, 20, 2, '#6b4226')
+    px(2, 7, 20, 2, '#8c5835')
+    px(3, 3, 18, 1, '#f8fafc')
+    // Seat planks
+    px(2, 10, 20, 2, '#b57a4c')
+    px(2, 12, 20, 1, '#4a2c18')
+  })
+
+  // Cute winter caretaker NPC with potted pine sapling (20x24) inspired by ref_4
+  createCanvasTexture(scene, 'deco-caretaker', 20, 24, (ctx) => {
+    const px = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color
+      ctx.fillRect(x, y, w, h)
+    }
+    // Shadow
+    px(4, 21, 12, 2, 'rgba(15, 23, 42, 0.3)')
+    // Cozy pointed winter hat (warm wood/gold tone with white trim)
+    px(8, 2, 4, 2, '#f8fafc')
+    px(6, 4, 8, 3, '#b91c1c')
+    px(4, 7, 12, 2, '#f8fafc')
+    // Face & rosy cheeks
+    px(5, 9, 10, 5, '#fde68a')
+    px(7, 10, 1, 2, '#1e0f07')
+    px(12, 10, 1, 2, '#1e0f07')
+    px(6, 12, 1, 1, '#fb7185')
+    px(13, 12, 1, 1, '#fb7185')
+    // Cozy green coat & red scarf
+    px(6, 14, 8, 2, '#dc2626')
+    px(5, 16, 10, 4, '#15803d')
+    px(6, 20, 3, 2, '#4a2c18')
+    px(11, 20, 3, 2, '#4a2c18')
+    // Mini potted pine beside caretaker
+    px(15, 19, 4, 3, '#9a3412')
+    px(15, 16, 4, 3, '#166534')
+    px(16, 14, 2, 2, '#22c55e')
   })
 
   // Cute Snowman (16x20)
@@ -290,18 +554,14 @@ function generateDecorTextures(scene: Phaser.Scene): void {
     px(4, 18, 8, 2, '#cbd5e1')
     px(4, 11, 8, 7, '#f8fafc')
     px(5, 5, 6, 6, '#f8fafc')
-    // Top hat
     px(4, 4, 8, 1, '#1e293b')
     px(5, 1, 6, 3, '#1e293b')
     px(5, 3, 6, 1, '#dc2626')
-    // Eyes & carrot nose
     px(6, 7, 1, 1, '#0f172a')
     px(9, 7, 1, 1, '#0f172a')
     px(7, 8, 3, 1, '#f97316')
-    // Red scarf
     px(5, 10, 6, 2, '#dc2626')
     px(9, 12, 2, 3, '#b91c1c')
-    // Buttons
     px(7, 13, 1, 1, '#1e293b')
     px(7, 15, 1, 1, '#1e293b')
   })
@@ -325,15 +585,12 @@ function generateDecorTextures(scene: Phaser.Scene): void {
       ctx.fillStyle = color
       ctx.fillRect(x, y, w, h)
     }
-    // Red box
     px(2, 8, 7, 6, '#dc2626')
     px(5, 8, 1, 6, '#fbbf24')
     px(2, 10, 7, 1, '#fbbf24')
-    // Green box
     px(8, 9, 6, 5, '#15803d')
     px(10, 9, 2, 5, '#f8fafc')
     px(8, 11, 6, 1, '#f8fafc')
-    // Small gold box on top
     px(5, 4, 5, 4, '#f59e0b')
     px(7, 4, 1, 4, '#b91c1c')
   })
@@ -341,14 +598,13 @@ function generateDecorTextures(scene: Phaser.Scene): void {
   // Warm Radial Pixel Glow (32x32)
   createCanvasTexture(scene, 'deco-glow', 32, 32, (ctx) => {
     const gradient = ctx.createRadialGradient(16, 16, 1, 16, 16, 16)
-    gradient.addColorStop(0, 'rgba(253, 224, 71, 0.55)')
-    gradient.addColorStop(0.45, 'rgba(251, 191, 36, 0.22)')
+    gradient.addColorStop(0, 'rgba(253, 224, 71, 0.58)')
+    gradient.addColorStop(0.45, 'rgba(251, 191, 36, 0.24)')
     gradient.addColorStop(1, 'rgba(251, 191, 36, 0)')
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, 32, 32)
   })
 
-  // Snow particle (2x2 pixel snowflake)
   createCanvasTexture(scene, 'particle-snow', 2, 2, (ctx) => {
     ctx.fillStyle = '#f8fafc'
     ctx.fillRect(0, 0, 2, 2)
@@ -364,46 +620,51 @@ export interface TreeTextureOptions {
 }
 
 /**
- * Procedurally draws a crisp 32x48 pixel-art Christmas tree whose tiers, branches,
- * ornaments, lights, star, gifts and aura scale directly with its commit stage.
+ * Draws a 40x56 storybook pixel-art Christmas tree combining organic leaf-cluster
+ * foliage, textured bark roots, snow tufts, twinkling `+` sparkles, ornaments and gifts.
  */
 export function ensureTreeTexture(scene: Phaser.Scene, opts: TreeTextureOptions): void {
   const { key, level, seed, isCreatorSpecial = false, lightsPhase } = opts
-  createCanvasTexture(scene, key, 32, 48, (ctx) => {
+  createCanvasTexture(scene, key, 40, 56, (ctx) => {
     const px = (x: number, y: number, w: number, h: number, color: string) => {
       ctx.fillStyle = color
       ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
     }
 
-    // Subtle per-user foliage variation (pine emerald vs classic spruce)
+    const cx = 20
     const isCoolSpruce = !isCreatorSpecial && seed % 3 === 0
     const pineOutline = '#071c15'
     const pineDark = isCreatorSpecial ? '#0c3b2e' : isCoolSpruce ? '#0f302b' : '#0f2e24'
-    const pineMid = isCreatorSpecial ? '#155e49' : isCoolSpruce ? '#164d44' : '#174636'
-    const pineBright = isCreatorSpecial ? '#228b6d' : isCoolSpruce ? '#1f6a5c' : '#22664d'
+    const pineMid = isCreatorSpecial ? '#16654e' : isCoolSpruce ? '#175249' : '#184b39'
+    const pineBright = isCreatorSpecial ? '#249473' : isCoolSpruce ? '#247868' : '#267355'
+    const pineTip = isCreatorSpecial ? '#5eead4' : '#6ee7b7'
 
-    // Ground snow shadow ellipse at base (y = 43..46)
-    px(9, 44, 14, 2, 'rgba(15, 23, 42, 0.35)')
-    px(11, 43, 10, 3, 'rgba(15, 23, 42, 0.25)')
+    // Soft snow shadow underneath roots
+    px(10, 51, 20, 3, 'rgba(15, 23, 42, 0.34)')
+    px(13, 50, 14, 4, 'rgba(15, 23, 42, 0.24)')
 
-    // Special Aura for level 6 or Creator Tree
+    // Festive ground aura for stage 6 or Creator Special Tree
     if (level >= 6 || isCreatorSpecial) {
       const auraColor = isCreatorSpecial
-        ? 'rgba(56, 189, 248, 0.18)'
-        : 'rgba(251, 191, 36, 0.16)'
-      px(6, 12, 20, 32, auraColor)
-      px(4, 18, 24, 22, auraColor)
+        ? 'rgba(56, 189, 248, 0.16)'
+        : 'rgba(251, 191, 36, 0.15)'
+      px(7, 14, 26, 37, auraColor)
+      px(4, 22, 32, 24, auraColor)
     }
 
-    // Trunk height & width grow with stage
-    const trunkWidth = level >= 4 ? 4 : 2
-    const trunkX = 16 - trunkWidth / 2
-    const trunkHeight = level === 0 ? 4 : level <= 2 ? 5 : 6
-    const baseY = 44
-    px(trunkX - 1, baseY - trunkHeight, trunkWidth + 2, trunkHeight, '#261409')
-    px(trunkX, baseY - trunkHeight, trunkWidth, trunkHeight, '#6b4226')
+    // Textured bark trunk with flared storybook roots
+    const trunkW = level >= 4 ? 4 : 2
+    const trunkH = level === 0 ? 5 : level <= 2 ? 6 : 7
+    const baseY = 52
+    px(cx - trunkW / 2 - 1, baseY - trunkH, trunkW + 2, trunkH, '#261409')
+    px(cx - trunkW / 2, baseY - trunkH, trunkW, trunkH, '#6b4226')
+    px(cx - trunkW / 2, baseY - trunkH + 1, 1, trunkH - 1, '#8c5835')
+    if (level >= 3 || isCreatorSpecial) {
+      // Root flares
+      px(cx - trunkW / 2 - 2, baseY - 2, 2, 2, '#4a2c18')
+      px(cx + trunkW / 2, baseY - 2, 2, 2, '#4a2c18')
+    }
 
-    // Tiers configuration per level
     const tierCountByLevel: Record<TreeLevelId, number> = {
       0: 2,
       1: 3,
@@ -414,35 +675,40 @@ export function ensureTreeTexture(scene: Phaser.Scene, opts: TreeTextureOptions)
       6: 6,
     }
     const tiers = isCreatorSpecial ? 6 : tierCountByLevel[level]
-    const treeBottomY = baseY - trunkHeight + 1
-    const tierHeight = level === 0 ? 5 : level <= 2 ? 6 : 6
-    const maxHalfWidth = level === 0 ? 5 : level === 1 ? 7 : level === 2 ? 9 : level <= 4 ? 11 : 13
+    const treeBottomY = baseY - trunkH + 1
+    const tierHeight = level === 0 ? 5 : 6
+    const maxHalfW =
+      level === 0 ? 6 : level === 1 ? 8 : level === 2 ? 10 : level <= 4 ? 13 : 15
 
-    // Draw pine tiers from bottom to top
+    // Organic scalloped foliage tiers with leaf-cluster texture
     for (let t = 0; t < tiers; t += 1) {
       const progress = t / Math.max(1, tiers - 1)
       const tierBaseY = treeBottomY - t * (tierHeight - 1)
-      const tierHalfW = Math.max(2, Math.round(maxHalfWidth * (1 - progress * 0.72)))
+      const tierHalfW = Math.max(2, Math.round(maxHalfW * (1 - progress * 0.7)))
 
       for (let row = 0; row < tierHeight; row += 1) {
         const y = tierBaseY - row
         const rowShrink = Math.floor((row / tierHeight) * (tierHalfW - 1))
-        const hw = Math.max(1, tierHalfW - rowShrink)
-        const left = 16 - hw
+        const scalloped = row === 0 ? 1 : 0
+        const hw = Math.max(1, tierHalfW - rowShrink + scalloped)
+        const left = cx - hw
         const width = hw * 2
 
-        // Outline + dark core + mid foliage + sunny left highlight
         px(left - 1, y, width + 2, 1, pineOutline)
         px(left, y, width, 1, pineDark)
         if (width >= 4) {
           px(left + 1, y, width - 2, 1, pineMid)
         }
+        // Dappled sunlit pine cluster highlights (inspired by ref_0)
         if (width >= 6 && row >= 1) {
-          px(left + 1, y, Math.max(2, Math.floor(width * 0.35)), 1, pineBright)
+          px(left + 1, y, Math.max(2, Math.floor(width * 0.36)), 1, pineBright)
+          if ((t + row + seed) % 2 === 0 && width >= 10) {
+            px(left + 3, y, 2, 1, pineTip)
+          }
         }
-        // Subtle snow edge on outer tips
+        // Snow tufts along branch undersides/tips
         if (row === 0 && width >= 6) {
-          px(left, y, 2, 1, '#e2e8f0')
+          px(left, y, 2, 1, '#f8fafc')
           px(left + width - 2, y, 2, 1, '#cbd5e1')
         }
       }
@@ -455,13 +721,13 @@ export function ensureTreeTexture(scene: Phaser.Scene, opts: TreeTextureOptions)
       const ornamentColors = isCreatorSpecial
         ? ['#fbbf24', '#38bdf8', '#f8fafc', '#f43f5e']
         : ['#dc2626', '#fbbf24', '#38bdf8', '#f472b6']
-      const ornamentCount = Math.min(14, level * 2 + 2)
+      const ornamentCount = Math.min(16, level * 2 + 2)
       for (let i = 0; i < ornamentCount; i += 1) {
         const h = (seed + i * 37) % 100
         const tierIdx = i % Math.max(1, tiers - 1)
         const ty = treeBottomY - 2 - tierIdx * (tierHeight - 1)
-        const spread = Math.max(2, Math.floor(maxHalfWidth * (1 - tierIdx * 0.18)) - 2)
-        const ox = 16 + ((h % (spread * 2 + 1)) - spread)
+        const spread = Math.max(2, Math.floor(maxHalfW * (1 - tierIdx * 0.18)) - 2)
+        const ox = cx + ((h % (spread * 2 + 1)) - spread)
         const color = ornamentColors[(seed + i) % ornamentColors.length]
         px(ox, ty, 1, 1, color)
         if (level >= 3 && i % 3 === 0) {
@@ -475,57 +741,56 @@ export function ensureTreeTexture(scene: Phaser.Scene, opts: TreeTextureOptions)
       const garlandColor = isCreatorSpecial ? '#fde047' : '#fca5a5'
       for (let t = 0; t < tiers - 1; t += 1) {
         const gy = treeBottomY - 1 - t * (tierHeight - 1)
-        const span = Math.max(2, Math.floor(maxHalfWidth * (1 - t * 0.2)) - 2)
+        const span = Math.max(2, Math.floor(maxHalfW * (1 - t * 0.2)) - 2)
         for (let dx = -span; dx <= span; dx += 2) {
-          px(16 + dx, gy - (Math.abs(dx) % 2), 1, 1, garlandColor)
+          px(cx + dx, gy - (Math.abs(dx) % 2), 1, 1, garlandColor)
         }
       }
     }
 
-    // Twinkling lights from level 4+
+    // Twinkling `+` & single-pixel lights from level 4+
     if (level >= 4 || isCreatorSpecial) {
       const bulbColorsA = ['#fef08a', '#38bdf8', '#f87171', '#4ade80']
       const bulbColorsB = ['#f59e0b', '#f8fafc', '#f472b6', '#60a5fa']
       for (let t = 0; t < tiers; t += 1) {
         const ly = treeBottomY - 2 - t * (tierHeight - 1)
-        const span = Math.max(1, Math.floor(maxHalfWidth * (1 - t * 0.2)) - 2)
+        const span = Math.max(1, Math.floor(maxHalfW * (1 - t * 0.2)) - 2)
         for (let dx = -span; dx <= span; dx += 3) {
           const isSetA = (dx + t) % 2 === 0
           const isLit = (isSetA && lightsPhase === 0) || (!isSetA && lightsPhase === 1)
           const color = isLit
             ? (lightsPhase === 0 ? bulbColorsA : bulbColorsB)[Math.abs(dx + t) % 4]
             : '#475569'
-          px(16 + dx, ly, 1, 1, color)
+          px(cx + dx, ly, 1, 1, color)
         }
       }
     }
 
-    // Topper: gold tip on level 4, golden star on level 5-6 & Creator
+    // Topper: gold tip on level 4, radiant star on level 5-6 & Creator
     if (level === 4 && !isCreatorSpecial) {
-      px(15, topTipY - 1, 2, 2, '#fbbf24')
+      px(cx - 1, topTipY - 1, 2, 2, '#fbbf24')
     } else if (level >= 5 || isCreatorSpecial) {
       const starMain = lightsPhase === 0 ? '#fbbf24' : '#fef08a'
-      const starCore = '#fffbeb'
-      px(15, topTipY - 4, 2, 5, starMain)
-      px(13, topTipY - 2, 6, 1, starMain)
-      px(14, topTipY - 3, 4, 3, starMain)
-      px(15, topTipY - 2, 2, 1, starCore)
+      px(cx - 1, topTipY - 4, 2, 5, starMain)
+      px(cx - 3, topTipY - 2, 6, 1, starMain)
+      px(cx - 2, topTipY - 3, 4, 3, starMain)
+      px(cx - 1, topTipY - 2, 2, 1, '#fffbeb')
       if (isCreatorSpecial) {
-        // Extra halo pixel sparkles around the creator star
-        px(12, topTipY - 4, 1, 1, '#7dd3fc')
-        px(19, topTipY - 4, 1, 1, '#7dd3fc')
+        // `+`-shaped fairy sparkles inspired by ref_0
+        px(cx - 5, topTipY - 4, 1, 1, '#7dd3fc')
+        px(cx + 4, topTipY - 4, 1, 1, '#7dd3fc')
       }
     }
 
-    // Wrapped gifts at tree base on level 5-6 & Creator
+    // Wrapped gifts stacked beneath tree on level 5-6 & Creator
     if (level >= 5 || isCreatorSpecial) {
-      px(9, 41, 4, 4, '#dc2626')
-      px(10, 41, 1, 4, '#fbbf24')
-      px(19, 42, 4, 3, '#2563eb')
-      px(20, 42, 1, 3, '#f8fafc')
+      px(cx - 8, 49, 4, 4, '#dc2626')
+      px(cx - 7, 49, 1, 4, '#fbbf24')
+      px(cx + 4, 50, 4, 3, '#2563eb')
+      px(cx + 5, 50, 1, 3, '#f8fafc')
       if (level >= 6 || isCreatorSpecial) {
-        px(14, 42, 3, 3, '#f59e0b')
-        px(15, 42, 1, 3, '#b91c1c')
+        px(cx - 2, 50, 4, 3, '#f59e0b')
+        px(cx - 1, 50, 1, 3, '#b91c1c')
       }
     }
   })
@@ -533,7 +798,9 @@ export function ensureTreeTexture(scene: Phaser.Scene, opts: TreeTextureOptions)
 
 export function generateAllVillageTextures(scene: Phaser.Scene): void {
   generateGroundTextures(scene)
-  generateCottageTexture(scene, 'cottage-red', '#991b1b', '#7f1d1d')
-  generateCottageTexture(scene, 'cottage-pine', '#166534', '#14532d')
+  generateStorybookCottage(scene)
+  generateMushroomCottage(scene, 'cottage-mushroom-pine', '#166534', '#14532d', '#e2e8f0')
+  generateMushroomCottage(scene, 'cottage-mushroom-red', '#991b1b', '#7f1d1d', '#fef3c7')
+  generateStumpCabin(scene)
   generateDecorTextures(scene)
 }
