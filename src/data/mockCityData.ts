@@ -313,13 +313,6 @@ export const MOCK_TREE_MESSAGES: readonly TreeMessage[] = [
   },
 ]
 
-export function getTreeByUsername(username: string): CityTree | undefined {
-  const normalized = username.trim().toLowerCase()
-  return MOCK_CITY_TREES.find(
-    (tree) => tree.profile.github_username.toLowerCase() === normalized,
-  )
-}
-
 export function getMessagesByTreeId(treeId: string): TreeMessage[] {
   return MOCK_TREE_MESSAGES.filter((msg) => msg.tree_id === treeId)
 }

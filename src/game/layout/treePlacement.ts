@@ -89,6 +89,36 @@ export function hashUsername(username: string): number {
   return hash >>> 0
 }
 
+/**
+ * Allocates the next free non-overlapping plot in the village for a newly
+ * authenticated developer, starting with curated garden plots and expanding
+ * deterministically around the town if all curated plots are occupied.
+ */
+export function allocateTreePosition(
+  occupiedPositions: readonly TreePosition[],
+  username: string,
+): TreePosition {
+  const isOccupied = (x: number, y: number) =>
+    occupiedPositions.some((pos) => Math.abs(pos.gridX - x) <= 1 && Math.abs(pos.gridY - y) <= 1)
+
+  for (const slot of CURATED_TREE_PLOTS) {
+    if (!isOccupied(slot.gridX, slot.gridY)) {
+      return slot
+    }
+  }
+
+  const seed = hashUsername(username)
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const gx = 3 + ((seed + attempt * 5) % (CITY_MAP_CONFIG.cols - 6))
+    const gy = CITY_MAP_CONFIG.skyRows + 2 + ((seed + attempt * 7) % (CITY_MAP_CONFIG.rows - 6))
+    if (!isRoadTile(gx, gy) && !isPlazaTile(gx, gy) && !isFrozenPondTile(gx, gy) && !isOccupied(gx, gy)) {
+      return { gridX: gx, gridY: gy }
+    }
+  }
+
+  return { gridX: 4, gridY: 11 }
+}
+
 export function isRoadTile(gridX: number, gridY: number): boolean {
   const isMainHorizontal = (gridY === 13 || gridY === 14) && gridX >= 2 && gridX <= 33
   const isMainVertical = gridX === 18 && gridY >= 5 && gridY <= 23

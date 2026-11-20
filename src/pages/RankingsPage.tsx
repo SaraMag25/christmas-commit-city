@@ -3,9 +3,10 @@ import { Compass, Flame, Gift, GitCommit, Sparkles, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AvatarBadge } from '../components/common/AvatarBadge'
 import { SubpageLayout } from '../components/layout/SubpageLayout'
-import { STANDARD_CONTRIBUTION_YEAR } from '../config/pixCampaign'
+import { STANDARD_CONTRIBUTION_YEAR } from '../config/githubPeriod'
 import { resolveTreeStage } from '../config/treeLevels'
-import { computeTreeDecorationScore, MOCK_CITY_TREES } from '../data/mockCityData'
+import { useCity } from '../context/cityContextStore'
+import { computeTreeDecorationScore } from '../data/mockCityData'
 import type { CityTree } from '../types/city'
 
 type RankingCategory = 'contributions' | 'gifts' | 'active' | 'decorated'
@@ -75,10 +76,11 @@ function sortTreesByCategory(
 }
 
 export function RankingsPage() {
+  const { trees } = useCity()
   const [activeTab, setActiveTab] = useState<RankingCategory>('contributions')
   const currentMeta = RANKING_TABS.find((t) => t.id === activeTab) ?? RANKING_TABS[0]
 
-  const sortedTrees = sortTreesByCategory(MOCK_CITY_TREES, activeTab)
+  const sortedTrees = sortTreesByCategory(trees, activeTab)
 
   const renderTabIcon = (id: RankingCategory) => {
     switch (id) {

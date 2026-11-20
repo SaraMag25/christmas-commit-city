@@ -1,8 +1,6 @@
 import type { PixCampaignConfig } from '../types/city'
 
-export const STANDARD_CONTRIBUTION_YEAR = Number(
-  import.meta.env.VITE_CONTRIBUTION_YEAR || new Date().getFullYear(),
-)
+export { STANDARD_CONTRIBUTION_YEAR } from './githubPeriod'
 
 export const CREATOR_CAMPAIGN: PixCampaignConfig = {
   title: 'Campanha da Criadora — Rumo à Formatura na UFC',

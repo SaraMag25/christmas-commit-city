@@ -1,9 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { computeCommunityStats, MOCK_CITY_TREES } from '../../data/mockCityData'
 import { CityHeader } from '../hud/CityHeader'
-import { GitHubConnectPreviewModal } from '../panels/GitHubConnectPreviewModal'
+import { GitHubConnectModal } from '../panels/GitHubConnectModal'
 import { HowItWorksModal } from '../panels/HowItWorksModal'
 
 interface SubpageLayoutProps {
@@ -19,12 +18,10 @@ export function SubpageLayout({
 }: SubpageLayoutProps) {
   const [showHowItWorks, setShowHowItWorks] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
-  const communityStats = useMemo(() => computeCommunityStats(MOCK_CITY_TREES), [])
 
   return (
     <div className="min-h-screen bg-[#070d1f] pb-16 pt-24 text-slate-100 sm:pt-28">
       <CityHeader
-        stats={communityStats}
         onOpenConnectModal={() => setShowConnectModal(true)}
         onOpenHowItWorks={() => setShowHowItWorks(true)}
       />
@@ -46,9 +43,7 @@ export function SubpageLayout({
       </main>
 
       {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} />}
-      {showConnectModal && (
-        <GitHubConnectPreviewModal onClose={() => setShowConnectModal(false)} />
-      )}
+      {showConnectModal && <GitHubConnectModal onClose={() => setShowConnectModal(false)} />}
     </div>
   )
 }

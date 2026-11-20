@@ -13,17 +13,24 @@ import { Link, useParams } from 'react-router-dom'
 import { AvatarBadge } from '../components/common/AvatarBadge'
 import { GiftCatalogPreviewModal } from '../components/gifts/GiftCatalogPreviewModal'
 import { SubpageLayout } from '../components/layout/SubpageLayout'
+import { ContributionCalendarPreview } from '../components/tree/ContributionCalendarPreview'
 import { TreePixelCanvas } from '../components/tree/TreePixelCanvas'
-import { CREATOR_CAMPAIGN, STANDARD_CONTRIBUTION_YEAR } from '../config/pixCampaign'
+import { STANDARD_CONTRIBUTION_YEAR } from '../config/githubPeriod'
+import { CREATOR_CAMPAIGN } from '../config/pixCampaign'
 import { resolveTreeStage, TREE_STAGES } from '../config/treeLevels'
-import { getMessagesByTreeId, getTreeByUsername } from '../data/mockCityData'
+import { useCity } from '../context/cityContextStore'
+import { getMessagesByTreeId } from '../data/mockCityData'
 
 export function TreeProfilePage() {
+  const { trees } = useCity()
   const { username = '' } = useParams<{ username: string }>()
   const [showGiftModal, setShowGiftModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const tree = useMemo(() => getTreeByUsername(username), [username])
+  const tree = useMemo(() => {
+    const normalized = username.trim().toLowerCase()
+    return trees.find((t) => t.profile.github_username.toLowerCase() === normalized)
+  }, [trees, username])
   const messages = useMemo(() => (tree ? getMessagesByTreeId(tree.id) : []), [tree])
 
   const shareUrl = `${window.location.origin}/tree/${tree?.profile.github_username ?? username}`
@@ -238,6 +245,12 @@ export function TreeProfilePage() {
                 </div>
               )}
             </section>
+
+            {/* GitHub GraphQL Activity Breakdown & Contribution Calendar */}
+            <ContributionCalendarPreview
+              stats={tree.stats}
+              fallbackTotal={tree.contribution_count}
+            />
 
             <section className="pixel-night-panel rounded-sm p-5">
               <div className="flex items-center justify-between border-b border-amber-500/30 pb-2.5">

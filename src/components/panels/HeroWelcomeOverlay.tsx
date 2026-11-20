@@ -1,5 +1,5 @@
 import { Compass, Heart, Sparkles, Trees, X } from 'lucide-react'
-import { STANDARD_CONTRIBUTION_YEAR } from '../../config/pixCampaign'
+import { STANDARD_CONTRIBUTION_YEAR } from '../../config/githubPeriod'
 import { GitHubIcon } from '../icons/GitHubIcon'
 import type { CityCommunityStats } from '../../types/city'
 
@@ -33,7 +33,7 @@ export function HeroWelcomeOverlay({
 
         <div className="inline-flex items-center gap-1.5 rounded-sm border border-amber-400/50 bg-[#070d1f]/80 px-2.5 py-1 text-[10px] text-amber-300">
           <Sparkles className="h-3 w-3 animate-twinkle" />
-          <span>TEMPORADA DE NATAL {STANDARD_CONTRIBUTION_YEAR} · FASE 1 (PREVIEW VISUAL)</span>
+          <span>TEMPORADA DE NATAL {STANDARD_CONTRIBUTION_YEAR} · COMUNIDADE GITHUB</span>
         </div>
 
         <h1 className="mt-3 font-pixel-title text-base leading-relaxed text-amber-300 drop-shadow-[0_2px_0_#1e0f07] sm:text-xl">

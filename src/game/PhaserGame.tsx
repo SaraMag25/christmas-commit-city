@@ -1,15 +1,31 @@
 import { useEffect, useRef } from 'react'
 import Phaser from 'phaser'
 import { CITY_PALETTE } from '../config/cityMapConfig'
+import type { CityTree } from '../types/city'
+import { gameEventBus } from './eventBus'
 import { BootScene } from './scenes/BootScene'
 import { CityScene } from './scenes/CityScene'
 
-export function PhaserGame() {
+interface PhaserGameProps {
+  trees: readonly CityTree[]
+}
+
+export function PhaserGame({ trees }: PhaserGameProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const latestTreesRef = useRef(trees)
+
+  useEffect(() => {
+    latestTreesRef.current = trees
+    gameEventBus.emit('city:trees-updated', trees)
+  }, [trees])
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+
+    const unsubReady = gameEventBus.on('city:ready', () => {
+      gameEventBus.emit('city:trees-updated', latestTreesRef.current)
+    })
 
     const game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -29,6 +45,7 @@ export function PhaserGame() {
     })
 
     return () => {
+      unsubReady()
       game.destroy(true)
     }
   }, [])

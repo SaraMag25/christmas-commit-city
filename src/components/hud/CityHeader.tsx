@@ -1,10 +1,9 @@
-import { Heart, HelpCircle, Sparkles, Trees, Trophy } from 'lucide-react'
+import { Heart, HelpCircle, LogOut, RefreshCw, Sparkles, Trees, Trophy } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import type { CityCommunityStats } from '../../types/city'
+import { useCity } from '../../context/cityContextStore'
 import { GitHubIcon } from '../icons/GitHubIcon'
 
 interface CityHeaderProps {
-  stats: CityCommunityStats
   onOpenConnectModal: () => void
   onOpenHowItWorks: () => void
   onFocusCreatorTree?: () => void
@@ -12,12 +11,12 @@ interface CityHeaderProps {
 }
 
 export function CityHeader({
-  stats,
   onOpenConnectModal,
   onOpenHowItWorks,
   onFocusCreatorTree,
   onShowWelcome,
 }: CityHeaderProps) {
+  const { stats, currentUserTree, isSyncing, resyncMyTree, signOut } = useCity()
   const location = useLocation()
   const navigate = useNavigate()
   const isHome = location.pathname === '/'
@@ -60,7 +59,6 @@ export function CityHeader({
           </div>
         </button>
 
-        {/* Live community stats bar */}
         <div className="hidden items-center gap-3 rounded-sm border border-amber-500/30 bg-[#070d1f]/75 px-3 py-1.5 text-xs xl:flex">
           <span className="flex items-center gap-1.5 text-emerald-300">
             <Trees className="h-3.5 w-3.5" />
@@ -117,15 +115,53 @@ export function CityHeader({
             <span className="hidden sm:inline">Campanha UFC</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenConnectModal}
-            className="pixel-btn pixel-btn-red rounded-sm px-3 py-1.5 text-[11px] font-bold"
-          >
-            <GitHubIcon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Conectar com GitHub</span>
-            <span className="sm:hidden">GitHub</span>
-          </button>
+          {currentUserTree ? (
+            <div className="flex items-center gap-1.5">
+              <Link
+                to={`/?focus=${encodeURIComponent(currentUserTree.profile.github_username)}`}
+                className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1.5 text-[11px] font-bold"
+                title="Ir para minha árvore"
+              >
+                <img
+                  src={currentUserTree.profile.avatar_url}
+                  alt={currentUserTree.profile.github_username}
+                  className="h-4 w-4 rounded-[2px] border border-amber-300"
+                />
+                <span>@{currentUserTree.profile.github_username}</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => void resyncMyTree()}
+                disabled={isSyncing}
+                className="pixel-btn pixel-btn-wood rounded-sm p-1.5 text-[11px] disabled:opacity-60"
+                title="Sincronizar contribuições do GitHub"
+                aria-label="Sincronizar contribuições"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="pixel-btn pixel-btn-wood rounded-sm p-1.5 text-[11px]"
+                title="Sair da conta GitHub"
+                aria-label="Sair"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenConnectModal}
+              className="pixel-btn pixel-btn-red rounded-sm px-3 py-1.5 text-[11px] font-bold"
+            >
+              <GitHubIcon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Conectar com GitHub</span>
+              <span className="sm:hidden">GitHub</span>
+            </button>
+          )}
         </nav>
       </div>
     </header>

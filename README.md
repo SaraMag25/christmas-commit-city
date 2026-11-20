@@ -44,13 +44,17 @@ Visitantes podem explorar a cidade vista de cima, conhecer desenvolvedores, envi
 
 ```text
 src/
-├── config/       # Paleta, dimensões do mapa, estágios de árvore e campanha UFC
+├── config/       # Paleta, dimensões do mapa, janela anual GitHub e campanha UFC
 ├── types/        # Contratos TypeScript alinhados ao modelo de dados
 ├── data/         # Dados fictícios iniciais para visualização da cidade
+├── context/      # Estado global da cidade, sessão OAuth e sincronização
+├── services/     # Cliente Supabase e integração com a Edge Function do GitHub
 ├── game/         # Cena Phaser, gerador pixel art compartilhado, neve e interações
-├── components/   # HUD natalina, explorador de árvores e painéis RPG retrô
+├── components/   # HUD natalina, explorador de árvores, calendário e painéis RPG
 └── pages/        # Vila interativa (/), perfil individual (/tree/:username) e rankings (/rankings)
 ```
+
+Consulte [docs/SUPABASE_GITHUB_SETUP.md](./docs/SUPABASE_GITHUB_SETUP.md) para configurar o GitHub OAuth (somente leitura `read:user`) e a Edge Function GraphQL.
 
 ---
 

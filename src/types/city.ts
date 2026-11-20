@@ -55,6 +55,26 @@ export interface TreePosition {
   gridY: number
 }
 
+export interface GitHubContributionDay {
+  date: string
+  contributionCount: number
+  color?: string
+}
+
+export interface GitHubContributionWeek {
+  contributionDays: GitHubContributionDay[]
+}
+
+export interface GitHubContributionStats {
+  periodYear: number
+  totalContributions: number
+  commits: number
+  pullRequests: number
+  issues: number
+  restrictedContributions: number
+  calendarWeeks: GitHubContributionWeek[]
+}
+
 export interface CityTree {
   id: string
   user_id: string
@@ -63,6 +83,7 @@ export interface CityTree {
   tree_level: TreeLevelId
   tree_position: TreePosition
   gifts: TreeGiftSummary[]
+  stats?: GitHubContributionStats
   custom_message?: string
   is_creator_special?: boolean
   last_synced_at: string

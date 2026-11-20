@@ -79,10 +79,18 @@ export function TreeDetailsPanel({
       {/* Stage & Contributions */}
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-sm border border-emerald-500/30 bg-[#0f2e24]/70 p-2.5">
-          <p className="text-[10px] text-emerald-200/80">Contribuições (2026)</p>
+          <p className="text-[10px] text-emerald-200/80">
+            Contribuições ({tree.stats?.periodYear ?? 2026})
+          </p>
           <p className="mt-1 font-pixel-title text-base text-amber-300">
             {tree.contribution_count}
           </p>
+          {tree.stats && (
+            <p className="mt-1 text-[10px] text-emerald-200/85">
+              {tree.stats.commits} commits · {tree.stats.pullRequests} PRs · {tree.stats.issues}{' '}
+              issues
+            </p>
+          )}
         </div>
         <div className="rounded-sm border border-amber-500/30 bg-[#15244a]/70 p-2.5">
           <p className="text-[10px] text-amber-200/80">Nível da árvore</p>

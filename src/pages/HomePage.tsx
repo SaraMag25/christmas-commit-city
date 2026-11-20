@@ -1,33 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { GiftCatalogPreviewModal } from '../components/gifts/GiftCatalogPreviewModal'
 import { CameraControls } from '../components/hud/CameraControls'
 import { CityExplorerBar } from '../components/hud/CityExplorerBar'
 import { CityHeader } from '../components/hud/CityHeader'
-import { GitHubConnectPreviewModal } from '../components/panels/GitHubConnectPreviewModal'
+import { GitHubConnectModal } from '../components/panels/GitHubConnectModal'
 import { HeroWelcomeOverlay } from '../components/panels/HeroWelcomeOverlay'
 import { HowItWorksModal } from '../components/panels/HowItWorksModal'
 import { TreeDetailsPanel } from '../components/panels/TreeDetailsPanel'
-import { computeCommunityStats, MOCK_CITY_TREES } from '../data/mockCityData'
+import { useCity } from '../context/cityContextStore'
 import { PhaserGame } from '../game/PhaserGame'
 import { gameEventBus } from '../game/eventBus'
 import type { CityTree, VillagePropDialogue } from '../types/city'
 
 export function HomePage() {
+  const { trees, stats, authError, clearAuthError } = useCity()
   const [searchParams, setSearchParams] = useSearchParams()
   const focusParam = searchParams.get('focus')
 
   const [showWelcome, setShowWelcome] = useState(() => !focusParam)
   const [showHowItWorks, setShowHowItWorks] = useState(false)
-  const [showConnectPreview, setShowConnectPreview] = useState(false)
+  const [showConnectModal, setShowConnectModal] = useState(false)
   const [giftTargetTree, setGiftTargetTree] = useState<CityTree | null>(null)
   const [hoveredTree, setHoveredTree] = useState<CityTree | null>(null)
   const [selectedTree, setSelectedTree] = useState<CityTree | null>(null)
   const [propDialogue, setPropDialogue] = useState<VillagePropDialogue | null>(null)
   const isCityReadyRef = useRef(false)
-
-  const communityStats = useMemo(() => computeCommunityStats(MOCK_CITY_TREES), [])
 
   useEffect(() => {
     const unsubReady = gameEventBus.on('city:ready', () => {
@@ -87,12 +86,11 @@ export function HomePage() {
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#070d1f]">
       {/* Full-bleed pixel-art village canvas */}
-      <PhaserGame />
+      <PhaserGame trees={trees} />
 
       {/* Top RPG HUD */}
       <CityHeader
-        stats={communityStats}
-        onOpenConnectModal={() => setShowConnectPreview(true)}
+        onOpenConnectModal={() => setShowConnectModal(true)}
         onOpenHowItWorks={() => setShowHowItWorks(true)}
         onFocusCreatorTree={handleFocusCreatorTree}
         onShowWelcome={() => {
@@ -105,18 +103,41 @@ export function HomePage() {
       {/* Quick explorer & filter bar */}
       {!showWelcome && (
         <CityExplorerBar
-          trees={MOCK_CITY_TREES}
+          trees={trees}
           selectedTreeId={selectedTree?.id ?? null}
           onSelectTree={handleSelectFromExplorer}
         />
       )}
 
+      {/* Auth / GraphQL Sync Error Notification */}
+      {authError && (
+        <div
+          role="alert"
+          className="fixed right-4 top-24 z-40 max-w-sm rounded-sm border-2 border-rose-500 bg-rose-950/95 p-3 text-xs text-rose-100 shadow-lg"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-bold text-rose-300">Aviso na sincronização GitHub</p>
+              <p className="mt-1 leading-snug">{authError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={clearAuthError}
+              aria-label="Fechar aviso"
+              className="rounded-sm p-1 text-rose-200 hover:bg-rose-900 cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Welcome banner highlighting the tagline and actions */}
       {showWelcome && (
         <HeroWelcomeOverlay
-          stats={communityStats}
+          stats={stats}
           onExploreCity={() => setShowWelcome(false)}
-          onConnectGitHub={() => setShowConnectPreview(true)}
+          onConnectGitHub={() => setShowConnectModal(true)}
           onFocusCreatorTree={handleFocusCreatorTree}
         />
       )}
@@ -164,9 +185,7 @@ export function HomePage() {
       />
 
       {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} />}
-      {showConnectPreview && (
-        <GitHubConnectPreviewModal onClose={() => setShowConnectPreview(false)} />
-      )}
+      {showConnectModal && <GitHubConnectModal onClose={() => setShowConnectModal(false)} />}
       {giftTargetTree && (
         <GiftCatalogPreviewModal
           recipientUsername={giftTargetTree.profile.github_username}
