@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+:root {
+  --color-night: #070d1f;
+  --color-night-mid: #0d1833;
+  --color-night-soft: #15244a;
+  --color-pine: #0f2e24;
+  --color-pine-mid: #174636;
+  --color-pine-bright: #1f5c45;
+  --color-cranberry: #b91c1c;
+  --color-cranberry-bright: #dc2626;
+  --color-gold: #f59e0b;
+  --color-gold-bright: #fbbf24;
+  --color-snow: #f8fafc;
+  --color-wood-dark: #3b2110;
+  --color-wood: #5c371d;
+  --color-wood-light: #8c5835;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-night);
+    font-family: 'Silkscreen', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+}
+
+.font-pixel-title {
+  font-family: 'Press Start 2P', 'Silkscreen', ui-monospace, monospace;
+}
+
+.font-pixel-ui {
+  font-family: 'Silkscreen', ui-monospace, monospace;
+}
+
+.font-pixel-body {
+  font-family: 'VT323', 'Silkscreen', ui-monospace, monospace;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Stardew-inspired wooden RPG dialogue/HUD frame */
+.pixel-wood-panel {
+  background: linear-gradient(180deg, #4b2b16 0%, #371e0f 100%);
+  border: 3px solid #1e0f07;
+  box-shadow:
+    inset 0 2px 0 #8c5835,
+    inset 0 -3px 0 #261409,
+    0 0 0 2px #d97706,
+    0 10px 25px rgba(0, 0, 0, 0.55);
+}
+
+/* Deep winter-night translucent panel with golden pixel border */
+.pixel-night-panel {
+  background: rgba(10, 19, 43, 0.9);
+  border: 2px solid #f59e0b;
+  box-shadow:
+    inset 0 2px 0 rgba(251, 191, 36, 0.25),
+    inset 0 -2px 0 rgba(7, 13, 31, 0.9),
+    0 8px 24px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+}
+
+.pixel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 2px solid #1e0f07;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.35),
+    0 4px 0 rgba(0, 0, 0, 0.45);
+  transition: transform 80ms ease, box-shadow 80ms ease, filter 120ms ease;
+  cursor: pointer;
+}
+
+.pixel-btn:hover {
+  filter: brightness(1.08);
+}
+
+.pixel-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.pixel-btn-red {
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+  color: #fff7ed;
+}
+
+.pixel-btn-gold {
+  background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+  color: #261409;
+}
+
+.pixel-btn-pine {
+  background: linear-gradient(180deg, #1f5c45 0%, #12382a 100%);
+  color: #ecfdf5;
+}
+
+.pixel-btn-wood {
+  background: linear-gradient(180deg, #7c4d2b 0%, #523018 100%);
+  color: #fef3c7;
+}
+
+@keyframes gentle-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.animate-twinkle {
+  animation: gentle-twinkle 2.4s ease-in-out infinite;
+}
