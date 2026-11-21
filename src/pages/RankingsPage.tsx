@@ -97,16 +97,14 @@ export function RankingsPage() {
 
   return (
     <SubpageLayout maxWidthClass="max-w-4xl">
-      <section className="pixel-wood-panel rounded-sm p-5 sm:p-6">
-        <div className="flex items-center gap-2.5">
-          <Trophy className="h-6 w-6 text-amber-300" />
+      <section className="pixel-night-panel rounded-md p-5 sm:p-6">
+        <div className="flex items-center gap-2.5 border-b border-slate-800 pb-3">
+          <Trophy className="h-5 w-5 text-amber-300" />
           <div>
-            <h1 className="font-pixel-title text-sm text-amber-300 sm:text-base">
+            <p className="text-[11px] text-emerald-400">$ rankings --sort={activeTab}</p>
+            <h1 className="mt-0.5 text-base font-bold text-slate-100">
               Rankings da Vila
             </h1>
-            <p className="mt-1 font-pixel-body text-xl text-amber-100">
-              Métricas transparentes: commits no GitHub nunca se misturam com presentes recebidos.
-            </p>
           </div>
         </div>
 
@@ -119,8 +117,8 @@ export function RankingsPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`pixel-btn rounded-sm px-3 py-2 text-[11px] font-bold ${
-                  isSelected ? 'pixel-btn-gold' : 'pixel-btn-pine'
+                className={`pixel-btn rounded-sm px-3 py-2 text-[11px] font-medium ${
+                  isSelected ? 'pixel-btn-pine font-semibold' : 'pixel-btn-wood'
                 }`}
               >
                 {renderTabIcon(tab.id)}
@@ -130,8 +128,8 @@ export function RankingsPage() {
           })}
         </div>
 
-        <p className="mt-3 rounded-sm border border-[#8c5835] bg-[#261409]/80 px-3 py-2 text-xs text-amber-100/90">
-          {currentMeta.description}
+        <p className="mt-3 rounded-sm border border-slate-800 bg-[#040811]/85 px-3 py-2 text-xs text-slate-300">
+          &gt; {currentMeta.description}
         </p>
 
         {/* Ranking Rows */}

@@ -20,7 +20,13 @@ export function SubpageLayout({
   const [showConnectModal, setShowConnectModal] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[#070d1f] pb-16 pt-24 text-slate-100 sm:pt-28">
+    <div
+      className="min-h-screen bg-[#070d1f] pb-16 pt-24 text-slate-100 sm:pt-28"
+      style={{
+        backgroundImage:
+          'radial-gradient(circle at 20% 10%, rgba(16, 185, 129, 0.12), transparent 40%), radial-gradient(circle at 80% 15%, rgba(251, 191, 36, 0.1), transparent 36%), radial-gradient(circle at 50% 85%, rgba(15, 46, 36, 0.35), transparent 55%)',
+      }}
+    >
       <CityHeader
         onOpenConnectModal={() => setShowConnectModal(true)}
         onOpenHowItWorks={() => setShowHowItWorks(true)}

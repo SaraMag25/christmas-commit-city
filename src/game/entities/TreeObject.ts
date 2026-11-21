@@ -34,6 +34,8 @@ export class TreeObject {
       seed,
       isCreatorSpecial: treeData.is_creator_special,
       lightsPhase: 0,
+      contributionCount: treeData.contribution_count,
+      calendarWeeks: treeData.stats?.calendarWeeks,
     })
     ensureTreeTexture(scene, {
       key: this.texKeyPhase1,
@@ -41,6 +43,8 @@ export class TreeObject {
       seed,
       isCreatorSpecial: treeData.is_creator_special,
       lightsPhase: 1,
+      contributionCount: treeData.contribution_count,
+      calendarWeeks: treeData.stats?.calendarWeeks,
     })
 
     const { tileSize, pixelScale } = CITY_MAP_CONFIG

@@ -1,10 +1,10 @@
 export const CITY_PALETTE = {
-  nightBg: '#070d1f',
-  nightMid: '#0d1833',
-  nightSkyNum: 0x070d1f,
-  pineDark: '#0f2e24',
-  pineMid: '#174636',
-  pineBright: '#1f5c45',
+  nightBg: '#040914',
+  nightMid: '#0a1428',
+  nightSkyNum: 0x040914,
+  pineDark: '#092419',
+  pineMid: '#0f3626',
+  pineBright: '#164d36',
   cranberry: '#b91c1c',
   cranberryBright: '#dc2626',
   gold: '#f59e0b',
@@ -25,14 +25,14 @@ export const CITY_MAP_CONFIG = {
   get tileSize(): number {
     return this.tileTexels * this.pixelScale
   },
-  /** Total columns and rows of the snowy village */
-  cols: 36,
-  rows: 26,
-  /** Central plaza coordinates (in tile units) where the creator's special tree stands */
+  /** Total columns and rows of the dense Christmas tree forest city */
+  cols: 40,
+  rows: 30,
+  /** Forest center coordinates for default camera framing */
   plazaCenter: {
-    gridX: 18,
-    gridY: 13,
+    gridX: 20,
+    gridY: 15,
   },
   /** Extra sky band above the northern tree line for starry night atmosphere */
-  skyRows: 3,
+  skyRows: 2,
 } as const

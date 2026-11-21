@@ -12,7 +12,7 @@ function getPixelCellColor(count: number): string {
   if (count <= 2) return '#14532d'
   if (count <= 5) return '#15803d'
   if (count <= 9) return '#22c55e'
-  return '#fbbf24'
+  return '#4ade80'
 }
 
 export function ContributionCalendarPreview({

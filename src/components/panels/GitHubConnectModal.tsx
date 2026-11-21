@@ -21,39 +21,41 @@ export function GitHubConnectModal({ onClose }: GitHubConnectModalProps) {
       aria-label="Conectar com GitHub"
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-3 backdrop-blur-xs"
     >
-      <div className="w-full max-w-md pixel-night-panel rounded-sm p-5">
-        <div className="flex items-start justify-between gap-3 border-b border-amber-500/30 pb-3">
-          <div className="flex items-center gap-2">
-            <GitHubIcon className="h-5 w-5 text-amber-300" />
-            <h2 className="font-pixel-title text-xs text-amber-300">Conectar com GitHub</h2>
+      <div className="w-full max-w-md pixel-night-panel rounded-md p-5">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <p className="text-[11px] text-emerald-400">$ auth github --scope=read:user</p>
+            <div className="mt-1 flex items-center gap-2">
+              <GitHubIcon className="h-4 w-4 text-slate-200" />
+              <h2 className="text-sm font-bold text-slate-100">Conectar com GitHub</h2>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar janela"
-            className="rounded-sm border border-amber-400/30 p-1 text-slate-300 hover:text-white cursor-pointer"
+            className="rounded-sm border border-slate-700 p-1 text-slate-400 hover:border-slate-500 hover:text-white cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="mt-3 space-y-2 rounded-sm border border-emerald-500/30 bg-[#0f2e24]/60 p-3 text-[11px] text-emerald-100">
+        <div className="mt-3 space-y-2 rounded-sm border border-emerald-500/25 bg-[#040811]/90 p-3 text-[11px] text-slate-300">
           <p className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-300" />
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
             <span>
-              Autenticação OAuth via Supabase Auth para consultar sua atividade via{' '}
-              <strong>GitHub GraphQL API</strong>.
+              OAuth via Supabase Auth para sincronizar sua atividade na{' '}
+              <strong className="text-slate-100">GitHub GraphQL API</strong>.
             </span>
           </p>
           <p className="flex items-center gap-2">
             <Lock className="h-4 w-4 shrink-0 text-amber-300" />
             <span>
-              Escopo estritamente <code>read:user</code>: nenhum acesso de escrita aos seus
-              repositórios é solicitado.
+              Escopo estrito <code className="text-emerald-300">read:user</code>: nenhum acesso de escrita aos repositórios.
             </span>
           </p>
-          <p className="text-slate-200">
-            Período padronizado de comparação: calendário de {STANDARD_CONTRIBUTION_YEAR}.
+          <p className="text-slate-400">
+            &gt; period_year: <span className="text-slate-200">{STANDARD_CONTRIBUTION_YEAR}</span>
           </p>
         </div>
 

@@ -4,81 +4,83 @@ import type { TreePosition } from '../../types/city'
 export interface VillageBuildingPlacement {
   gridX: number
   gridY: number
-  variant: 'storybook' | 'mushroom-pine' | 'mushroom-red' | 'stump'
+  variant: 'hobbit-emerald' | 'hobbit-amber' | 'elven-pavilion'
 }
 
 export interface VillageDecorationPlacement {
   gridX: number
   gridY: number
-  type: 'lamp' | 'snowman' | 'signpost' | 'gift-pile' | 'bench' | 'caretaker'
+  type: 'lamp' | 'snowman' | 'signpost' | 'gift-pile' | 'caretaker' | 'elven-arch' | 'waystone'
 }
 
 /**
- * Curated storybook cottage placements along the snowy village lanes.
- * Each cottage spans roughly a 3x3 lot anchored along bottom-center.
+ * Discrete Shire-style Hobbit burrows and an Elven riverside pavilion.
  */
 export const VILLAGE_COTTAGES: readonly VillageBuildingPlacement[] = [
-  { gridX: 6, gridY: 5, variant: 'storybook' },
-  { gridX: 11, gridY: 5, variant: 'mushroom-pine' },
-  { gridX: 22, gridY: 5, variant: 'stump' },
-  { gridX: 27, gridY: 5, variant: 'mushroom-red' },
-  { gridX: 6, gridY: 16, variant: 'mushroom-pine' },
-  { gridX: 28, gridY: 16, variant: 'storybook' },
-  { gridX: 11, gridY: 21, variant: 'stump' },
-  { gridX: 23, gridY: 21, variant: 'mushroom-red' },
-]
-
-export const VILLAGE_DECORATIONS: readonly VillageDecorationPlacement[] = [
-  // Central Plaza corner lanterns
-  { gridX: 15, gridY: 11, type: 'lamp' },
-  { gridX: 21, gridY: 11, type: 'lamp' },
-  { gridX: 15, gridY: 16, type: 'lamp' },
-  { gridX: 21, gridY: 16, type: 'lamp' },
-  // Avenue lanterns
-  { gridX: 10, gridY: 13, type: 'lamp' },
-  { gridX: 26, gridY: 13, type: 'lamp' },
-  { gridX: 18, gridY: 8, type: 'lamp' },
-  { gridX: 18, gridY: 20, type: 'lamp' },
-  // Cozy benches (inspired by ref_0 & ref_1)
-  { gridX: 16, gridY: 11, type: 'bench' },
-  { gridX: 20, gridY: 11, type: 'bench' },
-  { gridX: 6, gridY: 21, type: 'bench' },
-  // Cute winter caretaker NPC tending a pine sapling (inspired by ref_4)
-  { gridX: 19, gridY: 14, type: 'caretaker' },
-  // Festive snowmen, signs & gifts
-  { gridX: 16, gridY: 15, type: 'snowman' },
-  { gridX: 20, gridY: 15, type: 'gift-pile' },
-  { gridX: 17, gridY: 15, type: 'signpost' },
-  { gridX: 9, gridY: 7, type: 'snowman' },
-  { gridX: 26, gridY: 7, type: 'gift-pile' },
-  { gridX: 14, gridY: 23, type: 'snowman' },
+  { gridX: 4, gridY: 18, variant: 'hobbit-emerald' },
+  { gridX: 32, gridY: 7, variant: 'hobbit-amber' },
+  { gridX: 31, gridY: 25, variant: 'elven-pavilion' },
 ]
 
 /**
- * Curated non-overlapping plots for community developer trees.
+ * Subtle Lord-of-the-Rings & Christmas accents along river crossings & trails.
  */
-export const CURATED_TREE_PLOTS: readonly TreePosition[] = [
-  { gridX: 13, gridY: 11 },
-  { gridX: 23, gridY: 11 },
-  { gridX: 13, gridY: 16 },
-  { gridX: 23, gridY: 16 },
-  { gridX: 9, gridY: 10 },
-  { gridX: 27, gridY: 10 },
-  { gridX: 15, gridY: 7 },
-  { gridX: 20, gridY: 7 },
-  { gridX: 10, gridY: 16 },
-  { gridX: 26, gridY: 16 },
-  { gridX: 20, gridY: 22 },
-  { gridX: 15, gridY: 22 },
-  { gridX: 5, gridY: 10 },
-  { gridX: 31, gridY: 10 },
-  { gridX: 14, gridY: 18 },
-  { gridX: 22, gridY: 18 },
-  { gridX: 7, gridY: 22 },
-  { gridX: 30, gridY: 21 },
-  { gridX: 3, gridY: 12 },
-  { gridX: 33, gridY: 12 },
+export const VILLAGE_DECORATIONS: readonly VillageDecorationPlacement[] = [
+  { gridX: 19, gridY: 15, type: 'lamp' },
+  { gridX: 13, gridY: 15, type: 'lamp' },
+  { gridX: 28, gridY: 15, type: 'lamp' },
+  { gridX: 20, gridY: 9, type: 'lamp' },
+  { gridX: 20, gridY: 25, type: 'lamp' },
+  { gridX: 18, gridY: 15, type: 'signpost' },
+  { gridX: 21, gridY: 14, type: 'caretaker' },
+  { gridX: 6, gridY: 21, type: 'snowman' },
+  { gridX: 19, gridY: 16, type: 'gift-pile' },
+  { gridX: 30, gridY: 10, type: 'snowman' },
+  { gridX: 15, gridY: 14, type: 'elven-arch' },
+  { gridX: 25, gridY: 16, type: 'waystone' },
+  { gridX: 14, gridY: 24, type: 'waystone' },
 ]
+
+export function isRiverTile(gridX: number, gridY: number): boolean {
+  const { cols, rows, skyRows } = CITY_MAP_CONFIG
+  if (gridY < skyRows || gridY >= rows || gridX < 0 || gridX >= cols) return false
+
+  // Western/Central winding river flowing from northern mountains down past the pond
+  const mainRiverCenterX = 9.5 + Math.sin(gridY * 0.27) * 2.6
+  const inMainRiver = Math.abs(gridX - mainRiverCenterX) <= 0.85
+
+  // Eastern forest tributary branching near (x:11, y:19) toward southeast edge
+  const eastRiverCenterY = 20.2 + Math.sin((gridX - 10) * 0.22) * 1.9
+  const inEastTributary = gridX >= 10 && Math.abs(gridY - eastRiverCenterY) <= 0.8
+
+  return inMainRiver || inEastTributary
+}
+
+export function isBridgeTile(gridX: number, gridY: number): boolean {
+  // Bridge 1: East-west trail (y=15) crossing the main river
+  const westBridge = gridY === 15 && isRiverTile(gridX, gridY)
+  // Bridge 2: North-south trail (x=20) crossing the eastern tributary
+  const southBridge = gridX === 20 && isRiverTile(gridX, gridY)
+  return westBridge || southBridge
+}
+
+export function isRoadTile(gridX: number, gridY: number): boolean {
+  const mainTrailX = gridY === 15 && gridX >= 3 && gridX <= 36 && gridX !== 20
+  const mainTrailY = gridX === 20 && gridY >= 5 && gridY <= 27 && gridY !== 15
+  return mainTrailX || mainTrailY
+}
+
+export function isPlazaTile(gridX: number, gridY: number): boolean {
+  return gridX >= 19 && gridX <= 20 && gridY >= 14 && gridY <= 15
+}
+
+export function isFrozenPondTile(gridX: number, gridY: number): boolean {
+  return gridX >= 3 && gridX <= 6 && gridY >= 24 && gridY <= 27
+}
+
+export function isPierTile(gridX: number, gridY: number): boolean {
+  return (gridX === 5 || gridX === 6) && gridY === 25
+}
 
 export function hashUsername(username: string): number {
   let hash = 2166136261
@@ -89,10 +91,49 @@ export function hashUsername(username: string): number {
   return hash >>> 0
 }
 
+function isBlockedForTree(x: number, y: number): boolean {
+  if (
+    isRiverTile(x, y) ||
+    isBridgeTile(x, y) ||
+    isRoadTile(x, y) ||
+    isPlazaTile(x, y) ||
+    isFrozenPondTile(x, y) ||
+    isPierTile(x, y)
+  ) {
+    return true
+  }
+  for (const c of VILLAGE_COTTAGES) {
+    if (Math.abs(x - (c.gridX + 1)) <= 2 && Math.abs(y - (c.gridY + 1)) <= 2) return true
+  }
+  for (const d of VILLAGE_DECORATIONS) {
+    if (Math.abs(x - d.gridX) <= 1 && Math.abs(y - d.gridY) <= 1) return true
+  }
+  return false
+}
+
 /**
- * Allocates the next free non-overlapping plot in the village for a newly
- * authenticated developer, starting with curated garden plots and expanding
- * deterministically around the town if all curated plots are occupied.
+ * Generates dense urban-forest plots arranged in organic clusters along
+ * both sides of the winding rivers, maximizing forest density.
+ */
+function buildDenseForestPlots(): TreePosition[] {
+  const plots: TreePosition[] = []
+  const { cols, rows, skyRows } = CITY_MAP_CONFIG
+
+  for (let gy = skyRows + 1; gy <= rows - 2; gy += 2) {
+    for (let gx = 1; gx <= cols - 2; gx += 2) {
+      if (isBlockedForTree(gx, gy)) continue
+      plots.push({ gridX: gx, gridY: gy })
+    }
+  }
+
+  return plots
+}
+
+export const CURATED_TREE_PLOTS: readonly TreePosition[] = buildDenseForestPlots()
+
+/**
+ * Allocates the next free non-overlapping plot in the forest city for a newly
+ * authenticated developer.
  */
 export function allocateTreePosition(
   occupiedPositions: readonly TreePosition[],
@@ -108,39 +149,13 @@ export function allocateTreePosition(
   }
 
   const seed = hashUsername(username)
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    const gx = 3 + ((seed + attempt * 5) % (CITY_MAP_CONFIG.cols - 6))
-    const gy = CITY_MAP_CONFIG.skyRows + 2 + ((seed + attempt * 7) % (CITY_MAP_CONFIG.rows - 6))
-    if (!isRoadTile(gx, gy) && !isPlazaTile(gx, gy) && !isFrozenPondTile(gx, gy) && !isOccupied(gx, gy)) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const gx = 2 + ((seed + attempt * 5) % (CITY_MAP_CONFIG.cols - 4))
+    const gy = CITY_MAP_CONFIG.skyRows + 1 + ((seed + attempt * 7) % (CITY_MAP_CONFIG.rows - 4))
+    if (!isBlockedForTree(gx, gy) && !isOccupied(gx, gy)) {
       return { gridX: gx, gridY: gy }
     }
   }
 
   return { gridX: 4, gridY: 11 }
-}
-
-export function isRoadTile(gridX: number, gridY: number): boolean {
-  const isMainHorizontal = (gridY === 13 || gridY === 14) && gridX >= 2 && gridX <= 33
-  const isMainVertical = gridX === 18 && gridY >= 5 && gridY <= 23
-  const isNorthLane = gridY === 8 && gridX >= 6 && gridX <= 30
-  const isSouthLane = gridY === 20 && gridX >= 6 && gridX <= 30
-  return isMainHorizontal || isMainVertical || isNorthLane || isSouthLane
-}
-
-export function isPlazaTile(gridX: number, gridY: number): boolean {
-  const { plazaCenter } = CITY_MAP_CONFIG
-  return (
-    gridX >= plazaCenter.gridX - 3 &&
-    gridX <= plazaCenter.gridX + 3 &&
-    gridY >= plazaCenter.gridY - 2 &&
-    gridY <= plazaCenter.gridY + 3
-  )
-}
-
-export function isFrozenPondTile(gridX: number, gridY: number): boolean {
-  return gridX >= 2 && gridX <= 5 && gridY >= 21 && gridY <= 23
-}
-
-export function isPierTile(gridX: number, gridY: number): boolean {
-  return (gridX === 4 || gridX === 5) && gridY === 22
 }

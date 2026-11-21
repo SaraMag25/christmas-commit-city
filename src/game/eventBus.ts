@@ -13,6 +13,8 @@ export interface GameEventMap {
   'city:zoom-in': undefined
   'city:zoom-out': undefined
   'city:reset-camera': undefined
+  'city:orbit-left': undefined
+  'city:orbit-right': undefined
 }
 
 class TypedEventBus {

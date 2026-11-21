@@ -10,7 +10,7 @@ import { HeroWelcomeOverlay } from '../components/panels/HeroWelcomeOverlay'
 import { HowItWorksModal } from '../components/panels/HowItWorksModal'
 import { TreeDetailsPanel } from '../components/panels/TreeDetailsPanel'
 import { useCity } from '../context/cityContextStore'
-import { PhaserGame } from '../game/PhaserGame'
+import { City3DCanvas } from '../game/City3DCanvas'
 import { gameEventBus } from '../game/eventBus'
 import type { CityTree, VillagePropDialogue } from '../types/city'
 
@@ -26,7 +26,13 @@ export function HomePage() {
   const [hoveredTree, setHoveredTree] = useState<CityTree | null>(null)
   const [selectedTree, setSelectedTree] = useState<CityTree | null>(null)
   const [propDialogue, setPropDialogue] = useState<VillagePropDialogue | null>(null)
+  const [bootLogVisible, setBootLogVisible] = useState(true)
   const isCityReadyRef = useRef(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBootLogVisible(false), 4500)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     const unsubReady = gameEventBus.on('city:ready', () => {
@@ -85,8 +91,8 @@ export function HomePage() {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#070d1f]">
-      {/* Full-bleed pixel-art village canvas */}
-      <PhaserGame trees={trees} />
+      {/* Full-bleed 3D pixel-art village canvas */}
+      <City3DCanvas trees={trees} />
 
       {/* Top RPG HUD */}
       <CityHeader
@@ -142,16 +148,31 @@ export function HomePage() {
         />
       )}
 
-      {/* Interactive village prop RPG dialogue box */}
+      {/* Discreet developer-terminal world boot log */}
+      {bootLogVisible && !showWelcome && (
+        <div
+          aria-live="polite"
+          className="pointer-events-none fixed bottom-16 left-3 z-20 rounded-sm border border-emerald-500/25 bg-[#060b16]/80 px-3 py-2 text-[11px] text-slate-300 backdrop-blur-md sm:left-4"
+        >
+          <p className="text-emerald-400">&gt; Loading Christmas Forest...</p>
+          <p>&gt; Syncing GitHub contributions...</p>
+          <p>&gt; Generating developer trees...</p>
+          <p className="text-amber-300">&gt; World ready.</p>
+        </div>
+      )}
+
+      {/* Interactive village prop terminal dialogue box */}
       {propDialogue && (
         <div
           role="status"
-          className="fixed bottom-16 left-1/2 z-30 w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 pixel-wood-panel rounded-sm p-3.5"
+          className="fixed bottom-16 left-1/2 z-30 w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 pixel-night-panel rounded-md p-3.5"
         >
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-bold text-amber-300">{propDialogue.title}</p>
-              <p className="mt-1 font-pixel-body text-xl leading-snug text-amber-50">
+              <p className="text-[11px] font-semibold text-emerald-400">
+                $ npc talk --target=&quot;{propDialogue.title}&quot;
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-200">
                 {propDialogue.text}
               </p>
             </div>
@@ -159,7 +180,7 @@ export function HomePage() {
               type="button"
               onClick={() => setPropDialogue(null)}
               aria-label="Fechar diálogo"
-              className="rounded-sm border border-amber-400/30 p-1 text-amber-200 hover:bg-amber-500/20 cursor-pointer"
+              className="rounded-sm border border-slate-700 p-1 text-slate-400 hover:border-slate-500 hover:text-white cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -181,6 +202,8 @@ export function HomePage() {
         hoveredTree={hoveredTree}
         onZoomIn={() => gameEventBus.emit('city:zoom-in')}
         onZoomOut={() => gameEventBus.emit('city:zoom-out')}
+        onOrbitLeft={() => gameEventBus.emit('city:orbit-left')}
+        onOrbitRight={() => gameEventBus.emit('city:orbit-right')}
         onResetCamera={() => gameEventBus.emit('city:reset-camera')}
       />
 

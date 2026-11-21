@@ -120,10 +120,9 @@ export class CityScene extends Phaser.Scene {
 
   private drawCottagesAndDecorations(tileSize: number, pixelScale: number): void {
     const cottageTextureMap = {
-      storybook: 'cottage-storybook',
-      'mushroom-pine': 'cottage-mushroom-pine',
-      'mushroom-red': 'cottage-mushroom-red',
-      stump: 'cottage-stump',
+      'hobbit-emerald': 'cottage-mushroom-pine',
+      'hobbit-amber': 'cottage-storybook',
+      'elven-pavilion': 'cottage-stump',
     } as const
 
     VILLAGE_COTTAGES.forEach((cottage) => {
@@ -160,8 +159,9 @@ export class CityScene extends Phaser.Scene {
           snowman: 'deco-snowman',
           signpost: 'deco-signpost',
           'gift-pile': 'deco-gift-pile',
-          bench: 'deco-bench',
           caretaker: 'deco-caretaker',
+          'elven-arch': 'deco-signpost',
+          waystone: 'deco-signpost',
         }
         const sprite = this.add
           .image(cx, by, keyMap[deco.type])

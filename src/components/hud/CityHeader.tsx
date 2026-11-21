@@ -1,4 +1,4 @@
-import { Heart, HelpCircle, LogOut, RefreshCw, Sparkles, Trees, Trophy } from 'lucide-react'
+import { Heart, HelpCircle, LogOut, RefreshCw, Terminal, Trees, Trophy } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCity } from '../../context/cityContextStore'
 import { GitHubIcon } from '../icons/GitHubIcon'
@@ -40,92 +40,93 @@ export function CityHeader({
 
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-30 p-3 sm:p-4">
-      <div className="pointer-events-auto mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-3 py-2.5 pixel-night-panel rounded-sm">
+      <div className="pointer-events-auto mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 rounded-md px-3.5 py-2 pixel-night-panel">
         <button
           type="button"
           onClick={handleBrandClick}
-          className="flex items-center gap-2.5 text-left transition hover:brightness-110 cursor-pointer"
+          className="flex items-center gap-2 text-left transition hover:brightness-110 cursor-pointer"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-sm border-2 border-amber-400 bg-[#0f2e24] text-amber-300 shadow-inner">
-            <Trees className="h-5 w-5" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-sm border border-emerald-400/40 bg-emerald-950/70 text-emerald-400">
+            <Terminal className="h-3.5 w-3.5" />
           </span>
-          <div>
-            <p className="font-pixel-title text-[11px] leading-tight text-amber-300 sm:text-xs">
-              Christmas Commit City
-            </p>
-            <p className="font-pixel-body text-base leading-none text-slate-300">
-              Vila Natalina Open Source
-            </p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-bold text-slate-100 sm:text-sm">
+              christmas_commit_city
+            </span>
+            <span className="hidden text-[11px] text-amber-300/80 md:inline">
+              // natal 3d
+            </span>
           </div>
         </button>
 
-        <div className="hidden items-center gap-3 rounded-sm border border-amber-500/30 bg-[#070d1f]/75 px-3 py-1.5 text-xs xl:flex">
-          <span className="flex items-center gap-1.5 text-emerald-300">
-            <Trees className="h-3.5 w-3.5" />
-            <strong>{stats.totalTrees}</strong> árvores
+        <div className="hidden items-center gap-2.5 rounded-sm border border-slate-800 bg-[#040811]/85 px-3 py-1 text-[11px] text-slate-300 xl:flex">
+          <span>
+            trees: <strong className="text-emerald-400">{stats.totalTrees}</strong>
           </span>
-          <span className="text-slate-600">|</span>
-          <span className="flex items-center gap-1.5 text-amber-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            <strong>{stats.totalContributions.toLocaleString('pt-BR')}</strong> commits
+          <span className="text-slate-700">|</span>
+          <span>
+            commits:{' '}
+            <strong className="text-amber-300">
+              {stats.totalContributions.toLocaleString('pt-BR')}
+            </strong>
           </span>
-          <span className="text-slate-600">|</span>
-          <span className="text-sky-200">
-            <strong>{stats.illuminatedTrees}</strong> iluminadas
+          <span className="text-slate-700">|</span>
+          <span>
+            lights: <strong className="text-emerald-300">{stats.illuminatedTrees}</strong>
           </span>
         </div>
 
-        <nav aria-label="Navegação principal" className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <nav aria-label="Navegação principal" className="flex flex-wrap items-center gap-1.5">
           <Link
             to="/"
-            className={`pixel-btn rounded-sm px-2.5 py-1.5 text-[11px] ${
-              isHome ? 'pixel-btn-pine font-bold' : 'pixel-btn-wood'
+            className={`pixel-btn rounded-sm px-2.5 py-1 text-[11px] ${
+              isHome ? 'pixel-btn-pine font-semibold' : 'pixel-btn-wood'
             }`}
           >
             <Trees className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Cidade</span>
+            <span className="hidden md:inline">cidade</span>
           </Link>
 
           <Link
             to="/rankings"
-            className={`pixel-btn rounded-sm px-2.5 py-1.5 text-[11px] ${
-              isRankings ? 'pixel-btn-pine font-bold' : 'pixel-btn-wood'
+            className={`pixel-btn rounded-sm px-2.5 py-1 text-[11px] ${
+              isRankings ? 'pixel-btn-pine font-semibold' : 'pixel-btn-wood'
             }`}
           >
             <Trophy className="h-3.5 w-3.5 text-amber-300" />
-            <span className="hidden sm:inline">Rankings</span>
+            <span className="hidden sm:inline">rankings</span>
           </Link>
 
           <button
             type="button"
             onClick={onOpenHowItWorks}
-            className="pixel-btn pixel-btn-wood rounded-sm px-2.5 py-1.5 text-[11px]"
+            className="pixel-btn pixel-btn-wood rounded-sm px-2.5 py-1 text-[11px]"
             title="Como funciona e estágios das árvores"
           >
             <HelpCircle className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Como funciona</span>
+            <span className="hidden lg:inline">docs</span>
           </button>
 
           <button
             type="button"
             onClick={handleCreatorClick}
-            className="pixel-btn pixel-btn-gold rounded-sm px-2.5 py-1.5 text-[11px] font-bold"
+            className="pixel-btn pixel-btn-gold rounded-sm px-2.5 py-1 text-[11px] font-medium"
           >
-            <Heart className="h-3.5 w-3.5 fill-current" />
-            <span className="hidden sm:inline">Campanha UFC</span>
+            <Heart className="h-3 w-3 fill-current" />
+            <span className="hidden sm:inline">ufc</span>
           </button>
 
           {currentUserTree ? (
             <div className="flex items-center gap-1.5">
               <Link
                 to={`/?focus=${encodeURIComponent(currentUserTree.profile.github_username)}`}
-                className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1.5 text-[11px] font-bold"
+                className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold"
                 title="Ir para minha árvore"
               >
                 <img
                   src={currentUserTree.profile.avatar_url}
                   alt={currentUserTree.profile.github_username}
-                  className="h-4 w-4 rounded-[2px] border border-amber-300"
+                  className="h-3.5 w-3.5 rounded-[2px] border border-emerald-400/50"
                 />
                 <span>@{currentUserTree.profile.github_username}</span>
               </Link>
@@ -155,11 +156,11 @@ export function CityHeader({
             <button
               type="button"
               onClick={onOpenConnectModal}
-              className="pixel-btn pixel-btn-red rounded-sm px-3 py-1.5 text-[11px] font-bold"
+              className="pixel-btn pixel-btn-red rounded-sm px-2.5 py-1 text-[11px] font-semibold"
             >
               <GitHubIcon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Conectar com GitHub</span>
-              <span className="sm:hidden">GitHub</span>
+              <span className="hidden sm:inline">connect</span>
+              <span className="sm:hidden">git</span>
             </button>
           )}
         </nav>

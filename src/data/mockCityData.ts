@@ -1,10 +1,13 @@
 import { resolveTreeStage } from '../config/treeLevels'
-import { CITY_MAP_CONFIG } from '../config/cityMapConfig'
+import { STANDARD_CONTRIBUTION_YEAR } from '../config/githubPeriod'
+import { CURATED_TREE_PLOTS, hashUsername } from '../game/layout/treePlacement'
 import type {
   CityCommunityStats,
   CityTree,
   GiftItem,
   GiftRarity,
+  GitHubContributionStats,
+  GitHubContributionWeek,
   TreeMessage,
 } from '../types/city'
 
@@ -91,6 +94,72 @@ export const MOCK_GIFTS_CATALOG: readonly GiftItem[] = [
   },
 ]
 
+function buildSyntheticCalendarStats(
+  username: string,
+  totalContributions: number,
+): GitHubContributionStats {
+  const seed = hashUsername(username)
+  const weeks: GitHubContributionWeek[] = []
+  const startDate = new Date(Date.UTC(STANDARD_CONTRIBUTION_YEAR, 0, 1))
+  let remaining = Math.max(0, totalContributions)
+
+  // First pass: generate 52 weeks x 7 days deterministic activity weights
+  const rawWeights: number[] = []
+  let weightSum = 0
+
+  for (let i = 0; i < 364; i += 1) {
+    const h = (seed ^ Math.imul(i + 17, 2654435761)) >>> 0
+    const activeChance = totalContributions <= 0 ? 0 : Math.min(0.82, 0.08 + totalContributions / 650)
+    const isActive = (h % 1000) / 1000 < activeChance
+    const weight = isActive ? 1 + ((h >> 8) % (totalContributions > 400 ? 11 : 5)) : 0
+    rawWeights.push(weight)
+    weightSum += weight
+  }
+
+  for (let w = 0; w < 52; w += 1) {
+    const days = []
+    for (let d = 0; d < 7; d += 1) {
+      const idx = w * 7 + d
+      const date = new Date(startDate.getTime() + idx * 86400000).toISOString().slice(0, 10)
+      let count = 0
+      if (remaining > 0 && weightSum > 0 && rawWeights[idx] > 0) {
+        count = Math.max(1, Math.round((rawWeights[idx] / weightSum) * totalContributions))
+        count = Math.min(remaining, count)
+        remaining -= count
+      }
+      days.push({ date, contributionCount: count })
+    }
+    weeks.push({ contributionDays: days })
+  }
+
+  // Spread any rounding remainder onto active days
+  if (remaining > 0) {
+    for (let w = 0; w < weeks.length && remaining > 0; w += 1) {
+      for (let d = 0; d < weeks[w].contributionDays.length && remaining > 0; d += 1) {
+        if (weeks[w].contributionDays[d].contributionCount > 0 || totalContributions > 0) {
+          const add = Math.min(remaining, 3)
+          weeks[w].contributionDays[d].contributionCount += add
+          remaining -= add
+        }
+      }
+    }
+  }
+
+  const commits = Math.round(totalContributions * 0.82)
+  const pullRequests = Math.round(totalContributions * 0.12)
+  const issues = Math.max(0, totalContributions - commits - pullRequests)
+
+  return {
+    periodYear: STANDARD_CONTRIBUTION_YEAR,
+    totalContributions,
+    commits,
+    pullRequests,
+    issues,
+    restrictedContributions: 0,
+    calendarWeeks: weeks,
+  }
+}
+
 function buildMockTree(params: {
   id: string
   username: string
@@ -120,23 +189,30 @@ function buildMockTree(params: {
       gridY: params.gridY,
     },
     gifts: params.gifts ?? [],
+    stats: buildSyntheticCalendarStats(params.username, params.contributions),
     custom_message: params.customMessage,
     is_creator_special: params.isCreatorSpecial,
     last_synced_at: '2026-11-20T12:00:00Z',
   }
 }
 
-export const MOCK_CITY_TREES: readonly CityTree[] = [
-  buildMockTree({
+const FEATURED_DEVS: Array<{
+  id: string
+  username: string
+  name: string
+  contributions: number
+  customMessage?: string
+  isCreatorSpecial?: boolean
+  gifts?: CityTree['gifts']
+}> = [
+  {
     id: 'creator-ufc',
     username: 'SaraMag25',
     name: 'Sara Magalhães',
     contributions: 540,
-    gridX: CITY_MAP_CONFIG.plazaCenter.gridX,
-    gridY: CITY_MAP_CONFIG.plazaCenter.gridY,
     isCreatorSpecial: true,
     customMessage:
-      'Estou cursando Engenharia da Computação na UFC e criei esta vila para celebrarmos código aberto e Natal juntos!',
+      'Estou cursando Engenharia da Computação na UFC e criei esta floresta para celebrarmos código aberto e Natal juntos!',
     gifts: [
       {
         id: 'tg-1',
@@ -159,14 +235,12 @@ export const MOCK_CITY_TREES: readonly CityTree[] = [
         created_at: '2026-11-20T11:00:00Z',
       },
     ],
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-1',
     username: 'ada-lovelace',
     name: 'Ada L.',
-    contributions: 642,
-    gridX: 13,
-    gridY: 11,
+    contributions: 842,
     customMessage: 'Compilando flocos de neve em TypeScript!',
     gifts: [
       {
@@ -180,14 +254,12 @@ export const MOCK_CITY_TREES: readonly CityTree[] = [
         created_at: '2026-11-20T09:00:00Z',
       },
     ],
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-2',
     username: 'carlos-fortaleza',
     name: 'Carlos Eduardo',
     contributions: 384,
-    gridX: 23,
-    gridY: 11,
     customMessage: 'Boas festas direto do Ceará!',
     gifts: [
       {
@@ -201,107 +273,158 @@ export const MOCK_CITY_TREES: readonly CityTree[] = [
         created_at: '2026-11-20T08:30:00Z',
       },
     ],
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-3',
     username: 'mariana-ux',
     name: 'Mariana Costa',
     contributions: 215,
-    gridX: 13,
-    gridY: 16,
     customMessage: 'Pixel art e café quente neste inverno.',
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-4',
     username: 'lucas-embedded',
     name: 'Lucas Ribeiro',
     contributions: 84,
-    gridX: 23,
-    gridY: 16,
-    customMessage: 'Piscando LEDs e luzes de Natal!',
-  }),
-  buildMockTree({
+    customMessage: 'Piscando LEDs verdes e luzes de Natal!',
+  },
+  {
     id: 'dev-5',
     username: 'beatriz-py',
     name: 'Beatriz Alves',
     contributions: 36,
-    gridX: 9,
-    gridY: 10,
     customMessage: 'Treinando modelos e decorando pinheiros.',
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-6',
     username: 'joao-rust',
     name: 'João Pedro',
     contributions: 7,
-    gridX: 27,
-    gridY: 10,
     customMessage: 'Primeiro projeto open-source do ano!',
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-7',
     username: 'helena-caloura',
     name: 'Helena Nunes',
     contributions: 0,
-    gridX: 15,
-    gridY: 7,
     customMessage: 'Pronta para dar meu primeiro commit!',
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-8',
     username: 'rafael-go',
     name: 'Rafael Lima',
-    contributions: 478,
-    gridX: 20,
-    gridY: 7,
-    customMessage: 'Quase nos 500 commits antes do Natal!',
-  }),
-  buildMockTree({
+    contributions: 678,
+    customMessage: 'Mais de 600 commits antes do Natal!',
+  },
+  {
     id: 'dev-9',
     username: 'julia-mobile',
     name: 'Júlia Ferreira',
     contributions: 148,
-    gridX: 10,
-    gridY: 16,
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-10',
     username: 'thiago-data',
     name: 'Thiago Rocha',
     contributions: 63,
-    gridX: 26,
-    gridY: 16,
-  }),
-  buildMockTree({
+  },
+  {
     id: 'dev-11',
     username: 'camila-web',
     name: 'Camila Duarte',
     contributions: 19,
-    gridX: 20,
-    gridY: 22,
-  }),
+  },
 ]
+
+const FIRST_NAMES = [
+  'ana', 'pedro', 'gabriel', 'larissa', 'matheus', 'luiza', 'bruno', 'clara',
+  'felipe', 'amanda', 'rodrigo', 'sofia', 'henrique', 'leticia', 'diego', 'isabela',
+  'vitor', 'nicole', 'gustavo', 'yasmin', 'igor', 'marina', 'caio', 'paula',
+]
+
+const STACK_SUFFIXES = [
+  'ts', 'rust', 'py', 'go', 'k8s', 'react', 'linux', 'cpp', 'ml', 'node', 'wasm', 'vim',
+]
+
+function buildForestCommunityTrees(): CityTree[] {
+  const trees: CityTree[] = []
+  const totalPlots = CURATED_TREE_PLOTS.length
+  const targetCommunityCount = Math.min(220, Math.max(12, totalPlots - 12))
+
+  // Place featured developers across normal distributed plots (no central privilege)
+  FEATURED_DEVS.forEach((dev, idx) => {
+    const plotIdx = (idx * 11 + 5) % targetCommunityCount
+    const slot = CURATED_TREE_PLOTS[plotIdx]
+    trees.push(
+      buildMockTree({
+        ...dev,
+        gridX: slot.gridX,
+        gridY: slot.gridY,
+      }),
+    )
+  })
+
+  const usedPlotIndices = new Set(FEATURED_DEVS.map((_, idx) => (idx * 11 + 5) % targetCommunityCount))
+
+  // Fill remaining plots with varied GitHub developers to form a dense Git-City forest
+  let procIdx = 0
+  for (let p = 0; p < targetCommunityCount; p += 1) {
+    if (usedPlotIndices.has(p)) continue
+    const slot = CURATED_TREE_PLOTS[p]
+    const first = FIRST_NAMES[procIdx % FIRST_NAMES.length]
+    const stack = STACK_SUFFIXES[Math.floor(procIdx / FIRST_NAMES.length) % STACK_SUFFIXES.length]
+    const num = Math.floor(procIdx / (FIRST_NAMES.length * STACK_SUFFIXES.length))
+    const username = num > 0 ? `${first}-${stack}-${num}` : `${first}-${stack}`
+    const displayName = `${first[0].toUpperCase()}${first.slice(1)} (${stack.toUpperCase()})`
+
+    // Realistic distribution: seedlings (0), light devs (1-50), active (51-300), high (301-1200)
+    const h = hashUsername(username) % 100
+    let contributions: number
+    if (h < 8) contributions = 0
+    else if (h < 26) contributions = 1 + ((h * 3) % 24)
+    else if (h < 54) contributions = 25 + ((h * 7) % 95)
+    else if (h < 80) contributions = 120 + ((h * 13) % 280)
+    else if (h < 94) contributions = 400 + ((h * 19) % 350)
+    else contributions = 750 + ((h * 29) % 620)
+
+    trees.push(
+      buildMockTree({
+        id: `forest-${procIdx}`,
+        username,
+        name: displayName,
+        contributions,
+        gridX: slot.gridX,
+        gridY: slot.gridY,
+      }),
+    )
+    procIdx += 1
+  }
+
+  return trees
+}
+
+export const MOCK_CITY_TREES: readonly CityTree[] = buildForestCommunityTrees()
 
 export const MOCK_TREE_MESSAGES: readonly TreeMessage[] = [
   {
     id: 'msg-1',
     tree_id: 'creator-ufc',
     sender_name: 'Carlos Eduardo',
-    message: 'Que projeto lindo, Sara! Sucesso na reta final da Engenharia de Computação na UFC!',
+    message: 'Que projeto lindo, Sara! Sucesso na Engenharia da Computação na UFC!',
     created_at: '2026-11-20T09:15:00Z',
   },
   {
     id: 'msg-2',
     tree_id: 'creator-ufc',
     sender_name: 'Mariana Costa',
-    message: 'Amei a vibe Stardew Valley natalina! Feliz Natal para toda a comunidade dev.',
+    message: 'Feliz Natal para toda a comunidade dev iluminando a floresta!',
     created_at: '2026-11-20T11:40:00Z',
   },
   {
     id: 'msg-3',
     tree_id: 'dev-1',
     sender_name: 'Rafael Lima',
-    message: '642 commits este ano?! Essa árvore virou um farol na praça!',
+    message: '842 commits este ano?! Essa copa está brilhando verde demais!',
     created_at: '2026-11-20T10:12:00Z',
   },
   {

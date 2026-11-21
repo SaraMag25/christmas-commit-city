@@ -32,36 +32,36 @@ export function CityExplorerBar({
   }, [trees, query, stageFilter])
 
   return (
-    <div className="pointer-events-none fixed left-3 top-20 z-20 w-[calc(100vw-1.5rem)] max-w-xs sm:left-4 sm:top-24">
-      <div className="pointer-events-auto pixel-night-panel rounded-sm">
+    <div className="pointer-events-none fixed left-3 top-16 z-20 w-[calc(100vw-1.5rem)] max-w-xs sm:left-4 sm:top-20">
+      <div className="pointer-events-auto pixel-night-panel rounded-md">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-amber-200 hover:bg-amber-400/10 cursor-pointer"
+          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-200 hover:bg-emerald-500/10 cursor-pointer"
         >
-          <span className="flex items-center gap-2 font-bold">
-            <Search className="h-3.5 w-3.5 text-amber-300" />
-            Explorar Árvores ({trees.length})
+          <span className="flex items-center gap-2 font-medium">
+            <Search className="h-3.5 w-3.5 text-emerald-400" />
+            <span>trees --list ({trees.length})</span>
           </span>
-          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {isOpen ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
         </button>
 
         {isOpen && (
-          <div className="border-t border-amber-500/30 p-2.5">
+          <div className="border-t border-slate-800 p-2.5">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar @username ou nome..."
-              className="w-full rounded-sm border border-amber-500/40 bg-[#070d1f] px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-amber-300 focus:outline-none"
+              placeholder="filter @username..."
+              className="w-full rounded-sm border border-slate-700 bg-[#040811] px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
             />
 
             <div className="mt-2 flex gap-1 text-[10px]">
               {(
                 [
-                  ['all', 'Todas'],
-                  ['illuminated', 'Iluminadas'],
-                  ['special', 'Especiais'],
+                  ['all', 'todas'],
+                  ['illuminated', 'iluminadas'],
+                  ['special', 'especiais'],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -70,8 +70,8 @@ export function CityExplorerBar({
                   onClick={() => setStageFilter(key)}
                   className={`flex-1 rounded-sm border px-2 py-1 cursor-pointer ${
                     stageFilter === key
-                      ? 'border-amber-300 bg-amber-400/20 font-bold text-amber-200'
-                      : 'border-slate-700 bg-[#070d1f]/70 text-slate-300 hover:border-slate-500'
+                      ? 'border-emerald-400/60 bg-emerald-500/15 font-semibold text-emerald-300'
+                      : 'border-slate-800 bg-[#040811]/70 text-slate-400 hover:border-slate-600'
                   }`}
                 >
                   {label}
@@ -81,8 +81,8 @@ export function CityExplorerBar({
 
             <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-0.5">
               {filteredTrees.length === 0 ? (
-                <li className="py-3 text-center text-[11px] text-slate-400">
-                  Nenhuma árvore encontrada.
+                <li className="py-3 text-center text-[11px] text-slate-500">
+                  nenhuma árvore encontrada.
                 </li>
               ) : (
                 filteredTrees.map((tree) => {
@@ -95,19 +95,19 @@ export function CityExplorerBar({
                         onClick={() => onSelectTree(tree)}
                         className={`flex w-full items-center justify-between gap-2 rounded-sm border px-2.5 py-1.5 text-left text-[11px] transition cursor-pointer ${
                           isActive
-                            ? 'border-amber-400 bg-amber-400/15'
-                            : 'border-slate-700/80 bg-[#070d1f]/75 hover:border-amber-500/50'
+                            ? 'border-emerald-400/70 bg-emerald-500/15'
+                            : 'border-slate-800/90 bg-[#040811]/75 hover:border-emerald-500/40'
                         }`}
                       >
                         <div className="min-w-0">
-                          <p className="truncate font-bold text-amber-200">
+                          <p className="truncate font-semibold text-slate-100">
                             {tree.is_creator_special ? '★ ' : ''}@{tree.profile.github_username}
                           </p>
                           <p className="truncate text-[10px] text-slate-400">
-                            {stage.name} · {tree.contribution_count} commits
+                            nv.{stage.level} · {tree.contribution_count} commits
                           </p>
                         </div>
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                       </button>
                     </li>
                   )

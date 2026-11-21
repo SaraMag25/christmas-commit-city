@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { TreeLevelId } from '../../types/city'
+import type { GitHubContributionWeek, TreeLevelId } from '../../types/city'
 import { drawTreeToCanvas } from './treeCanvasRenderer'
 
 type PaletteMap = Record<string, string>
@@ -618,16 +618,33 @@ export interface TreeTextureOptions {
   seed: number
   isCreatorSpecial?: boolean
   lightsPhase: 0 | 1
+  contributionCount?: number
+  calendarWeeks?: GitHubContributionWeek[]
 }
 
 /**
- * Draws a 40x56 storybook pixel-art Christmas tree combining organic leaf-cluster
- * foliage, textured bark roots, snow tufts, twinkling `+` sparkles, ornaments and gifts.
+ * Draws a 48x64 storybook pixel-art Christmas tree combining organic leaf-cluster
+ * foliage, textured bark roots, snow tufts, twinkling commit lights, ornaments and gifts.
  */
 export function ensureTreeTexture(scene: Phaser.Scene, opts: TreeTextureOptions): void {
-  const { key, level, seed, isCreatorSpecial = false, lightsPhase } = opts
-  createCanvasTexture(scene, key, 40, 56, (ctx) => {
-    drawTreeToCanvas(ctx, { level, seed, isCreatorSpecial, lightsPhase })
+  const {
+    key,
+    level,
+    seed,
+    isCreatorSpecial = false,
+    lightsPhase,
+    contributionCount,
+    calendarWeeks,
+  } = opts
+  createCanvasTexture(scene, key, 48, 64, (ctx) => {
+    drawTreeToCanvas(ctx, {
+      level,
+      seed,
+      isCreatorSpecial,
+      lightsPhase,
+      contributionCount,
+      calendarWeeks,
+    })
   })
 }
 
