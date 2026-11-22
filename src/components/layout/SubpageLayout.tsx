@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useLocale } from '../../context/localeContextStore'
 import { CityHeader } from '../hud/CityHeader'
 import { GitHubConnectModal } from '../panels/GitHubConnectModal'
 import { HowItWorksModal } from '../panels/HowItWorksModal'
@@ -16,6 +17,7 @@ export function SubpageLayout({
   topRightAction,
   children,
 }: SubpageLayoutProps) {
+  const { t } = useLocale()
   const [showHowItWorks, setShowHowItWorks] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
 
@@ -39,7 +41,7 @@ export function SubpageLayout({
             className="pixel-btn pixel-btn-wood rounded-sm px-3 py-1.5 text-xs font-bold"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Voltar à Cidade</span>
+            <span>{t.subpage.backToCity}</span>
           </Link>
 
           {topRightAction}

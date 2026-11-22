@@ -1,30 +1,54 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
+import { CompanionShopModal } from '../components/companions/CompanionShopModal'
 import { GiftCatalogPreviewModal } from '../components/gifts/GiftCatalogPreviewModal'
+import { isViewerTreeOwner } from '../utils/treeOwnership'
 import { CameraControls } from '../components/hud/CameraControls'
 import { CityExplorerBar } from '../components/hud/CityExplorerBar'
 import { CityHeader } from '../components/hud/CityHeader'
 import { GitHubConnectModal } from '../components/panels/GitHubConnectModal'
 import { HeroWelcomeOverlay } from '../components/panels/HeroWelcomeOverlay'
 import { HowItWorksModal } from '../components/panels/HowItWorksModal'
+import { SupportCampaignModal } from '../components/panels/SupportCampaignModal'
 import { TreeDetailsPanel } from '../components/panels/TreeDetailsPanel'
 import { useCity } from '../context/cityContextStore'
+import { useLocale } from '../context/localeContextStore'
 import { City3DCanvas } from '../game/City3DCanvas'
 import { gameEventBus } from '../game/eventBus'
 import type { CityTree, VillagePropDialogue } from '../types/city'
 
 export function HomePage() {
-  const { trees, stats, authError, clearAuthError } = useCity()
+  const {
+    trees,
+    decorativeTrees,
+    stats,
+    currentUserTree,
+    isSupabaseReady,
+    authError,
+    clearAuthError,
+  } = useCity()
+  const { language, t } = useLocale()
   const [searchParams, setSearchParams] = useSearchParams()
   const focusParam = searchParams.get('focus')
+  const searchParam = searchParams.get('search')
 
-  const [showWelcome, setShowWelcome] = useState(() => !focusParam)
+  const [showWelcome, setShowWelcome] = useState(() => !focusParam && !searchParam)
+  const [showSearch, setShowSearch] = useState(() => Boolean(searchParam))
   const [showHowItWorks, setShowHowItWorks] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [giftTargetTree, setGiftTargetTree] = useState<CityTree | null>(null)
+  const [companionTargetTreeId, setCompanionTargetTreeId] = useState<string | null>(null)
+  const [supportTargetUsername, setSupportTargetUsername] = useState<string | null>(null)
   const [hoveredTree, setHoveredTree] = useState<CityTree | null>(null)
   const [selectedTree, setSelectedTree] = useState<CityTree | null>(null)
+
+  const activeSelectedTree = selectedTree
+    ? (trees.find((tItem) => tItem.id === selectedTree.id) ?? selectedTree)
+    : null
+  const companionTargetTree = companionTargetTreeId
+    ? (trees.find((tItem) => tItem.id === companionTargetTreeId) ?? null)
+    : null
   const [propDialogue, setPropDialogue] = useState<VillagePropDialogue | null>(null)
   const [bootLogVisible, setBootLogVisible] = useState(true)
   const isCityReadyRef = useRef(false)
@@ -57,7 +81,25 @@ export function HomePage() {
     }
   }, [])
 
-  // Handle incoming focus query like `/?focus=SaraMag25` from /rankings or /tree/:username
+  useEffect(() => {
+    if (!searchParam) return
+    setSearchParams({}, { replace: true })
+  }, [searchParam, setSearchParams])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) {
+        e.preventDefault()
+        setShowWelcome(false)
+        setShowSearch(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   useEffect(() => {
     if (!focusParam) return
 
@@ -83,39 +125,39 @@ export function HomePage() {
     gameEventBus.emit('city:focus-creator')
   }
 
-  const handleSelectFromExplorer = (tree: CityTree) => {
-    setShowWelcome(false)
-    setPropDialogue(null)
-    gameEventBus.emit('city:focus-tree', tree.id)
-  }
-
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#070d1f]">
-      {/* Full-bleed 3D pixel-art village canvas */}
-      <City3DCanvas trees={trees} />
+    <main className="relative h-screen w-screen overflow-hidden bg-[#0a1633]">
+      <City3DCanvas trees={trees} decorativeTrees={decorativeTrees} />
 
-      {/* Top RPG HUD */}
       <CityHeader
         onOpenConnectModal={() => setShowConnectModal(true)}
         onOpenHowItWorks={() => setShowHowItWorks(true)}
+        onOpenSearch={() => {
+          setShowWelcome(false)
+          setShowSearch(true)
+        }}
         onFocusCreatorTree={handleFocusCreatorTree}
         onShowWelcome={() => {
           setSelectedTree(null)
           setPropDialogue(null)
+          setShowSearch(false)
           setShowWelcome(true)
         }}
       />
 
-      {/* Quick explorer & filter bar */}
-      {!showWelcome && (
-        <CityExplorerBar
-          trees={trees}
-          selectedTreeId={selectedTree?.id ?? null}
-          onSelectTree={handleSelectFromExplorer}
-        />
-      )}
+      <CityExplorerBar
+        trees={trees}
+        selectedTreeId={activeSelectedTree?.id ?? null}
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+        onSelectTree={(tree) => {
+          setShowWelcome(false)
+          setPropDialogue(null)
+          setSelectedTree(tree)
+          gameEventBus.emit('city:focus-tree', tree.profile.github_username)
+        }}
+      />
 
-      {/* Auth / GraphQL Sync Error Notification */}
       {authError && (
         <div
           role="alert"
@@ -123,13 +165,13 @@ export function HomePage() {
         >
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="font-bold text-rose-300">Aviso na sincronização GitHub</p>
+              <p className="font-bold text-rose-300">{t.home.syncWarning}</p>
               <p className="mt-1 leading-snug">{authError}</p>
             </div>
             <button
               type="button"
               onClick={clearAuthError}
-              aria-label="Fechar aviso"
+              aria-label={t.home.close}
               className="rounded-sm p-1 text-rose-200 hover:bg-rose-900 cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
@@ -138,7 +180,6 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Welcome banner highlighting the tagline and actions */}
       {showWelcome && (
         <HeroWelcomeOverlay
           stats={stats}
@@ -148,20 +189,18 @@ export function HomePage() {
         />
       )}
 
-      {/* Discreet developer-terminal world boot log */}
       {bootLogVisible && !showWelcome && (
         <div
           aria-live="polite"
           className="pointer-events-none fixed bottom-16 left-3 z-20 rounded-sm border border-emerald-500/25 bg-[#060b16]/80 px-3 py-2 text-[11px] text-slate-300 backdrop-blur-md sm:left-4"
         >
-          <p className="text-emerald-400">&gt; Loading Christmas Forest...</p>
+          <p className="text-emerald-400">&gt; Loading North Pole Forest...</p>
           <p>&gt; Syncing GitHub contributions...</p>
-          <p>&gt; Generating developer trees...</p>
+          <p>&gt; Generating developer trees &amp; companions...</p>
           <p className="text-amber-300">&gt; World ready.</p>
         </div>
       )}
 
-      {/* Interactive village prop terminal dialogue box */}
       {propDialogue && (
         <div
           role="status"
@@ -170,16 +209,57 @@ export function HomePage() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-[11px] font-semibold text-emerald-400">
-                $ npc talk --target=&quot;{propDialogue.title}&quot;
+                $ npc talk --target=&quot;
+                {language === 'en' ? (propDialogue.titleEn ?? propDialogue.title) : propDialogue.title}
+                &quot;
               </p>
               <p className="mt-1.5 text-xs leading-relaxed text-slate-200">
-                {propDialogue.text}
+                {language === 'en' ? (propDialogue.textEn ?? propDialogue.text) : propDialogue.text}
               </p>
+
+              {propDialogue.action === 'open-shop' && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target =
+                        currentUserTree ??
+                        activeSelectedTree ??
+                        trees.find((item) => item.is_creator_special) ??
+                        trees[0]
+                      if (target) {
+                        setCompanionTargetTreeId(target.id)
+                      }
+                      setPropDialogue(null)
+                    }}
+                    className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-bold"
+                  >
+                    {language === 'en' ? 'Open Companion Shop' : 'Abrir Loja de Companheiros'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target =
+                        activeSelectedTree ??
+                        currentUserTree ??
+                        trees.find((item) => item.is_creator_special) ??
+                        trees[0]
+                      if (target) {
+                        setGiftTargetTree(target)
+                      }
+                      setPropDialogue(null)
+                    }}
+                    className="pixel-btn pixel-btn-gold rounded-sm px-2.5 py-1 text-[11px] font-bold"
+                  >
+                    {language === 'en' ? 'Browse Gifts' : 'Ver Presentes'}
+                  </button>
+                </div>
+              )}
             </div>
             <button
               type="button"
               onClick={() => setPropDialogue(null)}
-              aria-label="Fechar diálogo"
+              aria-label={t.home.close}
               className="rounded-sm border border-slate-700 p-1 text-slate-400 hover:border-slate-500 hover:text-white cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
@@ -188,16 +268,16 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Selected tree details drawer / bottom-sheet */}
-      {selectedTree && (
+      {activeSelectedTree && (
         <TreeDetailsPanel
-          tree={selectedTree}
+          tree={activeSelectedTree}
           onClose={() => setSelectedTree(null)}
           onOpenGiftCatalog={(tree) => setGiftTargetTree(tree)}
+          onOpenCompanionShop={(tree) => setCompanionTargetTreeId(tree.id)}
+          onOpenSupportModal={(tree) => setSupportTargetUsername(tree.profile.github_username)}
         />
       )}
 
-      {/* Zoom & hover coordinates bar */}
       <CameraControls
         hoveredTree={hoveredTree}
         onZoomIn={() => gameEventBus.emit('city:zoom-in')}
@@ -212,7 +292,20 @@ export function HomePage() {
       {giftTargetTree && (
         <GiftCatalogPreviewModal
           recipientUsername={giftTargetTree.profile.github_username}
+          isOwnTree={isViewerTreeOwner(giftTargetTree, currentUserTree, isSupabaseReady)}
           onClose={() => setGiftTargetTree(null)}
+        />
+      )}
+      {companionTargetTree && (
+        <CompanionShopModal
+          tree={companionTargetTree}
+          onClose={() => setCompanionTargetTreeId(null)}
+        />
+      )}
+      {supportTargetUsername && (
+        <SupportCampaignModal
+          targetUsername={supportTargetUsername}
+          onClose={() => setSupportTargetUsername(null)}
         />
       )}
     </main>

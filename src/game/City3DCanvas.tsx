@@ -4,26 +4,65 @@ import { CITY_MAP_CONFIG, CITY_PALETTE } from '../config/cityMapConfig'
 import type { CityTree } from '../types/city'
 import { gameEventBus } from './eventBus'
 import { hashUsername } from './layout/treePlacement'
-import { createVoxelMesh } from './voxel/voxelMaterials'
-import { buildVoxelChristmasTree, updateCommitLightsTwinkle, type BuiltVoxelTree } from './voxel/voxelTreeBuilder'
+import { createVoxelMesh, getUnitBoxGeometry } from './voxel/voxelMaterials'
+import {
+  buildVoxelCompanion,
+  disposeBuiltCompanion,
+  updateCompanionAnimation,
+  type BuiltCompanion,
+} from './voxel/voxelCompanionBuilder'
+import {
+  buildVoxelChristmasTree,
+  instancedBaubleMaterials,
+  updateCommitLightsTwinkle,
+  type BaubleInstanceData,
+  type BuiltVoxelTree,
+} from './voxel/voxelTreeBuilder'
 import { buildVoxelWorld, gridToWorld, type InteractivePropHandle } from './voxel/voxelWorldBuilder'
 
 interface City3DCanvasProps {
   trees: readonly CityTree[]
+  decorativeTrees?: readonly CityTree[]
 }
 
 interface TreeHandle {
   tree: CityTree
   built: BuiltVoxelTree
+  companionGroup: THREE.Group | null
   ring: THREE.Mesh
   worldPos: THREE.Vector3
 }
 
 const PIXEL_SCALE = 3
 
-export function City3DCanvas({ trees }: City3DCanvasProps) {
+function createInstancedBaubleLayer(
+  entries: Array<{ x: number; y: number; z: number; size: number; color: string }>,
+  material: THREE.Material,
+): THREE.InstancedMesh | null {
+  if (entries.length === 0) return null
+  const geom = getUnitBoxGeometry()
+  const instanced = new THREE.InstancedMesh(geom, material, entries.length)
+  const dummy = new THREE.Object3D()
+  const c = new THREE.Color()
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const item = entries[i]
+    dummy.position.set(item.x, item.y, item.z)
+    dummy.scale.set(item.size, item.size, item.size)
+    dummy.updateMatrix()
+    instanced.setMatrixAt(i, dummy.matrix)
+    c.set(item.color)
+    instanced.setColorAt(i, c)
+  }
+
+  instanced.instanceMatrix.needsUpdate = true
+  if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true
+  return instanced
+}
+
+export function City3DCanvas({ trees, decorativeTrees = [] }: City3DCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const latestTreesRef = useRef(trees)
+  const latestTreesRef = useRef<readonly CityTree[]>([...trees, ...decorativeTrees])
   const [hoveredLabel, setHoveredLabel] = useState<{
     username: string
     isCreator: boolean
@@ -32,9 +71,10 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
   } | null>(null)
 
   useEffect(() => {
-    latestTreesRef.current = trees
-    gameEventBus.emit('city:trees-updated', trees)
-  }, [trees])
+    const combined = [...trees, ...decorativeTrees]
+    latestTreesRef.current = combined
+    gameEventBus.emit('city:trees-updated', combined)
+  }, [trees, decorativeTrees])
 
   useEffect(() => {
     const container = containerRef.current
@@ -42,16 +82,18 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(CITY_PALETTE.nightBg)
-    scene.fog = new THREE.FogExp2(CITY_PALETTE.nightBg, 0.0082)
+    scene.fog = new THREE.Fog(CITY_PALETTE.nightSkyNum, 82, 200)
 
     const width = container.clientWidth || window.innerWidth
     const height = container.clientHeight || window.innerHeight
 
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.5, 280)
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.5, 320)
     const renderer = new THREE.WebGLRenderer({
       antialias: false,
       powerPreference: 'high-performance',
     })
+    renderer.toneMapping = THREE.NoToneMapping
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.setPixelRatio(1)
     renderer.setSize(
       Math.max(160, Math.floor(width / PIXEL_SCALE)),
@@ -64,32 +106,75 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
     renderer.domElement.className = 'pixelated block'
     container.appendChild(renderer.domElement)
 
-    // Balanced moonlight + warm forest ambient lighting
-    const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x0f2e24, 1.05)
+    // Crisp Cool-vs-Warm North Pole lighting: icy arctic sky + lavender shadow + golden moon/rim
+    const hemiLight = new THREE.HemisphereLight(0xc2e4ff, 0x6278ad, 1.05)
     scene.add(hemiLight)
 
-    const moonLight = new THREE.DirectionalLight(0xe0f2fe, 1.15)
-    moonLight.position.set(35, 55, -40)
+    const moonLight = new THREE.DirectionalLight(0xfff5d8, 1.18)
+    moonLight.position.set(42, 58, -40)
     scene.add(moonLight)
 
-    const warmFill = new THREE.DirectionalLight(0xfbbf24, 0.35)
-    warmFill.position.set(-25, 22, 30)
+    const warmFill = new THREE.DirectionalLight(0xffbe55, 0.42)
+    warmFill.position.set(-32, 22, 36)
     scene.add(warmFill)
 
-    // Build 3D enchanted Christmas forest & village
+    // Build 3D North Pole winter forest & village
     const world = buildVoxelWorld()
     scene.add(world.root)
 
-    // Developer Christmas trees layer
+    // Developer Christmas trees layer + global instanced GitHub bauble layers
     const treesGroup = new THREE.Group()
     scene.add(treesGroup)
     const treeHandles = new Map<string, TreeHandle>()
+    let companionHandles: Array<{ companion: BuiltCompanion; phase: number }> = []
     let selectedTreeId: string | null = null
     let hoveredTreeId: string | null = null
 
+    const disposeGroupGeometries = (group: THREE.Object3D) => {
+      group.traverse((obj) => {
+        if (obj instanceof THREE.InstancedMesh) {
+          obj.dispose()
+        } else if (obj instanceof THREE.Mesh && obj.geometry && obj.geometry.type !== 'BoxGeometry') {
+          obj.geometry.dispose()
+        }
+      })
+    }
+
     const rebuildTrees = (treeList: readonly CityTree[]) => {
+      for (let i = 0; i < companionHandles.length; i += 1) {
+        disposeBuiltCompanion(companionHandles[i].companion)
+      }
+      disposeGroupGeometries(treesGroup)
       treesGroup.clear()
       treeHandles.clear()
+      companionHandles = []
+
+      const l12Entries: Array<{ x: number; y: number; z: number; size: number; color: string }> = []
+      const l3Entries: Array<{ x: number; y: number; z: number; size: number; color: string }> = []
+      const l4aEntries: Array<{ x: number; y: number; z: number; size: number; color: string }> = []
+      const l4bEntries: Array<{ x: number; y: number; z: number; size: number; color: string }> = []
+
+      const appendWorldBaubles = (
+        worldX: number,
+        worldZ: number,
+        rotY: number,
+        baubles: BaubleInstanceData[],
+      ) => {
+        const cosR = Math.cos(rotY)
+        const sinR = Math.sin(rotY)
+        for (let i = 0; i < baubles.length; i += 1) {
+          const b = baubles[i]
+          const wx = worldX + b.x * cosR + b.z * sinR
+          const wz = worldZ - b.x * sinR + b.z * cosR
+          const item = { x: wx, y: b.y, z: wz, size: b.size, color: b.color }
+          if (b.bucket === 'l4a') l4aEntries.push(item)
+          else if (b.bucket === 'l4b') l4bEntries.push(item)
+          else if (b.bucket === 'l3') l3Entries.push(item)
+          else l12Entries.push(item)
+        }
+      }
+
+      const FRONT_VIEW_YAW = Math.PI * 0.25
 
       treeList.forEach((tree) => {
         const seed = hashUsername(tree.profile.github_username)
@@ -98,29 +183,76 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
           seed,
           gridX: tree.tree_position.gridX,
           gridY: tree.tree_position.gridY,
-          giftCount: tree.gifts.length,
+          gifts: tree.isDecorative ? [] : tree.gifts,
+          giftCount: tree.isDecorative ? 0 : tree.gifts.length,
           isCreatorSpecial: tree.is_creator_special,
           contributionCount: tree.contribution_count,
           calendarWeeks: tree.stats?.calendarWeeks,
+          frontYaw: FRONT_VIEW_YAW,
+          preserveFrontOrientation: true,
+          separateBaubles: true,
         })
 
         const pos = gridToWorld(tree.tree_position.gridX, tree.tree_position.gridY)
         built.group.position.set(pos.x, 0, pos.z)
+        treesGroup.add(built.group)
+        appendWorldBaubles(pos.x, pos.z, built.rotationY, built.baubleInstances)
+
+        // Decorative Day-1 background pines stay non-interactive and excluded from treeHandles
+        if (tree.isDecorative) {
+          return
+        }
+
         built.group.userData = { treeId: tree.id }
 
-        // Uniform emerald/gold selection ring beneath any selected developer tree
-        const ring = createVoxelMesh(pos.x, 0.08, pos.z, 4.4, 0.1, 4.4, '#4ade80', true, 0.72)
+        // Crisp emerald selection ring beneath selected developer tree
+        const ring = createVoxelMesh(pos.x, 0.08, pos.z, 4.1, 0.1, 4.1, '#40c463', true, 0.78)
         ring.visible = tree.id === selectedTreeId
         treesGroup.add(ring)
 
-        treesGroup.add(built.group)
+        let companionGroup: THREE.Group | null = null
+        if (tree.companion?.species) {
+          const companion = buildVoxelCompanion(tree.companion.species, tree.companion.equipped)
+          // Stand completely outside this tree's real outer foliage radius inside the open 30-deg circumcenter pocket
+          const compRadius = Math.max(1.86, built.outerRadius + 0.34)
+          const compX = pos.x + 0.866 * compRadius
+          const compZ = pos.z + 0.5 * compRadius
+
+          const plinthBase = createVoxelMesh(compX, 0.025, compZ, 1.32, 0.05, 1.32, '#dbeafe')
+          const plinthTop = createVoxelMesh(compX, 0.065, compZ, 1.1, 0.06, 1.1, '#f4f8ff')
+          plinthBase.userData = { treeId: tree.id }
+          plinthTop.userData = { treeId: tree.id }
+          treesGroup.add(plinthBase)
+          treesGroup.add(plinthTop)
+
+          companion.group.position.set(compX, 0.08, compZ)
+          companion.group.scale.setScalar(1.46)
+          companion.group.rotation.y = 0.62
+          companion.group.userData = { treeId: tree.id }
+          treesGroup.add(companion.group)
+          companionGroup = companion.group
+          companionHandles.push({ companion, phase: (seed % 100) * 0.17 })
+        }
+
         treeHandles.set(tree.id, {
           tree,
           built,
+          companionGroup,
           ring,
           worldPos: new THREE.Vector3(pos.x, 0, pos.z),
         })
       })
+
+      // Render thousands of GitHub green commit baubles across 350–500+ trees in just 4 draw calls
+      const l12Layer = createInstancedBaubleLayer(l12Entries, instancedBaubleMaterials.l12)
+      const l3Layer = createInstancedBaubleLayer(l3Entries, instancedBaubleMaterials.l3)
+      const l4aLayer = createInstancedBaubleLayer(l4aEntries, instancedBaubleMaterials.l4a)
+      const l4bLayer = createInstancedBaubleLayer(l4bEntries, instancedBaubleMaterials.l4b)
+
+      if (l12Layer) treesGroup.add(l12Layer)
+      if (l3Layer) treesGroup.add(l3Layer)
+      if (l4aLayer) treesGroup.add(l4aLayer)
+      if (l4bLayer) treesGroup.add(l4bLayer)
     }
 
     const highlightSelected = (treeId: string | null) => {
@@ -132,7 +264,7 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
 
     rebuildTrees(latestTreesRef.current)
 
-    // Camera orbit + pan state (smoothly damped) framed over the dense forest skyline
+    // Camera orbit + pan state framed over the expanded North Pole woodland
     const plazaPos = gridToWorld(CITY_MAP_CONFIG.plazaCenter.gridX, CITY_MAP_CONFIG.plazaCenter.gridY)
     const camState = {
       targetX: plazaPos.x,
@@ -143,8 +275,8 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       desiredAzimuth: Math.PI * 0.25,
       polar: 0.62,
       desiredPolar: 0.62,
-      distance: 56,
-      desiredDistance: 56,
+      distance: 60,
+      desiredDistance: 60,
     }
 
     const focusOnPos = (x: number, z: number, distance = 22) => {
@@ -158,7 +290,7 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       camState.desiredZ = plazaPos.z
       camState.desiredAzimuth = Math.PI * 0.25
       camState.desiredPolar = 0.62
-      camState.desiredDistance = 56
+      camState.desiredDistance = 60
     }
 
     // Raycasting & pointer interaction
@@ -201,7 +333,11 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointerNdc, camera)
 
-      const treeTargets = Array.from(treeHandles.values()).map((h) => h.built.group)
+      const treeTargets: THREE.Object3D[] = []
+      treeHandles.forEach((h) => {
+        treeTargets.push(h.built.group)
+        if (h.companionGroup) treeTargets.push(h.companionGroup)
+      })
       const hits = raycaster.intersectObjects(treeTargets, true)
       if (hits.length > 0) {
         const hitId = findTreeIdFromObject(hits[0].object)
@@ -226,7 +362,6 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
         }
       }
 
-      // Check interactive props for pointer cursor
       const propHits = raycaster.intersectObjects(
         world.interactiveProps.map((p) => p.mesh),
         true,
@@ -256,6 +391,14 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
 
     const onPointerMove = (e: PointerEvent) => {
       if (pointerMode === 'none') {
+        if (e.target !== renderer.domElement) {
+          if (hoveredTreeId !== null) {
+            hoveredTreeId = null
+            gameEventBus.emit('city:tree-hovered', null)
+          }
+          setHoveredLabel(null)
+          return
+        }
         updateHoverAt(e.clientX, e.clientY)
         return
       }
@@ -277,16 +420,15 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
         const panFactor = camState.distance * 0.0018
         const cosA = Math.cos(camState.azimuth)
         const sinA = Math.sin(camState.azimuth)
-        // Pan in camera-aligned XZ plane
         camState.desiredX = THREE.MathUtils.clamp(
           camState.desiredX - (dx * cosA + dy * sinA) * panFactor,
-          -66,
-          66,
+          -92,
+          92,
         )
         camState.desiredZ = THREE.MathUtils.clamp(
           camState.desiredZ - (-dx * sinA + dy * cosA) * panFactor,
-          -52,
-          52,
+          -68,
+          68,
         )
       }
     }
@@ -303,7 +445,11 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       pointerNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointerNdc, camera)
 
-      const treeTargets = Array.from(treeHandles.values()).map((h) => h.built.group)
+      const treeTargets: THREE.Object3D[] = []
+      treeHandles.forEach((h) => {
+        treeTargets.push(h.built.group)
+        if (h.companionGroup) treeTargets.push(h.companionGroup)
+      })
       const treeHits = raycaster.intersectObjects(treeTargets, true)
       if (treeHits.length > 0) {
         const hitId = findTreeIdFromObject(treeHits[0].object)
@@ -333,7 +479,7 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       camState.desiredDistance = THREE.MathUtils.clamp(
         camState.desiredDistance * (e.deltaY > 0 ? 1.09 : 0.91),
         14,
-        85,
+        120,
       )
     }
 
@@ -354,7 +500,7 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
           e.touches[0].clientY - e.touches[1].clientY,
         )
         const ratio = pinchStartDist / Math.max(10, d)
-        camState.desiredDistance = THREE.MathUtils.clamp(pinchStartDistanceVal * ratio, 14, 85)
+        camState.desiredDistance = THREE.MathUtils.clamp(pinchStartDistanceVal * ratio, 14, 120)
       }
     }
 
@@ -381,7 +527,6 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
 
-    // Resize handling keeping crisp integer pixel scale
     const handleResize = () => {
       const w = container.clientWidth || window.innerWidth
       const h = container.clientHeight || window.innerHeight
@@ -395,16 +540,15 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
     }
     window.addEventListener('resize', handleResize)
 
-    // Bus listeners
     const unsubs = [
       gameEventBus.on('city:trees-updated', (nextTrees) => {
         rebuildTrees(nextTrees)
       }),
       gameEventBus.on('city:zoom-in', () => {
-        camState.desiredDistance = THREE.MathUtils.clamp(camState.desiredDistance * 0.82, 14, 85)
+        camState.desiredDistance = THREE.MathUtils.clamp(camState.desiredDistance * 0.82, 14, 120)
       }),
       gameEventBus.on('city:zoom-out', () => {
-        camState.desiredDistance = THREE.MathUtils.clamp(camState.desiredDistance * 1.2, 14, 85)
+        camState.desiredDistance = THREE.MathUtils.clamp(camState.desiredDistance * 1.2, 14, 120)
       }),
       gameEventBus.on('city:reset-camera', () => {
         resetToPlaza()
@@ -442,10 +586,14 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
 
     gameEventBus.emit('city:ready')
 
-    // Animation loop
     let animId = 0
     let lastTime = performance.now()
     const dummy = new THREE.Object3D()
+    const lampBaseScales = world.lampGlows.map((glow) => ({
+      x: glow.scale.x,
+      y: glow.scale.y,
+      z: glow.scale.z,
+    }))
 
     const animate = (now: number) => {
       animId = requestAnimationFrame(animate)
@@ -453,7 +601,6 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       lastTime = now
       const t = now / 1000
 
-      // Keyboard movement
       const activeTag = document.activeElement?.tagName
       if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
         let kx = 0
@@ -469,12 +616,11 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
           const sinA = Math.sin(camState.azimuth)
           const moveX = (kx * cosA + kz * sinA) * speed
           const moveZ = (-kx * sinA + kz * cosA) * speed
-          camState.desiredX = THREE.MathUtils.clamp(camState.desiredX + moveX, -66, 66)
-          camState.desiredZ = THREE.MathUtils.clamp(camState.desiredZ + moveZ, -52, 52)
+          camState.desiredX = THREE.MathUtils.clamp(camState.desiredX + moveX, -92, 92)
+          camState.desiredZ = THREE.MathUtils.clamp(camState.desiredZ + moveZ, -68, 68)
         }
       }
 
-      // Smooth camera damping
       const damp = 1 - Math.exp(-8 * dt)
       camState.targetX = THREE.MathUtils.lerp(camState.targetX, camState.desiredX, damp)
       camState.targetZ = THREE.MathUtils.lerp(camState.targetZ, camState.desiredZ, damp)
@@ -491,15 +637,21 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       )
       camera.lookAt(camState.targetX, 1.8, camState.targetZ)
 
-      // Twinkle green GitHub commit lights in O(1) across all forest trees
+      // Twinkle GitHub green commit baubles across all 350–500+ trees in O(1)
       updateCommitLightsTwinkle(t)
+
+      // Animate adopted developer companions beside trees (bobbing, lanterns, coffee steam)
+      for (let i = 0; i < companionHandles.length; i += 1) {
+        const entry = companionHandles[i]
+        updateCompanionAnimation(entry.companion, t, entry.phase)
+      }
 
       // Falling 3D voxel snow
       for (let i = 0; i < world.snowData.length; i += 1) {
         const flake = world.snowData[i]
         flake.y -= flake.speed * dt
         if (flake.y < 0.2) {
-          flake.y = 32
+          flake.y = 34
         }
         const fx = flake.x + Math.sin(t * 1.4 + flake.drift) * 0.45
         dummy.position.set(fx, flake.y, flake.z)
@@ -509,7 +661,7 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       }
       world.snowParticles.instanceMatrix.needsUpdate = true
 
-      // Living forest wildlife: reindeer, foxes, snow bunnies, and river/pond fish
+      // Living forest wildlife
       for (const actor of world.wildlife) {
         const angle = t * actor.speed + actor.phase
         const nx = actor.centerX + Math.cos(angle) * actor.radiusX
@@ -534,12 +686,33 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
         puff.mesh.scale.set(s, s * 0.8, s)
       }
 
+      // Gentle spin + bobbing for Crystal Tower observatory spire
+      for (const crystal of world.crystalRotators) {
+        crystal.mesh.rotation.y = t * 0.55 + crystal.phase
+        crystal.mesh.position.y = crystal.baseY + Math.sin(t * 1.9 + crystal.phase) * 0.35
+      }
+
+      // Instanced golden / cyan / lilac magic sparkles around landmarks & giant mushrooms
+      for (let i = 0; i < world.magicParticleData.length; i += 1) {
+        const p = world.magicParticleData[i]
+        const angle = t * p.speed + p.phase
+        const px = p.centerX + Math.cos(angle) * p.radius
+        const pz = p.centerZ + Math.sin(angle) * p.radius
+        const py = p.baseY + Math.sin(t * 2.1 + p.phase * 1.7) * p.bobAmp
+        const s = p.size * (0.78 + 0.32 * (0.5 + 0.5 * Math.sin(t * 3.8 + p.phase * 3.1)))
+        dummy.position.set(px, py, pz)
+        dummy.scale.set(s, s, s)
+        dummy.updateMatrix()
+        world.magicParticles.setMatrixAt(i, dummy.matrix)
+      }
+      world.magicParticles.instanceMatrix.needsUpdate = true
+
       // Gently undulating Aurora Borealis ribbons
       for (const bar of world.auroraBars) {
         bar.mesh.position.y = bar.baseY + Math.sin(t * 0.8 + bar.phase) * 1.3
       }
 
-      // Floating enchanted forest wisps
+      // Floating forest wisps
       for (const wisp of world.wisps) {
         wisp.mesh.position.set(
           wisp.baseX + Math.sin(t * 0.9 + wisp.phase) * 0.6,
@@ -551,13 +724,21 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       // Flowing river ripples & mountain waterfall cascade
       for (const r of world.riverRipples) {
         if (r.isWaterfall) {
-          const drop = ((t * 4.5 + r.phase) % 5.8)
+          const drop = (t * 4.5 + r.phase) % 5.8
           r.mesh.position.y = 6.2 - drop
         } else {
           const shimmer = Math.sin(t * 2.4 + r.phase)
           r.mesh.position.z = r.baseZ + ((t * 1.1 + r.phase) % 1.4) - 0.7
           r.mesh.scale.set(0.8 + shimmer * 0.22, 0.08, 0.45)
         }
+      }
+
+      // Cozy flicker for warm lantern, campfire, and window glow pads on snow
+      for (let i = 0; i < world.lampGlows.length; i += 1) {
+        const glow = world.lampGlows[i]
+        const base = lampBaseScales[i]
+        const pulse = 1 + Math.sin(t * 3.1 + i * 1.3) * 0.06
+        glow.scale.set(base.x * pulse, base.y, base.z * pulse)
       }
 
       renderer.render(scene, camera)
@@ -579,6 +760,8 @@ export function City3DCanvas({ trees }: City3DCanvasProps) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('resize', handleResize)
+      disposeGroupGeometries(treesGroup)
+      disposeGroupGeometries(world.root)
       renderer.dispose()
       if (dom.parentNode === container) {
         container.removeChild(dom)

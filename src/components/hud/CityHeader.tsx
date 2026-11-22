@@ -1,11 +1,13 @@
-import { Heart, HelpCircle, LogOut, RefreshCw, Terminal, Trees, Trophy } from 'lucide-react'
+import { Heart, HelpCircle, LogOut, RefreshCw, Search, Terminal, Trees } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCity } from '../../context/cityContextStore'
+import { useLocale } from '../../context/localeContextStore'
 import { GitHubIcon } from '../icons/GitHubIcon'
 
 interface CityHeaderProps {
   onOpenConnectModal: () => void
   onOpenHowItWorks: () => void
+  onOpenSearch?: () => void
   onFocusCreatorTree?: () => void
   onShowWelcome?: () => void
 }
@@ -13,14 +15,15 @@ interface CityHeaderProps {
 export function CityHeader({
   onOpenConnectModal,
   onOpenHowItWorks,
+  onOpenSearch,
   onFocusCreatorTree,
   onShowWelcome,
 }: CityHeaderProps) {
   const { stats, currentUserTree, isSyncing, resyncMyTree, signOut } = useCity()
+  const { language, setLanguage, t } = useLocale()
   const location = useLocation()
   const navigate = useNavigate()
   const isHome = location.pathname === '/'
-  const isRankings = location.pathname === '/rankings'
 
   const handleBrandClick = () => {
     if (isHome && onShowWelcome) {
@@ -35,6 +38,14 @@ export function CityHeader({
       onFocusCreatorTree()
     } else {
       navigate('/?focus=SaraMag25')
+    }
+  }
+
+  const handleSearchClick = () => {
+    if (isHome && onOpenSearch) {
+      onOpenSearch()
+    } else {
+      navigate('/?search=1')
     }
   }
 
@@ -54,29 +65,59 @@ export function CityHeader({
               christmas_commit_city
             </span>
             <span className="hidden text-[11px] text-amber-300/80 md:inline">
-              // natal 3d
+              {t.header.subtitle}
             </span>
           </div>
         </button>
 
         <div className="hidden items-center gap-2.5 rounded-sm border border-slate-800 bg-[#040811]/85 px-3 py-1 text-[11px] text-slate-300 xl:flex">
           <span>
-            trees: <strong className="text-emerald-400">{stats.totalTrees}</strong>
+            {t.header.trees}: <strong className="text-emerald-400">{stats.totalTrees}</strong>
           </span>
           <span className="text-slate-700">|</span>
           <span>
-            commits:{' '}
+            {t.header.commits}:{' '}
             <strong className="text-amber-300">
-              {stats.totalContributions.toLocaleString('pt-BR')}
+              {stats.totalContributions.toLocaleString(language)}
             </strong>
           </span>
           <span className="text-slate-700">|</span>
           <span>
-            lights: <strong className="text-emerald-300">{stats.illuminatedTrees}</strong>
+            {t.header.lights}: <strong className="text-emerald-300">{stats.illuminatedTrees}</strong>
           </span>
         </div>
 
-        <nav aria-label="Navegação principal" className="flex flex-wrap items-center gap-1.5">
+        <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-1.5">
+          {/* Discreet PT | EN Language Switcher */}
+          <div
+            role="group"
+            aria-label="Language"
+            className="flex items-center rounded-sm border border-slate-700 bg-[#040811] p-0.5 text-[10px]"
+          >
+            <button
+              type="button"
+              onClick={() => setLanguage('pt-BR')}
+              className={`rounded-[2px] px-1.5 py-0.5 font-bold transition cursor-pointer ${
+                language === 'pt-BR'
+                  ? 'bg-emerald-500/25 text-emerald-300'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              PT
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`rounded-[2px] px-1.5 py-0.5 font-bold transition cursor-pointer ${
+                language === 'en'
+                  ? 'bg-sky-500/25 text-sky-300'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              EN
+            </button>
+          </div>
+
           <Link
             to="/"
             className={`pixel-btn rounded-sm px-2.5 py-1 text-[11px] ${
@@ -84,27 +125,27 @@ export function CityHeader({
             }`}
           >
             <Trees className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">cidade</span>
+            <span className="hidden md:inline">{t.header.city}</span>
           </Link>
 
-          <Link
-            to="/rankings"
-            className={`pixel-btn rounded-sm px-2.5 py-1 text-[11px] ${
-              isRankings ? 'pixel-btn-pine font-semibold' : 'pixel-btn-wood'
-            }`}
+          <button
+            type="button"
+            onClick={handleSearchClick}
+            className="pixel-btn pixel-btn-wood rounded-sm px-2.5 py-1 text-[11px]"
+            title={t.header.findTitle}
           >
-            <Trophy className="h-3.5 w-3.5 text-amber-300" />
-            <span className="hidden sm:inline">rankings</span>
-          </Link>
+            <Search className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">{t.header.find}</span>
+          </button>
 
           <button
             type="button"
             onClick={onOpenHowItWorks}
             className="pixel-btn pixel-btn-wood rounded-sm px-2.5 py-1 text-[11px]"
-            title="Como funciona e estágios das árvores"
+            title={t.howItWorks.title}
           >
             <HelpCircle className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">docs</span>
+            <span className="hidden lg:inline">{t.header.docs}</span>
           </button>
 
           <button
@@ -113,7 +154,7 @@ export function CityHeader({
             className="pixel-btn pixel-btn-gold rounded-sm px-2.5 py-1 text-[11px] font-medium"
           >
             <Heart className="h-3 w-3 fill-current" />
-            <span className="hidden sm:inline">ufc</span>
+            <span className="hidden sm:inline">{t.header.support}</span>
           </button>
 
           {currentUserTree ? (
@@ -121,7 +162,7 @@ export function CityHeader({
               <Link
                 to={`/?focus=${encodeURIComponent(currentUserTree.profile.github_username)}`}
                 className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold"
-                title="Ir para minha árvore"
+                title={t.header.myTreeTitle}
               >
                 <img
                   src={currentUserTree.profile.avatar_url}
@@ -136,8 +177,8 @@ export function CityHeader({
                 onClick={() => void resyncMyTree()}
                 disabled={isSyncing}
                 className="pixel-btn pixel-btn-wood rounded-sm p-1.5 text-[11px] disabled:opacity-60"
-                title="Sincronizar contribuições do GitHub"
-                aria-label="Sincronizar contribuições"
+                title={t.header.resyncTitle}
+                aria-label={t.header.resyncTitle}
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
               </button>
@@ -146,8 +187,8 @@ export function CityHeader({
                 type="button"
                 onClick={() => void signOut()}
                 className="pixel-btn pixel-btn-wood rounded-sm p-1.5 text-[11px]"
-                title="Sair da conta GitHub"
-                aria-label="Sair"
+                title={t.header.signOutTitle}
+                aria-label={t.header.signOutTitle}
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -159,8 +200,8 @@ export function CityHeader({
               className="pixel-btn pixel-btn-red rounded-sm px-2.5 py-1 text-[11px] font-semibold"
             >
               <GitHubIcon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">connect</span>
-              <span className="sm:hidden">git</span>
+              <span className="hidden sm:inline">{t.header.connect}</span>
+              <span className="sm:hidden">{t.header.connectShort}</span>
             </button>
           )}
         </nav>

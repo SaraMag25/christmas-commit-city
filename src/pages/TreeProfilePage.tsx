@@ -5,33 +5,44 @@ import {
   ExternalLink,
   Gift,
   Heart,
-  MessageSquare,
+  PawPrint,
   Share2,
   Sparkles,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { AvatarBadge } from '../components/common/AvatarBadge'
+import { CompanionShopModal } from '../components/companions/CompanionShopModal'
 import { GiftCatalogPreviewModal } from '../components/gifts/GiftCatalogPreviewModal'
+import { TreeGiftsSection } from '../components/gifts/TreeGiftsSection'
+import { isViewerTreeOwner } from '../utils/treeOwnership'
 import { SubpageLayout } from '../components/layout/SubpageLayout'
+import { SupportCampaignModal } from '../components/panels/SupportCampaignModal'
 import { ContributionCalendarPreview } from '../components/tree/ContributionCalendarPreview'
 import { TreePixelCanvas } from '../components/tree/TreePixelCanvas'
+import { getSpeciesById, resolveCompanionDisplayName } from '../config/companions'
 import { STANDARD_CONTRIBUTION_YEAR } from '../config/githubPeriod'
-import { CREATOR_CAMPAIGN } from '../config/pixCampaign'
 import { resolveTreeStage, TREE_STAGES } from '../config/treeLevels'
 import { useCity } from '../context/cityContextStore'
-import { getMessagesByTreeId } from '../data/mockCityData'
+import { useLocale } from '../context/localeContextStore'
+import {
+  CAMPAIGN_COPY,
+  SPECIES_COPY,
+  TREE_STAGE_COPY,
+} from '../i18n/translations'
 
 export function TreeProfilePage() {
-  const { trees } = useCity()
+  const { trees, currentUserTree, isSupabaseReady, isLoadingTrees } = useCity()
+  const { language, t } = useLocale()
   const { username = '' } = useParams<{ username: string }>()
   const [showGiftModal, setShowGiftModal] = useState(false)
+  const [showCompanionModal, setShowCompanionModal] = useState(false)
+  const [showSupportModal, setShowSupportModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const tree = useMemo(() => {
     const normalized = username.trim().toLowerCase()
-    return trees.find((t) => t.profile.github_username.toLowerCase() === normalized)
+    return trees.find((tItem) => tItem.profile.github_username.toLowerCase() === normalized)
   }, [trees, username])
-  const messages = useMemo(() => (tree ? getMessagesByTreeId(tree.id) : []), [tree])
 
   const shareUrl = `${window.location.origin}/tree/${tree?.profile.github_username ?? username}`
 
@@ -49,6 +60,25 @@ export function TreeProfilePage() {
     ? TREE_STAGES.find((stage) => stage.level === tree.tree_level + 1) ?? null
     : null
   const currentStage = tree ? resolveTreeStage(tree.contribution_count) : null
+  const currentStageCopy = currentStage ? TREE_STAGE_COPY[language][currentStage.level] : null
+  const nextStageCopy = nextStage ? TREE_STAGE_COPY[language][nextStage.level] : null
+  const campaignCopy = CAMPAIGN_COPY[language]
+
+  const companionSpecies = getSpeciesById(tree?.companion?.species)
+  const companionSpeciesCopy = companionSpecies
+    ? SPECIES_COPY[language][companionSpecies.id]
+    : null
+  const companionName = companionSpecies && companionSpeciesCopy
+    ? resolveCompanionDisplayName(
+        companionSpecies.id,
+        tree?.companion?.customName,
+        companionSpeciesCopy.defaultName,
+      )
+    : null
+
+  const isOwnTree = tree ? isViewerTreeOwner(tree, currentUserTree, isSupabaseReady) : false
+  const canCustomizeCompanion = Boolean(tree) && (!isSupabaseReady || isOwnTree)
+
   const progressPercent =
     tree && nextStage && currentStage
       ? Math.min(
@@ -74,35 +104,38 @@ export function TreeProfilePage() {
             className="pixel-btn pixel-btn-pine rounded-sm px-3 py-1.5 text-xs font-bold"
           >
             <Compass className="h-4 w-4" />
-            <span>Localizar na Cidade</span>
+            <span>{t.profile.locateInCity}</span>
           </Link>
         ) : undefined
       }
     >
-      {!tree || !currentStage ? (
+      {isLoadingTrees && !tree ? (
+        <section className="pixel-night-panel rounded-sm p-8 text-center">
+          <p className="text-xs text-emerald-300">{t.profile.loadingTrees}</p>
+        </section>
+      ) : !tree || !currentStage || !currentStageCopy ? (
         <section className="pixel-wood-panel rounded-sm p-8 text-center">
-          <h1 className="font-pixel-title text-base text-amber-300">Árvore não encontrada</h1>
+          <h1 className="font-pixel-title text-base text-amber-300">{t.profile.notFoundTitle}</h1>
           <p className="mt-3 text-sm text-amber-100/90">
-            Ainda não existe uma árvore plantada para <strong>@{username}</strong> na vila.
+            {t.profile.notFoundDesc} <strong>@{username}</strong>.
           </p>
           <Link
             to="/"
             className="pixel-btn pixel-btn-gold mt-5 inline-flex rounded-sm px-5 py-2.5 text-xs font-bold"
           >
-            Explorar Árvores da Vila
+            {t.profile.exploreCta}
           </Link>
         </section>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-          {/* Left Showcase: 3D Pixel-Art Tree + Quick Share */}
           <section className="flex flex-col items-center pixel-night-panel rounded-md p-5">
             <div className="relative flex w-full flex-col items-center justify-center rounded-sm border border-slate-800 bg-gradient-to-b from-[#040811] via-[#0a1324] to-[#0f2e24]/40 p-5">
               <div className="mb-2 inline-flex items-center gap-1.5 rounded-sm border border-emerald-500/30 bg-[#040811]/90 px-2.5 py-1 text-[10px] font-medium text-emerald-300">
                 <Sparkles className="h-3 w-3 text-amber-300" />
                 <span>
                   {tree.is_creator_special
-                    ? '★ árvore especial ufc'
-                    : `nv.${String(currentStage.level).padStart(2, '0')} · ${currentStage.name}`}
+                    ? t.profile.specialBadge
+                    : `lv.${String(currentStage.level).padStart(2, '0')} · ${currentStageCopy.name}`}
                 </span>
               </div>
 
@@ -113,14 +146,42 @@ export function TreeProfilePage() {
               </p>
             </div>
 
-            <div className="mt-4 flex w-full flex-col gap-2">
+            {/* Companion Summary Box (visible to all visitors) */}
+            <div className="mt-3 w-full rounded-sm border border-slate-800 bg-[#040811]/85 p-3 text-left text-[11px]">
+              <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
+                {t.profile.companionActiveLabel}
+              </p>
+              <span className="flex items-center gap-1.5 font-semibold text-slate-200">
+                <PawPrint className="h-3.5 w-3.5 text-amber-300" />
+                <span>{companionName ?? t.profile.noPet}</span>
+              </span>
+            </div>
+
+            <div className="mt-4 flex w-full flex-col gap-2 border-t border-slate-800/80 pt-3">
+              <p className="text-center text-[10px] uppercase tracking-wide text-slate-400">
+                {t.profile.actionsLabel}
+              </p>
+
+              {canCustomizeCompanion && (
+                <button
+                  type="button"
+                  onClick={() => setShowCompanionModal(true)}
+                  className="pixel-btn pixel-btn-pine w-full rounded-sm px-4 py-2.5 text-xs font-bold"
+                >
+                  <PawPrint className="h-4 w-4 text-amber-300" />
+                  <span>
+                    {companionSpecies ? t.profile.customizePet : t.profile.adoptPet}
+                  </span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowGiftModal(true)}
                 className="pixel-btn pixel-btn-red w-full rounded-sm px-4 py-2.5 text-xs font-bold"
               >
                 <Gift className="h-4 w-4" />
-                <span>Presentear esta Árvore</span>
+                <span>{isOwnTree ? t.profile.giftMyTree : t.profile.giftTree}</span>
               </button>
 
               <button
@@ -129,19 +190,18 @@ export function TreeProfilePage() {
                 className="pixel-btn pixel-btn-gold w-full rounded-sm px-4 py-2 text-xs font-bold"
               >
                 {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                <span>{copied ? 'Link copiado!' : 'Copiar link da árvore'}</span>
+                <span>{copied ? t.profile.linkCopied : t.profile.copyLink}</span>
               </button>
             </div>
 
-            {/* Social Share Links */}
             <div className="mt-4 w-full border-t border-amber-500/25 pt-3">
               <p className="text-center text-[10px] uppercase tracking-wide text-slate-400">
-                Compartilhar nas redes
+                {t.profile.shareSocial}
               </p>
               <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
                 <a
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                    `Veja a árvore de @${tree.profile.github_username} na Christmas Commit City!`,
+                    `Check out @${tree.profile.github_username}'s tree in Christmas Commit City!`,
                   )}&url=${encodeURIComponent(shareUrl)}`}
                   target="_blank"
                   rel="noreferrer"
@@ -151,7 +211,7 @@ export function TreeProfilePage() {
                 </a>
                 <a
                   href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `Olha essa árvore na Christmas Commit City: ${shareUrl}`,
+                    `Christmas Commit City: ${shareUrl}`,
                   )}`}
                   target="_blank"
                   rel="noreferrer"
@@ -173,7 +233,6 @@ export function TreeProfilePage() {
             </div>
           </section>
 
-          {/* Right Column: Developer Profile, Contributions, Gifts & Visitor Messages */}
           <div className="space-y-5">
             <section className="pixel-night-panel rounded-md p-5">
               <p className="mb-3 text-[11px] text-emerald-400">
@@ -201,7 +260,7 @@ export function TreeProfilePage() {
                       rel="noreferrer"
                       className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline"
                     >
-                      <span>[ view github profile ]</span>
+                      <span>{t.treePanel.viewGithub}</span>
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
@@ -212,7 +271,7 @@ export function TreeProfilePage() {
                     commits ({STANDARD_CONTRIBUTION_YEAR})
                   </p>
                   <p className="mt-0.5 text-lg font-bold text-emerald-400">
-                    {tree.contribution_count.toLocaleString('pt-BR')}
+                    {tree.contribution_count.toLocaleString(language)}
                   </p>
                 </div>
               </div>
@@ -220,12 +279,12 @@ export function TreeProfilePage() {
               <div className="mt-4 rounded-sm border border-slate-800 bg-[#040811]/85 p-3">
                 <div className="flex items-center justify-between text-[11px]">
                   <span style={{ color: currentStage.accentColor }} className="font-semibold">
-                    {currentStage.name} ({currentStage.badgeLabel})
+                    {currentStageCopy.name} ({currentStageCopy.badgeLabel})
                   </span>
                   <span className="text-slate-400">
-                    {nextStage
-                      ? `${Math.max(0, nextStage.minContributions - tree.contribution_count)} commits para ${nextStage.name}`
-                      : 'Estágio máximo'}
+                    {nextStage && nextStageCopy
+                      ? `${Math.max(0, nextStage.minContributions - tree.contribution_count)} ${t.profile.commitsLeftFor} ${nextStageCopy.name}`
+                      : t.profile.maxStage}
                   </span>
                 </div>
                 <div className="mt-2 h-2 w-full overflow-hidden rounded-sm bg-slate-900">
@@ -240,16 +299,25 @@ export function TreeProfilePage() {
                 <div className="mt-4 rounded-sm border-2 border-amber-400/70 bg-[#0d1833]/90 p-3.5">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
                     <Heart className="h-4 w-4 fill-rose-500 text-rose-400" />
-                    {CREATOR_CAMPAIGN.title}
+                    {campaignCopy.title}
                   </p>
-                  <p className="mt-2 font-pixel-body text-xl leading-snug text-amber-50">
-                    &ldquo;{CREATOR_CAMPAIGN.message}&rdquo;
-                  </p>
+                  <div className="mt-2.5 space-y-2.5 text-xs leading-relaxed text-amber-50/95 sm:text-[13px]">
+                    {campaignCopy.paragraphs.map((paragraph, idx) => (
+                      <p key={idx}>{paragraph}</p>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSupportModal(true)}
+                    className="pixel-btn pixel-btn-gold mt-3 rounded-sm px-4 py-2 text-xs font-bold"
+                  >
+                    <Heart className="h-3.5 w-3.5" />
+                    <span>{t.profile.supportCampaignBtn}</span>
+                  </button>
                 </div>
               )}
             </section>
 
-            {/* GitHub GraphQL Activity Breakdown & Contribution Calendar */}
             <ContributionCalendarPreview
               stats={tree.stats}
               fallbackTotal={tree.contribution_count}
@@ -259,62 +327,12 @@ export function TreeProfilePage() {
               <div className="flex items-center justify-between border-b border-amber-500/30 pb-2.5">
                 <h2 className="flex items-center gap-2 text-xs font-bold text-rose-300">
                   <Gift className="h-4 w-4" />
-                  Presentes recebidos ({tree.gifts.length})
+                  {t.profile.giftsTitle} ({tree.gifts.length})
                 </h2>
-                <span className="text-[10px] text-slate-400">
-                  Separados das estatísticas de commits
-                </span>
+                <span className="text-[10px] text-slate-400">{t.profile.giftsNote}</span>
               </div>
 
-              {tree.gifts.length === 0 ? (
-                <p className="mt-3 text-xs text-slate-400">
-                  Nenhum presente recebido ainda. Use o botão ao lado para conhecer o catálogo!
-                </p>
-              ) : (
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {tree.gifts.map((gift) => (
-                    <div
-                      key={gift.id}
-                      className="flex items-center justify-between rounded-sm border border-slate-700 bg-[#070d1f]/85 px-3 py-2 text-xs"
-                    >
-                      <div>
-                        <p className="font-bold text-amber-200">{gift.gift_name}</p>
-                        <p className="text-[10px] text-slate-400">Enviado por {gift.sender_name}</p>
-                      </div>
-                      <span className="rounded-sm bg-[#15244a] px-2 py-0.5 text-[10px] uppercase text-sky-300">
-                        {gift.rarity}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="pixel-night-panel rounded-sm p-5">
-              <h2 className="flex items-center gap-2 border-b border-amber-500/30 pb-2.5 text-xs font-bold text-emerald-300">
-                <MessageSquare className="h-4 w-4" />
-                Mensagens de visitantes ({messages.length})
-              </h2>
-
-              {messages.length === 0 ? (
-                <p className="mt-3 text-xs text-slate-400">
-                  Ainda não há recados nesta árvore. O mural interativo será conectado na Fase 6.
-                </p>
-              ) : (
-                <ul className="mt-3 space-y-2.5">
-                  {messages.map((msg) => (
-                    <li
-                      key={msg.id}
-                      className="rounded-sm border border-[#8c5835] bg-[#3b2110]/60 p-3"
-                    >
-                      <p className="text-xs font-bold text-amber-300">{msg.sender_name}</p>
-                      <p className="mt-1 font-pixel-body text-xl leading-snug text-amber-50">
-                        &ldquo;{msg.message}&rdquo;
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <TreeGiftsSection tree={tree} isOwner={isOwnTree} />
             </section>
           </div>
         </div>
@@ -323,7 +341,20 @@ export function TreeProfilePage() {
       {showGiftModal && tree && (
         <GiftCatalogPreviewModal
           recipientUsername={tree.profile.github_username}
+          isOwnTree={isOwnTree}
           onClose={() => setShowGiftModal(false)}
+        />
+      )}
+      {showCompanionModal && tree && (
+        <CompanionShopModal
+          tree={tree}
+          onClose={() => setShowCompanionModal(false)}
+        />
+      )}
+      {showSupportModal && tree && (
+        <SupportCampaignModal
+          targetUsername={tree.profile.github_username}
+          onClose={() => setShowSupportModal(false)}
         />
       )}
     </SubpageLayout>

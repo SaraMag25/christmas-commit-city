@@ -1,98 +1,21 @@
-import { resolveTreeStage } from '../config/treeLevels'
+import { GIFTS_CATALOG } from '../config/gifts'
 import { STANDARD_CONTRIBUTION_YEAR } from '../config/githubPeriod'
-import { CURATED_TREE_PLOTS, hashUsername } from '../game/layout/treePlacement'
+import { CREATOR_CAMPAIGN } from '../config/supportCampaign'
+import { resolveTreeStage } from '../config/treeLevels'
+import {
+  CURATED_TREE_PLOTS,
+  hashUsername,
+  selectStratifiedTreePlots,
+} from '../game/layout/treePlacement'
 import type {
   CityCommunityStats,
   CityTree,
-  GiftItem,
-  GiftRarity,
   GitHubContributionStats,
   GitHubContributionWeek,
-  TreeMessage,
 } from '../types/city'
+import type { TreeCompanionState } from '../types/companion'
 
-export const MOCK_GIFTS_CATALOG: readonly GiftItem[] = [
-  {
-    id: 'gift-star',
-    slug: 'golden-star',
-    name: 'Estrela Dourada',
-    category: 'special',
-    price: 10,
-    rarity: 'legendary',
-    description: 'Brilha no topo dos galhos como símbolo de apoio comunitário.',
-    accentColor: '#fbbf24',
-  },
-  {
-    id: 'gift-baubles',
-    slug: 'ornament-baubles',
-    name: 'Bolas Natalinas',
-    category: 'free',
-    price: 0,
-    rarity: 'common',
-    description: 'Bolinhas clássicas vermelhas e douradas para celebrar commits.',
-    accentColor: '#ef4444',
-  },
-  {
-    id: 'gift-lights',
-    slug: 'colorful-lights',
-    name: 'Luzes Coloridas',
-    category: 'free',
-    price: 0,
-    rarity: 'rare',
-    description: 'Cordão cintilante que deixa qualquer pinheiro mais acolhedor.',
-    accentColor: '#38bdf8',
-  },
-  {
-    id: 'gift-bell',
-    slug: 'festive-bell',
-    name: 'Sinos',
-    category: 'free',
-    price: 0,
-    rarity: 'common',
-    description: 'Pequenos sinos dourados que anunciam a chegada do Natal.',
-    accentColor: '#f59e0b',
-  },
-  {
-    id: 'gift-snowflake',
-    slug: 'crystal-snowflake',
-    name: 'Flocos de Neve',
-    category: 'free',
-    price: 0,
-    rarity: 'rare',
-    description: 'Cristais de gelo cintilantes para enfeitar os ramos.',
-    accentColor: '#bae6fd',
-  },
-  {
-    id: 'gift-box',
-    slug: 'gift-box',
-    name: 'Caixa de Presente',
-    category: 'free',
-    price: 0,
-    rarity: 'common',
-    description: 'Uma caixinha embrulhada com laço vermelho ao pé da árvore.',
-    accentColor: '#22c55e',
-  },
-  {
-    id: 'gift-teddy',
-    slug: 'cozy-teddy',
-    name: 'Ursinho de Inverno',
-    category: 'special',
-    price: 15,
-    rarity: 'epic',
-    description: 'Um ursinho com cachecol natalino colocado junto ao tronco.',
-    accentColor: '#d97706',
-  },
-  {
-    id: 'gift-crown',
-    slug: 'ufc-ornament',
-    name: 'Enfeite Especial',
-    category: 'special',
-    price: 25,
-    rarity: 'legendary',
-    description: 'Enfeite raro em edição natalina para homenagear grandes projetos.',
-    accentColor: '#fde047',
-  },
-]
+export const MOCK_GIFTS_CATALOG = GIFTS_CATALOG
 
 function buildSyntheticCalendarStats(
   username: string,
@@ -101,19 +24,73 @@ function buildSyntheticCalendarStats(
   const seed = hashUsername(username)
   const weeks: GitHubContributionWeek[] = []
   const startDate = new Date(Date.UTC(STANDARD_CONTRIBUTION_YEAR, 0, 1))
-  let remaining = Math.max(0, totalContributions)
+  const safeTotal = Math.max(0, Math.floor(totalContributions))
 
-  // First pass: generate 52 weeks x 7 days deterministic activity weights
-  const rawWeights: number[] = []
-  let weightSum = 0
+  // First pass: collect deterministic active days across all 364 days of the year
+  const rawWeights = new Array<number>(364).fill(0)
+  const candidateActiveIndices: number[] = []
+  const activeChance =
+    safeTotal <= 0 ? 0 : Math.min(0.68, 0.1 + safeTotal / 950)
 
   for (let i = 0; i < 364; i += 1) {
     const h = (seed ^ Math.imul(i + 17, 2654435761)) >>> 0
-    const activeChance = totalContributions <= 0 ? 0 : Math.min(0.82, 0.08 + totalContributions / 650)
-    const isActive = (h % 1000) / 1000 < activeChance
-    const weight = isActive ? 1 + ((h >> 8) % (totalContributions > 400 ? 11 : 5)) : 0
-    rawWeights.push(weight)
-    weightSum += weight
+    if ((h % 1000) / 1000 < activeChance) {
+      candidateActiveIndices.push(i)
+      rawWeights[i] = 1 + ((h >> 8) % (safeTotal > 400 ? 10 : 5))
+    }
+  }
+
+  // Ensure at least one active day when safeTotal > 0 and never more active days than total commits
+  if (safeTotal > 0 && candidateActiveIndices.length === 0) {
+    const fallbackIdx = seed % 364
+    candidateActiveIndices.push(fallbackIdx)
+    rawWeights[fallbackIdx] = 1
+  }
+
+  let selectedIndices = candidateActiveIndices
+  if (candidateActiveIndices.length > safeTotal) {
+    selectedIndices = []
+    for (let k = 0; k < safeTotal; k += 1) {
+      const pick = Math.floor((k * candidateActiveIndices.length) / safeTotal)
+      selectedIndices.push(candidateActiveIndices[pick])
+    }
+  }
+
+  const dailyCounts = new Array<number>(364).fill(0)
+  if (safeTotal > 0 && selectedIndices.length > 0) {
+    // Guarantee 1 commit per selected active day spread evenly across the full 52-week year
+    let remaining = safeTotal
+    for (const idx of selectedIndices) {
+      if (remaining <= 0) break
+      dailyCounts[idx] = 1
+      remaining -= 1
+    }
+
+    // Distribute remaining commits proportionally by deterministic weight across active days
+    const selectedWeightSum = selectedIndices.reduce((acc, idx) => acc + rawWeights[idx], 0)
+    if (remaining > 0 && selectedWeightSum > 0) {
+      const bonusPool = remaining
+      for (const idx of selectedIndices) {
+        if (remaining <= 0) break
+        const extra = Math.min(
+          remaining,
+          Math.floor((rawWeights[idx] / selectedWeightSum) * bonusPool),
+        )
+        if (extra > 0) {
+          dailyCounts[idx] += extra
+          remaining -= extra
+        }
+      }
+    }
+
+    // Spread any small rounding remainder across active days across the year (not clumped in week 0)
+    let cursor = seed % selectedIndices.length
+    while (remaining > 0) {
+      const idx = selectedIndices[cursor % selectedIndices.length]
+      dailyCounts[idx] += 1
+      remaining -= 1
+      cursor += 3
+    }
   }
 
   for (let w = 0; w < 52; w += 1) {
@@ -121,40 +98,19 @@ function buildSyntheticCalendarStats(
     for (let d = 0; d < 7; d += 1) {
       const idx = w * 7 + d
       const date = new Date(startDate.getTime() + idx * 86400000).toISOString().slice(0, 10)
-      let count = 0
-      if (remaining > 0 && weightSum > 0 && rawWeights[idx] > 0) {
-        count = Math.max(1, Math.round((rawWeights[idx] / weightSum) * totalContributions))
-        count = Math.min(remaining, count)
-        remaining -= count
-      }
-      days.push({ date, contributionCount: count })
+      days.push({ date, contributionCount: dailyCounts[idx] })
     }
     weeks.push({ contributionDays: days })
   }
 
-  // Spread any rounding remainder onto active days
-  if (remaining > 0) {
-    for (let w = 0; w < weeks.length && remaining > 0; w += 1) {
-      for (let d = 0; d < weeks[w].contributionDays.length && remaining > 0; d += 1) {
-        if (weeks[w].contributionDays[d].contributionCount > 0 || totalContributions > 0) {
-          const add = Math.min(remaining, 3)
-          weeks[w].contributionDays[d].contributionCount += add
-          remaining -= add
-        }
-      }
-    }
-  }
-
-  const commits = Math.round(totalContributions * 0.82)
-  const pullRequests = Math.round(totalContributions * 0.12)
-  const issues = Math.max(0, totalContributions - commits - pullRequests)
+  const commits = safeTotal
 
   return {
     periodYear: STANDARD_CONTRIBUTION_YEAR,
-    totalContributions,
+    totalContributions: safeTotal,
     commits,
-    pullRequests,
-    issues,
+    pullRequests: 0,
+    issues: 0,
     restrictedContributions: 0,
     calendarWeeks: weeks,
   }
@@ -170,6 +126,7 @@ function buildMockTree(params: {
   customMessage?: string
   isCreatorSpecial?: boolean
   gifts?: CityTree['gifts']
+  companion?: TreeCompanionState
 }): CityTree {
   const stage = resolveTreeStage(params.contributions)
   return {
@@ -189,6 +146,7 @@ function buildMockTree(params: {
       gridY: params.gridY,
     },
     gifts: params.gifts ?? [],
+    companion: params.companion,
     stats: buildSyntheticCalendarStats(params.username, params.contributions),
     custom_message: params.customMessage,
     is_creator_special: params.isCreatorSpecial,
@@ -204,6 +162,7 @@ const FEATURED_DEVS: Array<{
   customMessage?: string
   isCreatorSpecial?: boolean
   gifts?: CityTree['gifts']
+  companion?: TreeCompanionState
 }> = [
   {
     id: 'creator-ufc',
@@ -211,8 +170,15 @@ const FEATURED_DEVS: Array<{
     name: 'Sara Magalhães',
     contributions: 540,
     isCreatorSpecial: true,
-    customMessage:
-      'Estou cursando Engenharia da Computação na UFC e criei esta floresta para celebrarmos código aberto e Natal juntos!',
+    customMessage: CREATOR_CAMPAIGN.message,
+    companion: {
+      species: 'capybara',
+      equipped: {
+        head: 'santa-hat',
+        body: 'leaf-scarf',
+        hand: 'coffee-mug',
+      },
+    },
     gifts: [
       {
         id: 'tg-1',
@@ -221,7 +187,7 @@ const FEATURED_DEVS: Array<{
         gift_name: 'Estrela Dourada',
         category: 'special',
         rarity: 'legendary',
-        sender_name: 'Comunidade UFC',
+        sender_name: 'Amigos da Faculdade',
         created_at: '2026-11-20T10:00:00Z',
       },
       {
@@ -242,6 +208,14 @@ const FEATURED_DEVS: Array<{
     name: 'Ada L.',
     contributions: 842,
     customMessage: 'Compilando flocos de neve em TypeScript!',
+    companion: {
+      species: 'cat',
+      equipped: {
+        head: 'golden-butterfly',
+        body: 'round-glasses',
+        hand: 'white-fish',
+      },
+    },
     gifts: [
       {
         id: 'tg-3',
@@ -261,6 +235,14 @@ const FEATURED_DEVS: Array<{
     name: 'Carlos Eduardo',
     contributions: 384,
     customMessage: 'Boas festas direto do Ceará!',
+    companion: {
+      species: 'snake',
+      equipped: {
+        head: null,
+        body: 'leaf-scarf',
+        hand: null,
+      },
+    },
     gifts: [
       {
         id: 'tg-4',
@@ -280,6 +262,14 @@ const FEATURED_DEVS: Array<{
     name: 'Mariana Costa',
     contributions: 215,
     customMessage: 'Pixel art e café quente neste inverno.',
+    companion: {
+      species: 'mouse',
+      equipped: {
+        head: 'strawberry-hat',
+        body: 'leaf-scarf',
+        hand: 'cheese-wedge',
+      },
+    },
   },
   {
     id: 'dev-4',
@@ -315,12 +305,28 @@ const FEATURED_DEVS: Array<{
     name: 'Rafael Lima',
     contributions: 678,
     customMessage: 'Mais de 600 commits antes do Natal!',
+    companion: {
+      species: 'frog',
+      equipped: {
+        head: 'wizard-hat',
+        body: 'wizard-cloak',
+        hand: 'glow-lantern',
+      },
+    },
   },
   {
     id: 'dev-9',
     username: 'julia-mobile',
     name: 'Júlia Ferreira',
     contributions: 148,
+    companion: {
+      species: 'otter',
+      equipped: {
+        head: 'leaf-umbrella',
+        body: null,
+        hand: 'coffee-mug',
+      },
+    },
   },
   {
     id: 'dev-10',
@@ -349,12 +355,17 @@ const STACK_SUFFIXES = [
 function buildForestCommunityTrees(): CityTree[] {
   const trees: CityTree[] = []
   const totalPlots = CURATED_TREE_PLOTS.length
-  const targetCommunityCount = Math.min(220, Math.max(12, totalPlots - 12))
+  // Populate all 380 community trees evenly across the compact 56x42 forest while keeping open slots for new devs
+  const targetCommunityCount = Math.min(380, Math.max(12, totalPlots - 50))
+  const populatedSlots = selectStratifiedTreePlots(CURATED_TREE_PLOTS, targetCommunityCount)
 
-  // Place featured developers across normal distributed plots (no central privilege)
+  // Place featured developers across well-spaced plots (creator near North Pole clearing)
   FEATURED_DEVS.forEach((dev, idx) => {
-    const plotIdx = (idx * 11 + 5) % targetCommunityCount
-    const slot = CURATED_TREE_PLOTS[plotIdx]
+    const plotIdx =
+      idx === 0
+        ? Math.floor(populatedSlots.length * 0.46)
+        : (idx * 17 + 7) % populatedSlots.length
+    const slot = populatedSlots[plotIdx]
     trees.push(
       buildMockTree({
         ...dev,
@@ -364,13 +375,19 @@ function buildForestCommunityTrees(): CityTree[] {
     )
   })
 
-  const usedPlotIndices = new Set(FEATURED_DEVS.map((_, idx) => (idx * 11 + 5) % targetCommunityCount))
+  const usedPlotIndices = new Set(
+    FEATURED_DEVS.map((_, idx) =>
+      idx === 0
+        ? Math.floor(populatedSlots.length * 0.46)
+        : (idx * 17 + 7) % populatedSlots.length,
+    ),
+  )
 
   // Fill remaining plots with varied GitHub developers to form a dense Git-City forest
   let procIdx = 0
-  for (let p = 0; p < targetCommunityCount; p += 1) {
+  for (let p = 0; p < populatedSlots.length; p += 1) {
     if (usedPlotIndices.has(p)) continue
-    const slot = CURATED_TREE_PLOTS[p]
+    const slot = populatedSlots[p]
     const first = FIRST_NAMES[procIdx % FIRST_NAMES.length]
     const stack = STACK_SUFFIXES[Math.floor(procIdx / FIRST_NAMES.length) % STACK_SUFFIXES.length]
     const num = Math.floor(procIdx / (FIRST_NAMES.length * STACK_SUFFIXES.length))
@@ -404,54 +421,6 @@ function buildForestCommunityTrees(): CityTree[] {
 }
 
 export const MOCK_CITY_TREES: readonly CityTree[] = buildForestCommunityTrees()
-
-export const MOCK_TREE_MESSAGES: readonly TreeMessage[] = [
-  {
-    id: 'msg-1',
-    tree_id: 'creator-ufc',
-    sender_name: 'Carlos Eduardo',
-    message: 'Que projeto lindo, Sara! Sucesso na Engenharia da Computação na UFC!',
-    created_at: '2026-11-20T09:15:00Z',
-  },
-  {
-    id: 'msg-2',
-    tree_id: 'creator-ufc',
-    sender_name: 'Mariana Costa',
-    message: 'Feliz Natal para toda a comunidade dev iluminando a floresta!',
-    created_at: '2026-11-20T11:40:00Z',
-  },
-  {
-    id: 'msg-3',
-    tree_id: 'dev-1',
-    sender_name: 'Rafael Lima',
-    message: '842 commits este ano?! Essa copa está brilhando verde demais!',
-    created_at: '2026-11-20T10:12:00Z',
-  },
-  {
-    id: 'msg-4',
-    tree_id: 'dev-2',
-    sender_name: 'Beatriz Alves',
-    message: 'Saudações natalinas de Fortaleza! Boas festas!',
-    created_at: '2026-11-20T08:50:00Z',
-  },
-]
-
-export function getMessagesByTreeId(treeId: string): TreeMessage[] {
-  return MOCK_TREE_MESSAGES.filter((msg) => msg.tree_id === treeId)
-}
-
-const RARITY_WEIGHT: Record<GiftRarity, number> = {
-  common: 1,
-  rare: 2,
-  epic: 3,
-  legendary: 5,
-}
-
-export function computeTreeDecorationScore(tree: CityTree): number {
-  const uniqueGiftTypes = new Set(tree.gifts.map((g) => g.gift_slug)).size
-  const raritySum = tree.gifts.reduce((acc, gift) => acc + RARITY_WEIGHT[gift.rarity], 0)
-  return tree.tree_level * 2 + uniqueGiftTypes * 3 + raritySum
-}
 
 export function computeCommunityStats(trees: readonly CityTree[]): CityCommunityStats {
   return trees.reduce<CityCommunityStats>(

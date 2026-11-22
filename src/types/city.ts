@@ -1,3 +1,5 @@
+import type { TreeCompanionState } from './companion'
+
 export type TreeLevelId = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export interface TreeStageConfig {
@@ -32,6 +34,7 @@ export interface GiftItem {
   name: string
   category: GiftCategory
   price: number
+  priceUsd?: number
   rarity: GiftRarity
   description: string
   accentColor: string
@@ -82,24 +85,22 @@ export interface CityTree {
   contribution_count: number
   tree_level: TreeLevelId
   tree_position: TreePosition
+  plotIndex?: number
+  isDecorative?: boolean
   gifts: TreeGiftSummary[]
+  companion?: TreeCompanionState
   stats?: GitHubContributionStats
   custom_message?: string
   is_creator_special?: boolean
   last_synced_at: string
 }
 
-export interface TreeMessage {
-  id: string
-  tree_id: string
-  sender_name: string
-  message: string
-  created_at: string
-}
-
 export interface VillagePropDialogue {
   title: string
   text: string
+  titleEn?: string
+  textEn?: string
+  action?: 'open-shop'
 }
 
 export interface CityCommunityStats {
@@ -113,6 +114,7 @@ export interface PixCampaignConfig {
   title: string
   university: string
   course: string
+  paragraphs: readonly string[]
   message: string
   pixKey: string
   recipientName: string

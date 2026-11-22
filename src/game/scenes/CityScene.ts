@@ -120,8 +120,8 @@ export class CityScene extends Phaser.Scene {
 
   private drawCottagesAndDecorations(tileSize: number, pixelScale: number): void {
     const cottageTextureMap = {
-      'hobbit-emerald': 'cottage-mushroom-pine',
-      'hobbit-amber': 'cottage-storybook',
+      'santa-treehouse': 'cottage-storybook',
+      'crystal-tower': 'cottage-stump',
       'elven-pavilion': 'cottage-stump',
     } as const
 
@@ -156,12 +156,17 @@ export class CityScene extends Phaser.Scene {
         this.lampGlows.push(halo)
       } else {
         const keyMap: Record<Exclude<typeof deco.type, 'lamp'>, string> = {
+          'north-pole': 'deco-signpost',
+          campfire: 'deco-gift-pile',
+          sleigh: 'deco-gift-pile',
+          igloo: 'deco-snowman',
+          'candy-cane': 'deco-signpost',
           snowman: 'deco-snowman',
           signpost: 'deco-signpost',
           'gift-pile': 'deco-gift-pile',
           caretaker: 'deco-caretaker',
-          'elven-arch': 'deco-signpost',
-          waystone: 'deco-signpost',
+          'market-stall': 'deco-gift-pile',
+          'mushroom-house': 'deco-gift-pile',
         }
         const sprite = this.add
           .image(cx, by, keyMap[deco.type])
@@ -177,7 +182,7 @@ export class CityScene extends Phaser.Scene {
             },
             signpost: {
               title: 'Placa da Praça Central',
-              text: 'Praça da UFC ao centro · Lago Congelado a sudoeste · Use WASD, setas ou arraste para explorar.',
+              text: 'Praça do Polo Norte ao centro · Lago Congelado a sudoeste · Use WASD, setas ou arraste para explorar.',
             },
             snowman: {
               title: 'Boneco de Neve',
