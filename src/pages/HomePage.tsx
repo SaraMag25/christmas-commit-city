@@ -243,6 +243,11 @@ export function HomePage() {
         }}
         onFocusMyTree={handleFocusMyTree}
         onFocusCreatorTree={handleFocusCreatorTree}
+        onOpenSupport={() => {
+          setWelcomeMode('closed')
+          setPropDialogue(null)
+          setSupportTargetUsername('SaraMag25')
+        }}
         onShowWelcome={() => {
           setSelectedTree(null)
           setPropDialogue(null)

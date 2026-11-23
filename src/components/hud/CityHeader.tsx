@@ -11,6 +11,7 @@ interface CityHeaderProps {
   onOpenSearch?: () => void
   onFocusMyTree?: () => void
   onFocusCreatorTree?: () => void
+  onOpenSupport?: () => void
   onShowWelcome?: () => void
 }
 
@@ -20,6 +21,7 @@ export function CityHeader({
   onOpenSearch,
   onFocusMyTree,
   onFocusCreatorTree,
+  onOpenSupport,
   onShowWelcome,
 }: CityHeaderProps) {
   const { session, currentUserTree, isSyncing, resyncMyTree, signOut } = useCity()
@@ -146,7 +148,7 @@ export function CityHeader({
 
           <button
             type="button"
-            onClick={handleCreatorClick}
+            onClick={onOpenSupport ?? handleCreatorClick}
             className="pixel-btn pixel-btn-gold rounded-sm px-2.5 py-1 text-[11px] font-medium"
           >
             <Heart className="h-3 w-3 fill-current" />
