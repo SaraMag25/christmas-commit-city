@@ -30,7 +30,6 @@ import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
 import {
   ACCESSORY_COPY,
-  CAMPAIGN_COPY,
   SLOT_LABELS_BY_LANG,
   SPECIES_COPY,
 } from '../../i18n/translations'
@@ -165,7 +164,6 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const speciesLabels = SPECIES_COPY[language]
   const accessoryLabels = ACCESSORY_COPY[language]
   const slotLabels = SLOT_LABELS_BY_LANG[language]
-  const campaignCopy = CAMPAIGN_COPY[language]
 
   const handleSelectSpeciesCard = async (item: CompanionSpeciesItem) => {
     setFocusedSpeciesId(item.id)
@@ -931,16 +929,18 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                      <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-400" />
+                      {currency === 'BRL' ? (
+                        <QrCode className="h-3.5 w-3.5 text-emerald-300" />
+                      ) : (
+                        <CreditCard className="h-3.5 w-3.5 text-sky-300" />
+                      )}
                       {currency === 'BRL' ? t.shop.checkoutPixTitle : t.shop.checkoutUsdTitle} —{' '}
                       {pendingName}
                     </p>
                     <p className="mt-1 text-[11px] text-slate-300">
                       <strong className="text-emerald-300">
                         {formatCurrencyPrice(paymentPreview.amount, currency)}
-                      </strong>{' '}
-                      · {t.shop.checkoutSupportLine} {campaignCopy.university} (
-                      {paymentPreview.recipientName}).
+                      </strong>
                     </p>
                   </div>
                   <button
