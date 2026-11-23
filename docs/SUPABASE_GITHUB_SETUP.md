@@ -90,7 +90,7 @@ npx supabase functions deploy webhook-stripe --no-verify-jwt
 - **Stripe (`webhook-stripe`):**
   `https://<seu-project-ref>.supabase.co/functions/v1/webhook-stripe` (eventos **`checkout.session.completed`**, **`checkout.session.async_payment_succeeded`**, **`checkout.session.expired`** e **`checkout.session.async_payment_failed`**; copie o signing secret `whsec_...` para `STRIPE_WEBHOOK_SECRET`).
 
-> **Alternativa pelo painel Web:** caso prefira aplicar o SQL manualmente, cole [`supabase/migrations/20261122_phase6_secure_backend.sql`](../supabase/migrations/20261122_phase6_secure_backend.sql) seguido de [`supabase/migrations/20261122_phase7_prices_and_payments.sql`](../supabase/migrations/20261122_phase7_prices_and_payments.sql) no **SQL Editor** do Supabase.
+> **Alternativa pelo painel Web:** caso prefira aplicar o SQL manualmente, cole [`supabase/migrations/20261122_phase6_secure_backend.sql`](../supabase/migrations/20261122_phase6_secure_backend.sql), depois [`supabase/migrations/2026112301_phase7_prices_and_payments.sql`](../supabase/migrations/2026112301_phase7_prices_and_payments.sql) e por fim [`supabase/migrations/2026112302_bump_shop_brl_prices.sql`](../supabase/migrations/2026112302_bump_shop_brl_prices.sql) no **SQL Editor** do Supabase.
 
 ---
 

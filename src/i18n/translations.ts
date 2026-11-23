@@ -793,7 +793,7 @@ export const UI_TRANSLATIONS = {
       directPixDesc:
         'Apoie meus estudos enviando qualquer valor pelo app do seu banco via QR Code ou Pix Copia e Cola (apoio voluntário, sem vínculo com desbloqueios automáticos).',
       directPixPhase7Note:
-        'Para desbloquear o Pacote Apoiador (R$ 10,00) ou itens/presentes automaticamente na árvore, use o botão dourado acima ou a loja (checkout automático via Pix).',
+        'Para desbloquear o Pacote Apoiador (R$ 15,00) ou itens/presentes automaticamente na árvore, use o botão dourado acima ou a loja (checkout automático via Pix).',
       pixQrAlt: 'QR Code Pix do Banco Inter para apoio voluntário aos estudos',
       pixRecipientLabel: 'Recebedor',
       pixBrCodeLabel: 'Pix Copia e Cola (BR Code)',

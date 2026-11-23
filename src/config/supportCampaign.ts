@@ -46,7 +46,7 @@ export const CREATOR_CAMPAIGN_EN = {
 
 export const SUPPORTER_BUNDLE: SupporterBundleConfig = {
   id: 'supporter-bundle',
-  priceBrl: 10.0,
+  priceBrl: 15.0,
   priceUsd: 7.0,
 }
 
