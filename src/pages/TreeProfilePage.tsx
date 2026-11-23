@@ -25,7 +25,6 @@ import { resolveTreeStage, TREE_STAGES } from '../config/treeLevels'
 import { useCity } from '../context/cityContextStore'
 import { useLocale } from '../context/localeContextStore'
 import {
-  CAMPAIGN_COPY,
   SPECIES_COPY,
   TREE_STAGE_COPY,
 } from '../i18n/translations'
@@ -62,7 +61,6 @@ export function TreeProfilePage() {
   const currentStage = tree ? resolveTreeStage(tree.contribution_count) : null
   const currentStageCopy = currentStage ? TREE_STAGE_COPY[language][currentStage.level] : null
   const nextStageCopy = nextStage ? TREE_STAGE_COPY[language][nextStage.level] : null
-  const campaignCopy = CAMPAIGN_COPY[language]
 
   const companionSpecies = getSpeciesById(tree?.companion?.species)
   const companionSpeciesCopy = companionSpecies
@@ -296,20 +294,11 @@ export function TreeProfilePage() {
               </div>
 
               {tree.is_creator_special && (
-                <div className="mt-4 rounded-sm border-2 border-amber-400/70 bg-[#0d1833]/90 p-3.5">
-                  <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                    <Heart className="h-4 w-4 fill-rose-500 text-rose-400" />
-                    {campaignCopy.title}
-                  </p>
-                  <div className="mt-2.5 space-y-2.5 text-xs leading-relaxed text-amber-50/95 sm:text-[13px]">
-                    {campaignCopy.paragraphs.map((paragraph, idx) => (
-                      <p key={idx}>{paragraph}</p>
-                    ))}
-                  </div>
+                <div className="mt-4">
                   <button
                     type="button"
                     onClick={() => setShowSupportModal(true)}
-                    className="pixel-btn pixel-btn-gold mt-3 rounded-sm px-4 py-2 text-xs font-bold"
+                    className="pixel-btn pixel-btn-gold rounded-sm px-4 py-2 text-xs font-bold"
                   >
                     <Heart className="h-3.5 w-3.5" />
                     <span>{t.profile.supportCampaignBtn}</span>

@@ -5,6 +5,7 @@ import { useLocale } from '../../context/localeContextStore'
 import { CityHeader } from '../hud/CityHeader'
 import { GitHubConnectModal } from '../panels/GitHubConnectModal'
 import { HowItWorksModal } from '../panels/HowItWorksModal'
+import { SupportCampaignModal } from '../panels/SupportCampaignModal'
 
 interface SubpageLayoutProps {
   maxWidthClass?: string
@@ -20,6 +21,7 @@ export function SubpageLayout({
   const { t } = useLocale()
   const [showHowItWorks, setShowHowItWorks] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
+  const [showSupportModal, setShowSupportModal] = useState(false)
 
   return (
     <div
@@ -32,6 +34,7 @@ export function SubpageLayout({
       <CityHeader
         onOpenConnectModal={() => setShowConnectModal(true)}
         onOpenHowItWorks={() => setShowHowItWorks(true)}
+        onOpenSupport={() => setShowSupportModal(true)}
       />
 
       <main className={`mx-auto px-4 ${maxWidthClass}`}>
@@ -52,6 +55,7 @@ export function SubpageLayout({
 
       {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} />}
       {showConnectModal && <GitHubConnectModal onClose={() => setShowConnectModal(false)} />}
+      {showSupportModal && <SupportCampaignModal onClose={() => setShowSupportModal(false)} />}
     </div>
   )
 }

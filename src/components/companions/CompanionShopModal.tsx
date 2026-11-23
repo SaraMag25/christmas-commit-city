@@ -30,7 +30,6 @@ import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
 import {
   ACCESSORY_COPY,
-  CAMPAIGN_COPY,
   SLOT_LABELS_BY_LANG,
   SPECIES_COPY,
 } from '../../i18n/translations'
@@ -165,7 +164,6 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const speciesLabels = SPECIES_COPY[language]
   const accessoryLabels = ACCESSORY_COPY[language]
   const slotLabels = SLOT_LABELS_BY_LANG[language]
-  const campaignCopy = CAMPAIGN_COPY[language]
 
   const handleSelectSpeciesCard = async (item: CompanionSpeciesItem) => {
     setFocusedSpeciesId(item.id)
@@ -938,9 +936,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                     <p className="mt-1 text-[11px] text-slate-300">
                       <strong className="text-emerald-300">
                         {formatCurrencyPrice(paymentPreview.amount, currency)}
-                      </strong>{' '}
-                      · {t.shop.checkoutSupportLine} {campaignCopy.university} (
-                      {paymentPreview.recipientName}).
+                      </strong>
                     </p>
                   </div>
                   <button
