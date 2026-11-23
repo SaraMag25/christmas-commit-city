@@ -929,7 +929,11 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                      <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-400" />
+                      {currency === 'BRL' ? (
+                        <QrCode className="h-3.5 w-3.5 text-emerald-300" />
+                      ) : (
+                        <CreditCard className="h-3.5 w-3.5 text-sky-300" />
+                      )}
                       {currency === 'BRL' ? t.shop.checkoutPixTitle : t.shop.checkoutUsdTitle} —{' '}
                       {pendingName}
                     </p>
