@@ -8,7 +8,6 @@ import { useLocale } from '../../context/localeContextStore'
 import { hashUsername } from '../../game/layout/treePlacement'
 import { resolveTreeTheme } from '../../game/voxel/voxelTreeBuilder'
 import {
-  CAMPAIGN_COPY,
   SPECIES_COPY,
   TREE_STAGE_COPY,
 } from '../../i18n/translations'
@@ -43,7 +42,6 @@ export function TreeDetailsPanel({
 
   const stage = resolveTreeStage(tree.contribution_count)
   const stageCopy = TREE_STAGE_COPY[language][stage.level]
-  const campaignCopy = CAMPAIGN_COPY[language]
 
   const companionSpecies = getSpeciesById(tree.companion?.species)
   const companionSpeciesCopy = companionSpecies
@@ -215,20 +213,11 @@ export function TreeDetailsPanel({
       </div>
 
       {tree.is_creator_special && (
-        <div className="mt-3 rounded-sm border border-amber-400/35 bg-amber-950/20 p-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
-            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-400" />
-            <span>{campaignCopy.title}</span>
-          </div>
-          <div className="mt-2 space-y-2 text-xs leading-relaxed text-slate-200">
-            {campaignCopy.paragraphs.map((paragraph, idx) => (
-              <p key={idx}>{paragraph}</p>
-            ))}
-          </div>
+        <div className="mt-3">
           <button
             type="button"
             onClick={() => onOpenSupportModal(tree)}
-            className="pixel-btn pixel-btn-gold mt-2.5 w-full rounded-sm px-3 py-1.5 text-[11px] font-bold"
+            className="pixel-btn pixel-btn-gold w-full rounded-sm px-3 py-1.5 text-[11px] font-bold"
           >
             <Heart className="h-3.5 w-3.5" />
             <span>{t.treePanel.supportBtn}</span>

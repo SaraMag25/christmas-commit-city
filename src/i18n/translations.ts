@@ -563,8 +563,8 @@ export const UI_TRANSLATIONS = {
       exploreBtn: '$ explorar --polo-norte',
       connectBtn: '$ conectar --github',
       myTreeBtn: '$ ir --minha-arvore',
-      campaignLine: 'Ajude uma estudante a se formar',
-      viewCreatorBtn: 'ver árvore & apoiar',
+      campaignLine: 'Feito por @SaraMag25 · Polo Norte 3D',
+      viewCreatorBtn: 'ver árvore da criadora',
     },
     camera: {
       move: 'Mover',
@@ -603,7 +603,7 @@ export const UI_TRANSLATIONS = {
       giftBtn: 'presentear árvore',
       giftMyTreeBtn: 'presentear minha árvore',
       companionShopBtn: 'companheiro & loja',
-      supportBtn: 'apoiar campanha (pix / usd)',
+      supportBtn: 'apoie o projeto',
       copyLink: 'copiar link da árvore',
       linkCopied: 'link copiado!',
     },
@@ -615,8 +615,8 @@ export const UI_TRANSLATIONS = {
       step1Desc: 'OAuth somente leitura (read:user) via GitHub GraphQL API.',
       step2Title: '2. crescer --árvore',
       step2Desc: '7 estágios 3D com bolas nos 4 níveis do GitHub e companheiros personalizáveis.',
-      step3Title: '3. apoiar --polo-norte',
-      step3Desc: 'Adote pets com seu saldo de commits ou apoie a campanha via Pix / USD.',
+      step3Title: '3. personalizar --árvore',
+      step3Desc: 'Adote companheiros com seu saldo de commits e envie presentes para decorar árvores.',
       levelsTitle: 'níveis_das_árvores',
     },
     connectModal: {
@@ -634,8 +634,8 @@ export const UI_TRANSLATIONS = {
     giftModal: {
       title: 'Presentear',
       titleOwn: 'Presentear minha árvore',
-      subtitle: 'Selecione um presente para visualizar a prévia 3D antes de confirmar.',
-      subtitleOwn: 'Teste presentes na prévia 3D antes de colocá-los na sua árvore!',
+      subtitle: 'Selecione um presente para visualizar em 3D antes de confirmar.',
+      subtitleOwn: 'Visualize presentes em 3D antes de colocá-los na sua árvore!',
       special: 'Especial',
       free: 'Gratuito',
       rarity: 'Raridade',
@@ -650,11 +650,11 @@ export const UI_TRANSLATIONS = {
       placedFeedback: 'Presente colocado na árvore em 3D!',
       onTreeCount: 'na árvore',
       selectHint: 'Clique em um item do catálogo ao lado para visualizar na árvore 3D.',
-      note: 'Presentes gratuitos são salvos na hora; presentes especiais usam Pix (Mercado Pago) ou Stripe com confirmação via webhook.',
+      note: 'Presentes gratuitos são adicionados na hora; presentes especiais aparecem assim que o pagamento é confirmado.',
       phase7Notice:
-        'Checkout real ativo: selecione Pix (BRL) ou Cartão via Stripe (USD) — o presente aparece na árvore assim que o webhook confirmar.',
+        'Selecione Pix (BRL) ou Cartão (USD) — o presente aparece na árvore logo após a confirmação do pagamento.',
       loginRequiredFree:
-        'Conecte sua conta GitHub primeiro para enviar presentes gratuitos em produção.',
+        'Conecte sua conta GitHub para enviar presentes gratuitos.',
       loginRequiredPaid:
         'Conecte sua conta GitHub para enviar presentes especiais via Pix ou Cartão.',
       sendingBtn: 'Enviando...',
@@ -693,7 +693,7 @@ export const UI_TRANSLATIONS = {
       sentBy: 'Enviado por',
       actionsLabel: 'Personalizar & Presentear',
       companionActiveLabel: 'Companheiro ativo na árvore',
-      supportCampaignBtn: 'Apoiar Campanha (Pix / USD)',
+      supportCampaignBtn: 'Apoiar Projeto',
     },
     calendar: {
       title: 'Atividade no GitHub',
@@ -753,7 +753,7 @@ export const UI_TRANSLATIONS = {
       copied: 'Copiado!',
       openCheckout: 'Abrir Checkout Internacional',
       noCheckoutEnv:
-        'Checkout externo indisponível no modo local; use o botão ao lado para simular.',
+        'Checkout externo indisponível no modo local; use o botão ao lado para simular o desbloqueio.',
       previewNote:
         'Modo local: salvo apenas neste navegador.',
       phase7Notice:
@@ -793,7 +793,7 @@ export const UI_TRANSLATIONS = {
       directPixDesc:
         'Apoie meus estudos enviando qualquer valor pelo app do seu banco via QR Code ou Pix Copia e Cola (apoio voluntário, sem vínculo com desbloqueios automáticos).',
       directPixPhase7Note:
-        'Para desbloquear o Pacote Apoiador (R$ 10,00) ou itens/presentes automaticamente na árvore, use o botão dourado acima ou a loja (checkout automático via Pix).',
+        'Para desbloquear o Pacote Apoiador (R$ 15,00) ou itens/presentes automaticamente na árvore, use o botão dourado acima ou a loja (checkout automático via Pix).',
       pixQrAlt: 'QR Code Pix do Banco Inter para apoio voluntário aos estudos',
       pixRecipientLabel: 'Recebedor',
       pixBrCodeLabel: 'Pix Copia e Cola (BR Code)',
@@ -839,8 +839,8 @@ export const UI_TRANSLATIONS = {
       exploreBtn: '$ explore --north-pole',
       connectBtn: '$ connect --github',
       myTreeBtn: '$ go --my-tree',
-      campaignLine: 'Help a student graduate',
-      viewCreatorBtn: 'view tree & support',
+      campaignLine: 'Built by @SaraMag25 · North Pole 3D',
+      viewCreatorBtn: 'view creator tree',
     },
     camera: {
       move: 'Move',
@@ -855,7 +855,7 @@ export const UI_TRANSLATIONS = {
       syncWarning: 'GitHub sync notice',
       close: 'Close',
       paymentSuccessBanner: 'Payment confirmed! Your item or gift has been unlocked.',
-      paymentPendingBanner: 'Payment received — finalizing webhook confirmation...',
+      paymentPendingBanner: 'Payment received — finalizing confirmation...',
       paymentCancelledBanner: 'Checkout cancelled. No charge was made.',
     },
     treePanel: {
@@ -879,7 +879,7 @@ export const UI_TRANSLATIONS = {
       giftBtn: 'gift tree',
       giftMyTreeBtn: 'gift my tree',
       companionShopBtn: 'companion & shop',
-      supportBtn: 'support campaign (pix / usd)',
+      supportBtn: 'support project',
       copyLink: 'copy tree link',
       linkCopied: 'link copied!',
     },
@@ -891,8 +891,8 @@ export const UI_TRANSLATIONS = {
       step1Desc: 'Read-only OAuth (read:user) powered by the official GitHub GraphQL API.',
       step2Title: '2. grow --tree',
       step2Desc: '7 3D pine stages with GitHub commit baubles and customizable companions.',
-      step3Title: '3. support --north-pole',
-      step3Desc: 'Adopt companions with commit balance or support the creator campaign via Pix / USD.',
+      step3Title: '3. customize --tree',
+      step3Desc: 'Adopt companions with commit balance and send gifts to decorate trees.',
       levelsTitle: 'tree_levels',
     },
     connectModal: {
@@ -926,11 +926,11 @@ export const UI_TRANSLATIONS = {
       placedFeedback: 'Gift placed on the 3D tree!',
       onTreeCount: 'on tree',
       selectHint: 'Click any item in the catalog to preview it on the 3D tree.',
-      note: 'Free gifts save right away; special gifts use verified Pix (Mercado Pago) or Stripe webhook checkout.',
+      note: 'Free gifts appear on the tree right away; special gifts are delivered as soon as payment is confirmed.',
       phase7Notice:
-        'Live checkout active: choose Pix (BRL) or Stripe Card (USD) — your gift appears on the tree once the webhook confirms.',
+        'Choose Pix (BRL) or Card (USD) — your gift appears on the tree as soon as payment is confirmed.',
       loginRequiredFree:
-        'Connect your GitHub account first to send free gifts in production.',
+        'Connect your GitHub account to send free gifts.',
       loginRequiredPaid:
         'Connect your GitHub account first to send special gifts via Pix or Card.',
       sendingBtn: 'Sending...',
@@ -969,7 +969,7 @@ export const UI_TRANSLATIONS = {
       sentBy: 'Sent by',
       actionsLabel: 'Customize & Gift',
       companionActiveLabel: 'Active companion on tree',
-      supportCampaignBtn: 'Support Campaign (Pix / USD)',
+      supportCampaignBtn: 'Support Project',
     },
     calendar: {
       title: 'GitHub Activity',
@@ -1029,7 +1029,7 @@ export const UI_TRANSLATIONS = {
       copied: 'Copied!',
       openCheckout: 'Open International Checkout',
       noCheckoutEnv:
-        'External checkout unavailable in local mode; use the button beside to simulate.',
+        'External checkout unavailable in local mode; use the button beside to simulate unlocking.',
       previewNote:
         'Local mode: saved in browser storage only.',
       phase7Notice:
