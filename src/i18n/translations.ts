@@ -634,8 +634,8 @@ export const UI_TRANSLATIONS = {
     giftModal: {
       title: 'Presentear',
       titleOwn: 'Presentear minha árvore',
-      subtitle: 'Selecione um presente para visualizar a prévia 3D antes de confirmar.',
-      subtitleOwn: 'Teste presentes na prévia 3D antes de colocá-los na sua árvore!',
+      subtitle: 'Selecione um presente para visualizar em 3D antes de confirmar.',
+      subtitleOwn: 'Visualize presentes em 3D antes de colocá-los na sua árvore!',
       special: 'Especial',
       free: 'Gratuito',
       rarity: 'Raridade',
@@ -650,11 +650,11 @@ export const UI_TRANSLATIONS = {
       placedFeedback: 'Presente colocado na árvore em 3D!',
       onTreeCount: 'na árvore',
       selectHint: 'Clique em um item do catálogo ao lado para visualizar na árvore 3D.',
-      note: 'Presentes gratuitos são salvos na hora; presentes especiais usam Pix (Mercado Pago) ou Stripe com confirmação via webhook.',
+      note: 'Presentes gratuitos são adicionados na hora; presentes especiais aparecem assim que o pagamento é confirmado.',
       phase7Notice:
-        'Checkout real ativo: selecione Pix (BRL) ou Cartão via Stripe (USD) — o presente aparece na árvore assim que o webhook confirmar.',
+        'Selecione Pix (BRL) ou Cartão (USD) — o presente aparece na árvore logo após a confirmação do pagamento.',
       loginRequiredFree:
-        'Conecte sua conta GitHub primeiro para enviar presentes gratuitos em produção.',
+        'Conecte sua conta GitHub para enviar presentes gratuitos.',
       loginRequiredPaid:
         'Conecte sua conta GitHub para enviar presentes especiais via Pix ou Cartão.',
       sendingBtn: 'Enviando...',
@@ -753,11 +753,11 @@ export const UI_TRANSLATIONS = {
       copied: 'Copiado!',
       openCheckout: 'Abrir Checkout Internacional',
       noCheckoutEnv:
-        'Configure VITE_STRIPE_CHECKOUT_URL ou VITE_KOFI_URL no .env para link real; use o botão ao lado para testar o desbloqueio na prévia local.',
+        'Checkout externo indisponível no modo local; use o botão ao lado para simular o desbloqueio.',
       previewNote:
-        'Modo prévia local: salva no navegador e está estruturado para confirmação automática via webhook + Supabase (Fases 6–7).',
+        'Modo local: salvo apenas neste navegador.',
       phase7Notice:
-        'Checkout real ativo: Pix (Mercado Pago) em BRL e Stripe em USD com confirmação automática via webhook.',
+        'Liberação automática na sua conta logo após a confirmação do pagamento.',
       generatePixBtn: 'Gerar QR Code Pix',
       payWithStripeBtn: 'Pagar com Cartão (Stripe)',
       generatingCheckout: 'Gerando pagamento...',
@@ -765,7 +765,7 @@ export const UI_TRANSLATIONS = {
       pixExpiresAt: 'expira às',
       pixCopyCodeLabel: 'Código Pix Copia e Cola',
       pixAutoConfirmHint:
-        'Pague no app do seu banco — a liberação acontece automaticamente em segundos após o webhook confirmar.',
+        'Pague no app do seu banco — a liberação acontece automaticamente em segundos após a confirmação.',
       checkStatusBtn: 'Verificar pagamento',
       pixConfirmed: 'Pagamento Pix confirmado! Atualizando sua árvore...',
       pixExpiredOrFailed: 'Este Pix expirou ou foi cancelado. Gere um novo código se desejar.',
@@ -855,7 +855,7 @@ export const UI_TRANSLATIONS = {
       syncWarning: 'GitHub sync notice',
       close: 'Close',
       paymentSuccessBanner: 'Payment confirmed! Your item or gift has been unlocked.',
-      paymentPendingBanner: 'Payment received — finalizing webhook confirmation...',
+      paymentPendingBanner: 'Payment received — finalizing confirmation...',
       paymentCancelledBanner: 'Checkout cancelled. No charge was made.',
     },
     treePanel: {
@@ -926,11 +926,11 @@ export const UI_TRANSLATIONS = {
       placedFeedback: 'Gift placed on the 3D tree!',
       onTreeCount: 'on tree',
       selectHint: 'Click any item in the catalog to preview it on the 3D tree.',
-      note: 'Free gifts save right away; special gifts use verified Pix (Mercado Pago) or Stripe webhook checkout.',
+      note: 'Free gifts appear on the tree right away; special gifts are delivered as soon as payment is confirmed.',
       phase7Notice:
-        'Live checkout active: choose Pix (BRL) or Stripe Card (USD) — your gift appears on the tree once the webhook confirms.',
+        'Choose Pix (BRL) or Card (USD) — your gift appears on the tree as soon as payment is confirmed.',
       loginRequiredFree:
-        'Connect your GitHub account first to send free gifts in production.',
+        'Connect your GitHub account to send free gifts.',
       loginRequiredPaid:
         'Connect your GitHub account first to send special gifts via Pix or Card.',
       sendingBtn: 'Sending...',
@@ -1029,11 +1029,11 @@ export const UI_TRANSLATIONS = {
       copied: 'Copied!',
       openCheckout: 'Open International Checkout',
       noCheckoutEnv:
-        'Set VITE_STRIPE_CHECKOUT_URL or VITE_KOFI_URL in .env for a live link; use the button to test local preview unlock.',
+        'External checkout unavailable in local mode; use the button beside to simulate unlocking.',
       previewNote:
-        'Local preview mode: saved in browser storage and modeled for Phases 6–7 Supabase + webhook verification.',
+        'Local mode: saved in browser storage only.',
       phase7Notice:
-        'Live checkout active: Pix (Mercado Pago) in BRL and Stripe in USD with automatic webhook verification.',
+        'Unlocked automatically on your account right after payment confirmation.',
       generatePixBtn: 'Generate Pix QR Code',
       payWithStripeBtn: 'Pay with Card (Stripe)',
       generatingCheckout: 'Creating checkout...',
