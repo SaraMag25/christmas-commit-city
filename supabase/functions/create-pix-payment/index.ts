@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    const notificationUrl = `${auth.supabaseUrl.replace(/\/+$/, '')}/functions/v1/webhook-mercadopago`
+    const notificationUrl = `${auth.supabaseUrl.replace(/\/+$/, '')}/functions/v1/webhook-mercadopago?source_news=webhooks`
     const transactionAmount = Number((validated.amountCents / 100).toFixed(2))
     const payerEmail =
       auth.user.email?.trim() || `dev-${auth.user.id.slice(0, 8)}@users.christmascommit.city`
