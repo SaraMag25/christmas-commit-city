@@ -103,13 +103,6 @@ export interface VillagePropDialogue {
   action?: 'open-shop'
 }
 
-export interface CityCommunityStats {
-  totalTrees: number
-  totalContributions: number
-  totalGifts: number
-  illuminatedTrees: number
-}
-
 export interface PixCampaignConfig {
   title: string
   university: string
@@ -117,6 +110,8 @@ export interface PixCampaignConfig {
   paragraphs: readonly string[]
   message: string
   pixKey: string
+  pixBrCode: string
+  pixQrImageUrl: string
   recipientName: string
   recipientCity: string
   goalAmount: number

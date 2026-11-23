@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import type { CityCommunityStats, CityTree, GiftItem, TreeGiftSummary } from '../types/city'
+import type { CityTree, GiftItem, TreeGiftSummary } from '../types/city'
 import type {
   AccessorySlot,
   CompanionAccessoryId,
@@ -26,7 +26,6 @@ export interface TreeGiftActionResult {
 export interface CityContextValue {
   trees: readonly CityTree[]
   decorativeTrees: readonly CityTree[]
-  stats: CityCommunityStats
   session: Session | null
   currentUserTree: CityTree | null
   isSupabaseReady: boolean
@@ -36,6 +35,7 @@ export interface CityContextValue {
   authError: string | null
   connectWithGitHub: () => Promise<boolean>
   resyncMyTree: () => Promise<void>
+  refreshCityState: () => Promise<void>
   signOut: () => Promise<void>
   clearAuthError: () => void
   getCompanionLoadout: (username: string) => UserCompanionLoadout

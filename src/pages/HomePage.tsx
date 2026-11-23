@@ -16,24 +16,46 @@ import { useCity } from '../context/cityContextStore'
 import { useLocale } from '../context/localeContextStore'
 import { City3DCanvas } from '../game/City3DCanvas'
 import { gameEventBus } from '../game/eventBus'
+import { fetchMyPaymentOrderStatus } from '../services/paymentService'
 import type { CityTree, VillagePropDialogue } from '../types/city'
 
 export function HomePage() {
   const {
     trees,
     decorativeTrees,
-    stats,
+    session,
     currentUserTree,
     isSupabaseReady,
+    isSyncing,
     authError,
+    resyncMyTree,
+    refreshCityState,
+    signOut,
     clearAuthError,
   } = useCity()
   const { language, t } = useLocale()
   const [searchParams, setSearchParams] = useSearchParams()
   const focusParam = searchParams.get('focus')
   const searchParam = searchParams.get('search')
+  const paymentParam = searchParams.get('payment')
+  const orderIdParam = searchParams.get('order_id')
 
-  const [showWelcome, setShowWelcome] = useState(() => !focusParam && !searchParam)
+  const [paymentBanner, setPaymentBanner] = useState<{
+    kind: 'success' | 'pending' | 'cancelled'
+    message: string
+  } | null>(() => {
+    if (paymentParam === 'cancelled') {
+      return { kind: 'cancelled', message: t.home.paymentCancelledBanner }
+    }
+    if (paymentParam === 'success') {
+      return { kind: 'pending', message: t.home.paymentPendingBanner }
+    }
+    return null
+  })
+
+  const [welcomeMode, setWelcomeMode] = useState<'auto' | 'manual' | 'closed'>(() =>
+    focusParam || searchParam || paymentParam ? 'closed' : 'auto',
+  )
   const [showSearch, setShowSearch] = useState(() => Boolean(searchParam))
   const [showHowItWorks, setShowHowItWorks] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
@@ -42,6 +64,10 @@ export function HomePage() {
   const [supportTargetUsername, setSupportTargetUsername] = useState<string | null>(null)
   const [hoveredTree, setHoveredTree] = useState<CityTree | null>(null)
   const [selectedTree, setSelectedTree] = useState<CityTree | null>(null)
+
+  const isWelcomeVisible =
+    welcomeMode === 'manual' || (welcomeMode === 'auto' && !session)
+  const isConnectModalVisible = showConnectModal && !session
 
   const activeSelectedTree = selectedTree
     ? (trees.find((tItem) => tItem.id === selectedTree.id) ?? selectedTree)
@@ -52,6 +78,7 @@ export function HomePage() {
   const [propDialogue, setPropDialogue] = useState<VillagePropDialogue | null>(null)
   const [bootLogVisible, setBootLogVisible] = useState(true)
   const isCityReadyRef = useRef(false)
+  const autoFocusedUserRef = useRef<string | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setBootLogVisible(false), 4500)
@@ -66,11 +93,11 @@ export function HomePage() {
     const unsubSelect = gameEventBus.on('city:tree-selected', (tree) => {
       setSelectedTree(tree)
       setPropDialogue(null)
-      setShowWelcome(false)
+      setWelcomeMode('closed')
     })
     const unsubProp = gameEventBus.on('city:prop-interacted', (dialogue) => {
       setPropDialogue(dialogue)
-      setShowWelcome(false)
+      setWelcomeMode('closed')
     })
 
     return () => {
@@ -87,12 +114,78 @@ export function HomePage() {
   }, [searchParam, setSearchParams])
 
   useEffect(() => {
+    if (!paymentParam) return
+    let active = true
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('payment')
+    nextParams.delete('order_id')
+    setSearchParams(nextParams, { replace: true })
+
+    if (paymentParam !== 'success') {
+      return () => {
+        active = false
+      }
+    }
+
+    const verifyPaid = async () => {
+      if (orderIdParam) {
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          const record = await fetchMyPaymentOrderStatus(orderIdParam)
+          if (!active) return
+          if (record?.status === 'paid') {
+            await refreshCityState()
+            if (active) {
+              setPaymentBanner({ kind: 'success', message: t.home.paymentSuccessBanner })
+            }
+            return
+          }
+          if (record?.status === 'failed') {
+            setPaymentBanner({ kind: 'cancelled', message: t.shop.pixExpiredOrFailed })
+            return
+          }
+          await new Promise((r) => window.setTimeout(r, 2000))
+        }
+      }
+      await refreshCityState()
+    }
+    void verifyPaid()
+
+    return () => {
+      active = false
+    }
+  }, [
+    paymentParam,
+    orderIdParam,
+    searchParams,
+    setSearchParams,
+    refreshCityState,
+    t.home.paymentSuccessBanner,
+    t.shop.pixExpiredOrFailed,
+  ])
+
+  useEffect(() => {
+    if (!session) {
+      autoFocusedUserRef.current = null
+      return
+    }
+
+    if (focusParam || searchParam || !currentUserTree) return
+
+    const usernameKey = currentUserTree.profile.github_username.toLowerCase()
+    if (autoFocusedUserRef.current !== usernameKey) {
+      autoFocusedUserRef.current = usernameKey
+      gameEventBus.emit('city:focus-tree', currentUserTree.profile.github_username)
+    }
+  }, [session, currentUserTree, focusParam, searchParam])
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) {
         e.preventDefault()
-        setShowWelcome(false)
+        setWelcomeMode('closed')
         setShowSearch(true)
       }
     }
@@ -119,8 +212,20 @@ export function HomePage() {
     }
   }, [focusParam, setSearchParams])
 
+  const handleFocusMyTree = () => {
+    setWelcomeMode('closed')
+    setShowSearch(false)
+    setPropDialogue(null)
+    if (currentUserTree) {
+      setSelectedTree(currentUserTree)
+      gameEventBus.emit('city:focus-tree', currentUserTree.profile.github_username)
+    } else if (session) {
+      void resyncMyTree()
+    }
+  }
+
   const handleFocusCreatorTree = () => {
-    setShowWelcome(false)
+    setWelcomeMode('closed')
     setPropDialogue(null)
     gameEventBus.emit('city:focus-creator')
   }
@@ -133,15 +238,16 @@ export function HomePage() {
         onOpenConnectModal={() => setShowConnectModal(true)}
         onOpenHowItWorks={() => setShowHowItWorks(true)}
         onOpenSearch={() => {
-          setShowWelcome(false)
+          setWelcomeMode('closed')
           setShowSearch(true)
         }}
+        onFocusMyTree={handleFocusMyTree}
         onFocusCreatorTree={handleFocusCreatorTree}
         onShowWelcome={() => {
           setSelectedTree(null)
           setPropDialogue(null)
           setShowSearch(false)
-          setShowWelcome(true)
+          setWelcomeMode('manual')
         }}
       />
 
@@ -151,12 +257,37 @@ export function HomePage() {
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
         onSelectTree={(tree) => {
-          setShowWelcome(false)
+          setWelcomeMode('closed')
           setPropDialogue(null)
           setSelectedTree(tree)
           gameEventBus.emit('city:focus-tree', tree.profile.github_username)
         }}
       />
+
+      {paymentBanner && (
+        <div
+          role="status"
+          className={`fixed left-4 top-24 z-40 max-w-sm rounded-sm border-2 p-3 text-xs shadow-lg ${
+            paymentBanner.kind === 'success'
+              ? 'border-emerald-400 bg-emerald-950/95 text-emerald-100'
+              : paymentBanner.kind === 'pending'
+                ? 'border-amber-400 bg-amber-950/95 text-amber-100'
+                : 'border-slate-500 bg-slate-900/95 text-slate-200'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="leading-snug">{paymentBanner.message}</p>
+            <button
+              type="button"
+              onClick={() => setPaymentBanner(null)}
+              aria-label={t.home.close}
+              className="rounded-sm p-1 text-slate-300 hover:bg-black/30 cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {authError && (
         <div
@@ -167,6 +298,28 @@ export function HomePage() {
             <div>
               <p className="font-bold text-rose-300">{t.home.syncWarning}</p>
               <p className="mt-1 leading-snug">{authError}</p>
+              {session && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void resyncMyTree()}
+                    disabled={isSyncing}
+                    className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold disabled:opacity-60"
+                  >
+                    {isSyncing ? t.header.syncing : t.header.retrySyncBtn}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowConnectModal(false)
+                      void signOut()
+                    }}
+                    className="pixel-btn pixel-btn-wood rounded-sm px-2.5 py-1 text-[11px]"
+                  >
+                    {t.header.signOutBtn}
+                  </button>
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -180,16 +333,16 @@ export function HomePage() {
         </div>
       )}
 
-      {showWelcome && (
+      {isWelcomeVisible && (
         <HeroWelcomeOverlay
-          stats={stats}
-          onExploreCity={() => setShowWelcome(false)}
+          onExploreCity={() => setWelcomeMode('closed')}
           onConnectGitHub={() => setShowConnectModal(true)}
+          onGoToMyTree={handleFocusMyTree}
           onFocusCreatorTree={handleFocusCreatorTree}
         />
       )}
 
-      {bootLogVisible && !showWelcome && (
+      {bootLogVisible && !isWelcomeVisible && (
         <div
           aria-live="polite"
           className="pointer-events-none fixed bottom-16 left-3 z-20 rounded-sm border border-emerald-500/25 bg-[#060b16]/80 px-3 py-2 text-[11px] text-slate-300 backdrop-blur-md sm:left-4"
@@ -288,7 +441,7 @@ export function HomePage() {
       />
 
       {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} />}
-      {showConnectModal && <GitHubConnectModal onClose={() => setShowConnectModal(false)} />}
+      {isConnectModalVisible && <GitHubConnectModal onClose={() => setShowConnectModal(false)} />}
       {giftTargetTree && (
         <GiftCatalogPreviewModal
           recipientUsername={giftTargetTree.profile.github_username}

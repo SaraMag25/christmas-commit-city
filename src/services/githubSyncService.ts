@@ -7,7 +7,144 @@ import type {
   ProfileSummary,
   TreeLevelId,
 } from '../types/city'
+import { parseEdgeFunctionError } from './edgeFunctionError'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
+
+const PROVIDER_TOKEN_SESSION_KEY = 'ccc_gh_provider_token_v1'
+
+export interface SessionGitHubUser {
+  username: string
+  avatarUrl: string
+}
+
+export function extractSessionGitHubUser(session: Session | null): SessionGitHubUser | null {
+  if (!session?.user) return null
+  const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>
+  const githubIdentity = session.user.identities?.find((item) => item.provider === 'github')
+  const identityData = (githubIdentity?.identity_data ?? {}) as Record<string, unknown>
+
+  const username =
+    (typeof identityData.user_name === 'string' && identityData.user_name.trim()) ||
+    (typeof identityData.preferred_username === 'string' &&
+      identityData.preferred_username.trim()) ||
+    (typeof meta.user_name === 'string' && meta.user_name.trim()) ||
+    (typeof meta.preferred_username === 'string' && meta.preferred_username.trim()) ||
+    ''
+
+  if (!username) return null
+
+  const avatarUrl =
+    (typeof meta.avatar_url === 'string' && meta.avatar_url.trim()) ||
+    (typeof identityData.avatar_url === 'string' && identityData.avatar_url.trim()) ||
+    ''
+
+  return { username, avatarUrl }
+}
+
+export function cacheGitHubProviderToken(token: string | null | undefined): void {
+  const trimmed = token?.trim()
+  if (!trimmed) return
+  try {
+    window.sessionStorage.setItem(PROVIDER_TOKEN_SESSION_KEY, trimmed)
+  } catch {
+    // Ignore storage quota or private browsing errors gracefully.
+  }
+}
+
+export function getCachedGitHubProviderToken(): string | null {
+  try {
+    const raw = window.sessionStorage.getItem(PROVIDER_TOKEN_SESSION_KEY)?.trim()
+    return raw || null
+  } catch {
+    return null
+  }
+}
+
+export function clearCachedGitHubProviderToken(): void {
+  try {
+    window.sessionStorage.removeItem(PROVIDER_TOKEN_SESSION_KEY)
+  } catch {
+    // Ignore private browsing errors gracefully.
+  }
+}
+
+/**
+ * Removes the empty trailing `#` left behind in the URL bar after Supabase OAuth
+ * processes hash fragment tokens without triggering a page reload.
+ */
+export function cleanEmptyOAuthHashFromUrl(): void {
+  if (typeof window === 'undefined') return
+  const { href, pathname, search, hash } = window.location
+  const hasOAuthParams =
+    hash.includes('access_token=') ||
+    hash.includes('refresh_token=') ||
+    hash.includes('provider_token=') ||
+    hash.includes('error=')
+  if (hasOAuthParams) return
+
+  if (href.endsWith('#') || hash === '#') {
+    const cleanUrl = `${pathname}${search}` || '/'
+    window.history.replaceState(window.history.state, '', cleanUrl)
+  }
+}
+
+async function formatEdgeFunctionInvokeError(error: unknown): Promise<string> {
+  const detail = await parseEdgeFunctionError(error, 'github-sync')
+
+  if (detail.isFetchError) {
+    return `Não foi possível alcançar a Edge Function sync-github-contributions (rede ou CORS bloqueado para ${window.location.origin}). Verifique ALLOWED_ORIGINS no Supabase.`
+  }
+
+  if (detail.isRelayError) {
+    return detail.status
+      ? `Erro do gateway Supabase ao chamar sync-github-contributions (HTTP ${detail.status}).`
+      : 'Erro de comunicação com o gateway Supabase para a Edge Function.'
+  }
+
+  if (typeof detail.status === 'number') {
+    const { status, code: serverCode = '', serverMessage: serverError = '' } = detail
+
+    if (status === 404) {
+      return 'Edge Function "sync-github-contributions" não publicada ou não encontrada (HTTP 404). Execute npx supabase functions deploy sync-github-contributions --no-verify-jwt.'
+    }
+
+    if (status === 401) {
+      return `Sessão Supabase inválida ou expirada (HTTP 401)${serverError ? `: ${serverError}` : '.'} Clique em Sair e conecte novamente.`
+    }
+
+    if (status === 403) {
+      if (serverError.toLowerCase().includes('cors')) {
+        return `Bloqueio de CORS na Edge Function (HTTP 403): confira ALLOWED_ORIGINS para ${window.location.origin}.`
+      }
+      return `Acesso negado na Edge Function (HTTP 403)${serverError ? `: ${serverError}` : '.'}`
+    }
+
+    if (status === 400 || serverCode === 'GITHUB_TOKEN_INVALID') {
+      const missingOrInvalidToken =
+        serverCode === 'GITHUB_TOKEN_INVALID' ||
+        serverError.toLowerCase().includes('missing github access token') ||
+        serverError.toLowerCase().includes('bad credentials')
+      if (missingOrInvalidToken) {
+        return 'Token OAuth do GitHub ausente ou expirado nesta sessão. Clique em Sair e conecte novamente com o GitHub.'
+      }
+      return `Erro na requisição de sincronização (HTTP ${status})${serverError ? `: ${serverError}` : '.'}`
+    }
+
+    if (status === 502) {
+      return `Erro na GraphQL API do GitHub (HTTP 502)${serverError ? `: ${serverError}` : '.'}`
+    }
+
+    if (status >= 500) {
+      return `Erro interno no servidor da Edge Function (HTTP ${status})${serverError ? `: ${serverError}` : '.'}`
+    }
+
+    return serverError
+      ? `${serverError} (HTTP ${status})`
+      : `Falha na sincronização GitHub (HTTP ${status}).`
+  }
+
+  return detail.serverMessage || 'Falha ao sincronizar contribuições do GitHub.'
+}
 
 export interface GitHubSyncResult {
   treeId?: string
@@ -190,6 +327,7 @@ export async function signInWithGitHubReadOnly(): Promise<void> {
 }
 
 export async function signOutFromCity(): Promise<void> {
+  clearCachedGitHubProviderToken()
   if (!supabase) return
   await supabase.auth.signOut()
 }
@@ -205,19 +343,28 @@ export async function syncAuthenticatedGitHubTree(
     throw new Error('SUPABASE_NOT_CONFIGURED')
   }
 
+  if (session.provider_token) {
+    cacheGitHubProviderToken(session.provider_token)
+  }
+  const providerToken = session.provider_token?.trim() || getCachedGitHubProviderToken() || undefined
+
   const { year } = getStandardContributionWindow()
   const { data, error } = await supabase.functions.invoke<GitHubSyncResult>(
     'sync-github-contributions',
     {
+      headers: session.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : undefined,
       body: {
-        providerToken: session.provider_token ?? undefined,
+        providerToken,
         year,
       },
     },
   )
 
   if (error) {
-    throw new Error(error.message || 'Falha ao sincronizar contribuições do GitHub.')
+    const detailedMessage = await formatEdgeFunctionInvokeError(error)
+    throw new Error(detailedMessage)
   }
   if (!data || !data.profile) {
     throw new Error('Resposta inválida da função de sincronização do GitHub.')

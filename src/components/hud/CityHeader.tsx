@@ -2,12 +2,14 @@ import { Heart, HelpCircle, LogOut, RefreshCw, Search, Terminal, Trees } from 'l
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
+import { extractSessionGitHubUser } from '../../services/githubSyncService'
 import { GitHubIcon } from '../icons/GitHubIcon'
 
 interface CityHeaderProps {
   onOpenConnectModal: () => void
   onOpenHowItWorks: () => void
   onOpenSearch?: () => void
+  onFocusMyTree?: () => void
   onFocusCreatorTree?: () => void
   onShowWelcome?: () => void
 }
@@ -16,20 +18,31 @@ export function CityHeader({
   onOpenConnectModal,
   onOpenHowItWorks,
   onOpenSearch,
+  onFocusMyTree,
   onFocusCreatorTree,
   onShowWelcome,
 }: CityHeaderProps) {
-  const { stats, currentUserTree, isSyncing, resyncMyTree, signOut } = useCity()
+  const { session, currentUserTree, isSyncing, resyncMyTree, signOut } = useCity()
   const { language, setLanguage, t } = useLocale()
   const location = useLocation()
   const navigate = useNavigate()
   const isHome = location.pathname === '/'
+  const sessionUser = !currentUserTree ? extractSessionGitHubUser(session) : null
 
   const handleBrandClick = () => {
     if (isHome && onShowWelcome) {
       onShowWelcome()
     } else {
       navigate('/')
+    }
+  }
+
+  const handleMyTreeClick = () => {
+    if (!currentUserTree) return
+    if (isHome && onFocusMyTree) {
+      onFocusMyTree()
+    } else {
+      navigate(`/?focus=${encodeURIComponent(currentUserTree.profile.github_username)}`)
     }
   }
 
@@ -69,23 +82,6 @@ export function CityHeader({
             </span>
           </div>
         </button>
-
-        <div className="hidden items-center gap-2.5 rounded-sm border border-slate-800 bg-[#040811]/85 px-3 py-1 text-[11px] text-slate-300 xl:flex">
-          <span>
-            {t.header.trees}: <strong className="text-emerald-400">{stats.totalTrees}</strong>
-          </span>
-          <span className="text-slate-700">|</span>
-          <span>
-            {t.header.commits}:{' '}
-            <strong className="text-amber-300">
-              {stats.totalContributions.toLocaleString(language)}
-            </strong>
-          </span>
-          <span className="text-slate-700">|</span>
-          <span>
-            {t.header.lights}: <strong className="text-emerald-300">{stats.illuminatedTrees}</strong>
-          </span>
-        </div>
 
         <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-1.5">
           {/* Discreet PT | EN Language Switcher */}
@@ -159,8 +155,9 @@ export function CityHeader({
 
           {currentUserTree ? (
             <div className="flex items-center gap-1.5">
-              <Link
-                to={`/?focus=${encodeURIComponent(currentUserTree.profile.github_username)}`}
+              <button
+                type="button"
+                onClick={handleMyTreeClick}
                 className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold"
                 title={t.header.myTreeTitle}
               >
@@ -170,7 +167,52 @@ export function CityHeader({
                   className="h-3.5 w-3.5 rounded-[2px] border border-emerald-400/50"
                 />
                 <span>@{currentUserTree.profile.github_username}</span>
-              </Link>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void resyncMyTree()}
+                disabled={isSyncing}
+                className="pixel-btn pixel-btn-wood rounded-sm p-1.5 text-[11px] disabled:opacity-60"
+                title={t.header.resyncTitle}
+                aria-label={t.header.resyncTitle}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="pixel-btn pixel-btn-wood rounded-sm p-1.5 text-[11px]"
+                title={t.header.signOutTitle}
+                aria-label={t.header.signOutTitle}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : session ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void resyncMyTree()}
+                disabled={isSyncing}
+                className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold disabled:opacity-70"
+                title={t.header.resyncTitle}
+              >
+                {sessionUser?.avatarUrl ? (
+                  <img
+                    src={sessionUser.avatarUrl}
+                    alt={sessionUser.username}
+                    className="h-3.5 w-3.5 rounded-[2px] border border-emerald-400/50"
+                  />
+                ) : (
+                  <GitHubIcon className="h-3.5 w-3.5" />
+                )}
+                <span>@{sessionUser?.username || 'github'}</span>
+                <span className="hidden text-[10px] text-amber-200/90 md:inline">
+                  · {isSyncing ? t.header.syncing : t.header.syncPending}
+                </span>
+              </button>
 
               <button
                 type="button"

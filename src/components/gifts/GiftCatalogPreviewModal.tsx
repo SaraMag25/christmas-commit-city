@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react'
-import { Check, Eye, Gift, Sparkles, X } from 'lucide-react'
+import { Check, CreditCard, Eye, Gift, Loader2, QrCode, Sparkles, X } from 'lucide-react'
 import { normalizeGiftSlug, resolveGiftUsdPrice } from '../../config/gifts'
 import { formatCurrencyPrice } from '../../config/supportCampaign'
 import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
 import { MOCK_GIFTS_CATALOG } from '../../data/mockCityData'
 import { GIFT_CATALOG_COPY } from '../../i18n/translations'
+import {
+  createPixPayment,
+  createStripeCheckout,
+  type PixPaymentOrder,
+} from '../../services/paymentService'
 import type { CityTree, GiftItem, TreeGiftSummary } from '../../types/city'
+import { GitHubIcon } from '../icons/GitHubIcon'
+import { PixCheckoutBox } from '../payments/PixCheckoutBox'
 import { TreePixelCanvas } from '../tree/TreePixelCanvas'
 
 interface GiftCatalogPreviewModalProps {
@@ -20,14 +27,22 @@ export function GiftCatalogPreviewModal({
   isOwnTree = false,
   onClose,
 }: GiftCatalogPreviewModalProps) {
-  const { trees, currentUserTree, session, isSupabaseReady, connectWithGitHub, sendGiftToTree } =
-    useCity()
-  const { currency, language, t } = useLocale()
+  const {
+    trees,
+    currentUserTree,
+    session,
+    isSupabaseReady,
+    connectWithGitHub,
+    sendGiftToTree,
+    refreshCityState,
+  } = useCity()
+  const { currency, setCurrency, language, t } = useLocale()
   const [selectedGiftId, setSelectedGiftId] = useState<string>(MOCK_GIFTS_CATALOG[0]?.id ?? '')
   const [showWithPreview, setShowWithPreview] = useState(true)
   const [recentGiftName, setRecentGiftName] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
+  const [pixOrder, setPixOrder] = useState<PixPaymentOrder | null>(null)
 
   const targetTree = useMemo(() => {
     const norm = recipientUsername.trim().toLowerCase()
@@ -83,8 +98,35 @@ export function GiftCatalogPreviewModal({
 
   const handleConfirmGift = async () => {
     setActionError(null)
+    setRecentGiftName(null)
     setIsSending(true)
     try {
+      if (isSupabaseReady && selectedGift.category === 'special') {
+        if (!session) {
+          await connectWithGitHub()
+          return
+        }
+        if (!targetTree) {
+          setActionError('Árvore destinatária não encontrada.')
+          return
+        }
+
+        if (currency === 'BRL') {
+          const order = await createPixPayment({
+            itemId: selectedGift.id,
+            targetTreeId: targetTree.id,
+          })
+          setPixOrder(order)
+        } else {
+          const stripe = await createStripeCheckout({
+            itemId: selectedGift.id,
+            targetTreeId: targetTree.id,
+          })
+          window.location.assign(stripe.checkoutUrl)
+        }
+        return
+      }
+
       const senderLabel = isOwnTree
         ? currentUserTree
           ? `@${currentUserTree.profile.github_username}`
@@ -102,9 +144,18 @@ export function GiftCatalogPreviewModal({
       } else if (result.error) {
         setActionError(result.error)
       }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Falha ao iniciar pagamento.')
     } finally {
       setIsSending(false)
     }
+  }
+
+  const handleGiftPixConfirmed = async () => {
+    await refreshCityState()
+    setPixOrder(null)
+    setRecentGiftName(selectedName)
+    setShowWithPreview(true)
   }
 
   const headerTitle = isOwnTree
@@ -126,7 +177,7 @@ export function GiftCatalogPreviewModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-xs sm:p-6"
     >
       <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto pixel-wood-panel rounded-sm p-4 sm:p-6">
-        <div className="flex items-start justify-between gap-4 border-b border-[#8c5835] pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#8c5835] pb-3">
           <div>
             <h2 className="flex items-center gap-2 font-pixel-title text-xs text-amber-300 sm:text-sm">
               <Gift className="h-4 w-4 text-rose-400" />
@@ -136,14 +187,54 @@ export function GiftCatalogPreviewModal({
               {isOwnTree ? t.giftModal.subtitleOwn : t.giftModal.subtitle}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t.home.close}
-            className="rounded-sm border border-amber-400/40 bg-[#261409] p-1 text-amber-200 hover:bg-amber-500/20 cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <div
+              role="group"
+              aria-label="Currency selector"
+              className="flex rounded-sm border border-amber-400/35 bg-[#040811] p-0.5 text-[10px]"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrency('BRL')
+                  setPixOrder(null)
+                  setActionError(null)
+                }}
+                className={`rounded-[2px] px-2 py-1 font-semibold transition cursor-pointer ${
+                  currency === 'BRL'
+                    ? 'bg-emerald-500/25 text-emerald-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t.shop.currencyBrlLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrency('USD')
+                  setPixOrder(null)
+                  setActionError(null)
+                }}
+                className={`rounded-[2px] px-2 py-1 font-semibold transition cursor-pointer ${
+                  currency === 'USD'
+                    ? 'bg-sky-500/25 text-sky-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t.shop.currencyUsdLabel}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t.home.close}
+              className="rounded-sm border border-amber-400/40 bg-[#261409] p-1 text-amber-200 hover:bg-amber-500/20 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {recentGiftName && (
@@ -243,24 +334,29 @@ export function GiftCatalogPreviewModal({
                 </p>
               )}
 
-              {isSupabaseReady && selectedGift.category === 'special' ? (
-                <div className="mt-3 rounded-sm border border-amber-400/45 bg-amber-950/35 p-2.5 text-[11px] leading-snug text-amber-100">
-                  {t.giftModal.phase7Notice}
-                </div>
-              ) : isSupabaseReady && !session ? (
+              {isSupabaseReady && !session ? (
                 <div className="mt-3 space-y-2">
                   <p className="rounded-sm border border-sky-400/35 bg-[#0d1833]/80 p-2 text-[11px] leading-snug text-sky-100">
-                    {t.giftModal.loginRequiredFree}
+                    {selectedGift.category === 'special'
+                      ? t.giftModal.loginRequiredPaid
+                      : t.giftModal.loginRequiredFree}
                   </p>
                   <button
                     type="button"
                     onClick={() => void connectWithGitHub()}
                     className="pixel-btn pixel-btn-red w-full rounded-sm px-3 py-2 text-xs font-bold"
                   >
-                    <Gift className="h-3.5 w-3.5" />
+                    <GitHubIcon className="h-3.5 w-3.5" />
                     <span>{t.connectModal.authorize}</span>
                   </button>
                 </div>
+              ) : isSupabaseReady && selectedGift.category === 'special' && pixOrder ? (
+                <PixCheckoutBox
+                  order={pixOrder}
+                  itemLabel={selectedName}
+                  onConfirmed={handleGiftPixConfirmed}
+                  onCancel={() => setPixOrder(null)}
+                />
               ) : (
                 <button
                   type="button"
@@ -270,8 +366,22 @@ export function GiftCatalogPreviewModal({
                     selectedGift.category === 'special' ? 'pixel-btn-gold' : 'pixel-btn-pine'
                   }`}
                 >
-                  <Gift className="h-3.5 w-3.5" />
-                  <span>{isSending ? t.giftModal.sendingBtn : confirmLabel}</span>
+                  {isSending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : isSupabaseReady && selectedGift.category === 'special' && currency === 'BRL' ? (
+                    <QrCode className="h-3.5 w-3.5" />
+                  ) : isSupabaseReady && selectedGift.category === 'special' ? (
+                    <CreditCard className="h-3.5 w-3.5" />
+                  ) : (
+                    <Gift className="h-3.5 w-3.5" />
+                  )}
+                  <span>
+                    {isSending
+                      ? selectedGift.category === 'special' && isSupabaseReady
+                        ? t.shop.generatingCheckout
+                        : t.giftModal.sendingBtn
+                      : confirmLabel}
+                  </span>
                 </button>
               )}
             </div>
@@ -299,6 +409,7 @@ export function GiftCatalogPreviewModal({
                       setShowWithPreview(true)
                       setRecentGiftName(null)
                       setActionError(null)
+                      setPixOrder(null)
                     }}
                     className={`flex flex-col justify-between rounded-sm border p-3 text-left transition cursor-pointer ${
                       isSelected

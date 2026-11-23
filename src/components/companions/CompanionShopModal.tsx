@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import {
   Check,
   Coins,
-  Copy,
+  CreditCard,
   ExternalLink,
   Heart,
+  Loader2,
   Lock,
   PawPrint,
+  QrCode,
   ShieldCheck,
   Sparkles,
   X,
@@ -21,7 +23,6 @@ import {
 } from '../../config/companions'
 import {
   buildCompanionSupportPreview,
-  CREATOR_CAMPAIGN,
   formatCurrencyPrice,
   SUPPORTER_BUNDLE,
 } from '../../config/supportCampaign'
@@ -33,6 +34,11 @@ import {
   SLOT_LABELS_BY_LANG,
   SPECIES_COPY,
 } from '../../i18n/translations'
+import {
+  createPixPayment,
+  createStripeCheckout,
+  type PixPaymentOrder,
+} from '../../services/paymentService'
 import type { CityTree } from '../../types/city'
 import type {
   AccessorySlot,
@@ -45,6 +51,8 @@ import type {
   HandAccessoryId,
   HeadAccessoryId,
 } from '../../types/companion'
+import { GitHubIcon } from '../icons/GitHubIcon'
+import { PixCheckoutBox } from '../payments/PixCheckoutBox'
 import { CompanionPreviewCanvas } from './CompanionPreviewCanvas'
 
 interface CompanionShopModalProps {
@@ -78,6 +86,7 @@ function setSlotOverride(
 export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const { language, currency, setCurrency, t } = useLocale()
   const {
+    session,
     isSupabaseReady,
     getCompanionLoadout,
     getAvailableCommits,
@@ -87,6 +96,8 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     toggleEquippedAccessory,
     unlockSupporterBundle,
     renameCompanion,
+    connectWithGitHub,
+    refreshCityState,
   } = useCity()
 
   const username = tree.profile.github_username
@@ -112,7 +123,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   )
   const [nameDraft, setNameDraft] = useState<string>(() => loadout.customName ?? '')
   const [pendingPayment, setPendingPayment] = useState<PendingPaymentItem | null>(null)
-  const [pixCopied, setPixCopied] = useState(false)
+  const [pixOrder, setPixOrder] = useState<PixPaymentOrder | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isMutating, setIsMutating] = useState(false)
 
@@ -160,6 +171,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     setFocusedSpeciesId(item.id)
     setPreviewSpeciesId(item.id)
     setPendingPayment(null)
+    setPixOrder(null)
     setFeedback(null)
     if (isSpeciesUnlocked(item.id) && !isMutating) {
       setIsMutating(true)
@@ -175,6 +187,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const handleSelectAccessoryCard = async (item: CompanionAccessoryItem) => {
     setFocusedAccessoryId(item.id)
     setPendingPayment(null)
+    setPixOrder(null)
     setFeedback(null)
 
     if (isAccessoryUnlocked(item.id) && !isMutating) {
@@ -225,6 +238,32 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
 
   const handleConfirmPaymentUnlock = async () => {
     if (!pendingPayment || isMutating) return
+
+    if (isSupabaseReady) {
+      if (!session) {
+        await connectWithGitHub()
+        return
+      }
+      const itemId =
+        pendingPayment.kind === 'bundle' ? SUPPORTER_BUNDLE.id : pendingPayment.item.id
+      setIsMutating(true)
+      setFeedback(null)
+      try {
+        if (currency === 'BRL') {
+          const order = await createPixPayment({ itemId })
+          setPixOrder(order)
+        } else {
+          const stripe = await createStripeCheckout({ itemId })
+          window.location.assign(stripe.checkoutUrl)
+        }
+      } catch (err) {
+        setFeedback(err instanceof Error ? err.message : t.shop.phase7Notice)
+      } finally {
+        setIsMutating(false)
+      }
+      return
+    }
+
     const method = currency === 'BRL' ? 'pix' : 'international'
     setIsMutating(true)
     try {
@@ -260,13 +299,26 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     }
   }
 
-  const handleCopyPixKey = async () => {
-    try {
-      await navigator.clipboard.writeText(CREATOR_CAMPAIGN.pixKey)
-      setPixCopied(true)
-      window.setTimeout(() => setPixCopied(false), 1800)
-    } catch {
-      // Ignore clipboard failures in restricted environments.
+  const handlePixPaymentConfirmed = async () => {
+    const confirmedItem = pendingPayment
+    await refreshCityState()
+    setPixOrder(null)
+    setPendingPayment(null)
+    if (confirmedItem?.kind === 'bundle') {
+      setPreviewAccessoryOverride({})
+      setFeedback(t.shop.supporterUnlocked)
+    } else if (confirmedItem?.kind === 'species') {
+      setPreviewSpeciesId(confirmedItem.item.id)
+      setFeedback(
+        `${speciesLabels[confirmedItem.item.id].name} — ${t.shop.paymentConfirmedUnlocked}`,
+      )
+    } else if (confirmedItem?.kind === 'accessory') {
+      setPreviewAccessoryOverride((prev) => setSlotOverride(prev, confirmedItem.item.slot, undefined))
+      setFeedback(
+        `${accessoryLabels[confirmedItem.item.id].name} — ${t.shop.paymentConfirmedUnlocked}`,
+      )
+    } else {
+      setFeedback(t.shop.paymentConfirmedUnlocked)
     }
   }
 
@@ -351,6 +403,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 onClick={() => {
                   setCurrency('BRL')
                   setPendingPayment(null)
+                  setPixOrder(null)
                 }}
                 className={`rounded-[2px] px-2.5 py-1 font-semibold transition cursor-pointer ${
                   currency === 'BRL'
@@ -365,6 +418,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 onClick={() => {
                   setCurrency('USD')
                   setPendingPayment(null)
+                  setPixOrder(null)
                 }}
                 className={`rounded-[2px] px-2.5 py-1 font-semibold transition cursor-pointer ${
                   currency === 'USD'
@@ -871,7 +925,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
               </div>
             </div>
 
-            {/* Dual Payment Preview Panel (BRL Pix / USD International Checkout) */}
+            {/* Dual Payment Panel (Real Mercado Pago Pix / Stripe Checkout in production, Local Preview offline) */}
             {pendingPayment && paymentPreview && (
               <div className="mt-3 rounded-sm border-2 border-amber-400/55 bg-[#111c36] p-3.5">
                 <div className="flex items-start justify-between gap-2">
@@ -891,74 +945,104 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setPendingPayment(null)}
+                    onClick={() => {
+                      setPendingPayment(null)
+                      setPixOrder(null)
+                    }}
                     className="text-[10px] text-slate-400 hover:text-white cursor-pointer"
                   >
                     {t.shop.cancel}
                   </button>
                 </div>
 
-                {currency === 'BRL' ? (
-                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-700 bg-[#040811]/90 px-3 py-2 text-[11px]">
-                    <div className="truncate">
-                      <span className="text-slate-500">{t.shop.pixKeyLabel}: </span>
-                      <code className="text-amber-200">{paymentPreview.pixKey}</code>
-                      <span className="ml-2 text-[10px] text-slate-500">
-                        ({paymentPreview.externalReference})
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyPixKey}
-                      className="inline-flex items-center gap-1 rounded-sm border border-slate-700 px-2 py-1 text-[10px] text-slate-200 hover:border-amber-400 cursor-pointer"
-                    >
-                      {pixCopied ? (
-                        <Check className="h-3 w-3 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                      <span>{pixCopied ? t.shop.copied : t.shop.copy}</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-700 bg-[#040811]/90 px-3 py-2 text-[11px]">
-                    {paymentPreview.checkoutUrl ? (
-                      <>
-                        <span className="text-slate-300">
-                          Ref: <code className="text-sky-300">{paymentPreview.externalReference}</code>
-                        </span>
-                        <a
-                          href={paymentPreview.checkoutUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-sm border border-sky-400/50 bg-sky-500/20 px-2.5 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/30"
-                        >
-                          <span>{t.shop.openCheckout}</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </>
-                    ) : (
-                      <p className="text-[10px] text-sky-200/90">{t.shop.noCheckoutEnv}</p>
-                    )}
-                  </div>
-                )}
-
                 {isSupabaseReady ? (
-                  <p className="mt-2.5 rounded-sm border border-amber-400/40 bg-amber-950/35 p-2.5 text-[10px] leading-relaxed text-amber-100">
-                    {t.shop.phase7Notice}
-                  </p>
+                  !session ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="rounded-sm border border-sky-400/35 bg-[#040811]/90 p-2.5 text-[11px] text-sky-100">
+                        {t.shop.loginRequiredPaid}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void connectWithGitHub()}
+                        className="pixel-btn pixel-btn-red rounded-sm px-3.5 py-2 text-xs font-bold"
+                      >
+                        <GitHubIcon className="h-3.5 w-3.5" />
+                        <span>{t.connectModal.authorize}</span>
+                      </button>
+                    </div>
+                  ) : pixOrder && currency === 'BRL' ? (
+                    <PixCheckoutBox
+                      order={pixOrder}
+                      itemLabel={pendingName}
+                      onConfirmed={handlePixPaymentConfirmed}
+                      onCancel={() => setPixOrder(null)}
+                    />
+                  ) : (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] text-sky-200/85">{t.shop.phase7Notice}</p>
+                      <button
+                        type="button"
+                        disabled={isMutating}
+                        onClick={() => void handleConfirmPaymentUnlock()}
+                        className="pixel-btn pixel-btn-gold shrink-0 rounded-sm px-3.5 py-2 text-xs font-bold disabled:opacity-60"
+                      >
+                        {isMutating ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : currency === 'BRL' ? (
+                          <QrCode className="h-3.5 w-3.5" />
+                        ) : (
+                          <CreditCard className="h-3.5 w-3.5" />
+                        )}
+                        <span>
+                          {isMutating
+                            ? t.shop.generatingCheckout
+                            : currency === 'BRL'
+                              ? t.shop.generatePixBtn
+                              : t.shop.payWithStripeBtn}
+                        </span>
+                      </button>
+                    </div>
+                  )
                 ) : (
-                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[10px] text-sky-200/80">{t.shop.previewNote}</p>
-                    <button
-                      type="button"
-                      disabled={isMutating}
-                      onClick={() => void handleConfirmPaymentUnlock()}
-                      className="pixel-btn pixel-btn-pine rounded-sm px-3.5 py-1.5 text-[11px] font-bold disabled:opacity-60"
-                    >
-                      {t.shop.confirmPreview}
-                    </button>
-                  </div>
+                  <>
+                    {currency === 'USD' && (
+                      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-700 bg-[#040811]/90 px-3 py-2 text-[11px]">
+                        {paymentPreview.checkoutUrl ? (
+                          <>
+                            <span className="text-slate-300">
+                              Ref:{' '}
+                              <code className="text-sky-300">
+                                {paymentPreview.externalReference}
+                              </code>
+                            </span>
+                            <a
+                              href={paymentPreview.checkoutUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-sm border border-sky-400/50 bg-sky-500/20 px-2.5 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/30"
+                            >
+                              <span>{t.shop.openCheckout}</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </>
+                        ) : (
+                          <p className="text-[10px] text-sky-200/90">{t.shop.noCheckoutEnv}</p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] text-sky-200/80">{t.shop.previewNote}</p>
+                      <button
+                        type="button"
+                        disabled={isMutating}
+                        onClick={() => void handleConfirmPaymentUnlock()}
+                        className="pixel-btn pixel-btn-pine rounded-sm px-3.5 py-1.5 text-[11px] font-bold disabled:opacity-60"
+                      >
+                        {t.shop.confirmPreview}
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             )}

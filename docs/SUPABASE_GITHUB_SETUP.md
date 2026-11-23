@@ -13,20 +13,20 @@ Este guia descreve como colocar o **Christmas Commit City** em produção com **
    ```
 3. No GitHub, acesse **Settings → Developer settings → OAuth Apps → New OAuth App** e preencha:
    - **Application name:** `Christmas Commit City`
-   - **Homepage URL:** `https://seu-dominio.vercel.app` (ou `http://localhost:5173` para testes locais)
+   - **Homepage URL:** `https://seu-dominio.com` (ou `https://seu-projeto.pages.dev` / `http://localhost:5173`)
    - **Authorization callback URL:** `https://<seu-project-ref>.supabase.co/auth/v1/callback`
 4. Copie o **Client ID** e o **Client Secret** do GitHub e cole em **Authentication → Providers → GitHub** no Supabase (ative o provider).
 5. Em **Authentication → URL Configuration** no Supabase:
-   - **Site URL:** `https://seu-dominio.vercel.app` (ou `http://localhost:5173`)
-   - **Redirect URLs:** adicione `http://localhost:5173` e `https://seu-dominio.vercel.app/**`.
+   - **Site URL:** `https://seu-dominio.com` (ou `http://localhost:5173`)
+   - **Redirect URLs:** adicione `http://localhost:5173` e `https://seu-dominio.com/**` (e `https://seu-projeto.pages.dev/**` se usar preview do Cloudflare Pages).
 
 > **Escopo mínimo:** o app solicita apenas `read:user` — **nunca** acesso de escrita aos repositórios.
 
 ---
 
-## 2. Variáveis de Ambiente (`.env` / Vercel vs Secrets do Supabase)
+## 2. Variáveis de Ambiente (`.env` / Cloudflare Pages vs Secrets do Supabase)
 
-### Frontend (`.env` local e Environment Variables na Vercel)
+### Frontend (`.env` local e Environment Variables na Cloudflare Pages)
 Copie `.env.example` para `.env`:
 
 ```bash
@@ -39,6 +39,10 @@ Preencha **apenas** variáveis públicas `VITE_*` (nunca coloque `SUPABASE_SERVI
 VITE_SUPABASE_URL=https://<seu-project-ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=<sua-chave-anon-publica>
 VITE_CONTRIBUTION_YEAR=2026
+VITE_PIX_KEY=<sua-chave-pix>
+VITE_PIX_BR_CODE=<seu-pix-copia-e-cola>
+VITE_PIX_RECIPIENT_NAME=<seu-nome>
+VITE_PIX_RECIPIENT_CITY=<sua-cidade>
 ```
 
 ### Backend (Secrets da Edge Function no Supabase)
@@ -46,15 +50,21 @@ As variáveis `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` 
 
 ```bash
 # Origens permitidas para CORS em produção (separadas por vírgula)
-npx supabase secrets set ALLOWED_ORIGINS="https://seu-dominio.vercel.app,http://localhost:5173"
+npx supabase secrets set ALLOWED_ORIGINS="https://seu-dominio.com,http://localhost:5173"
 
-# Opcional/recomendado: token clássico read-only para re-sincronizações após refresh de sessão
+# Token clássico read-only opcional para re-sincronizações após refresh de sessão
 npx supabase secrets set GITHUB_READONLY_TOKEN="ghp_seu_token_apenas_leitura"
+
+# Segredos da Fase 7 — Pagamentos Reais (Pix Mercado Pago + Cartão Internacional Stripe)
+npx supabase secrets set MERCADOPAGO_ACCESS_TOKEN="APP_USR-seu-token"
+npx supabase secrets set MERCADOPAGO_WEBHOOK_SECRET="sua-assinatura-secreta-mp"
+npx supabase secrets set STRIPE_SECRET_KEY="sk_live_ou_test_sua_chave"
+npx supabase secrets set STRIPE_WEBHOOK_SECRET="whsec_sua_assinatura_stripe"
 ```
 
 ---
 
-## 3. Aplicar Migrations SQL e Fazer Deploy da Edge Function
+## 3. Aplicar Migrations SQL e Fazer Deploy das Edge Functions
 
 No diretório raiz do projeto:
 
@@ -63,14 +73,45 @@ No diretório raiz do projeto:
 npx supabase login
 npx supabase link --project-ref <seu-project-ref>
 
-# 2. Aplicar todas as migrations SQL (tabelas, seed de shop_catalog, RLS, views e RPCs)
+# 2. Aplicar todas as migrations SQL (Fase 6 + Fase 7 preços/pagamentos)
 npx supabase db push
 
-# 3. Fazer deploy da Edge Function endurecida
-npx supabase functions deploy sync-github-contributions
+# 3. Fazer deploy das Edge Functions (validação JWT interna + webhooks HMAC)
+npx supabase functions deploy sync-github-contributions --no-verify-jwt
+npx supabase functions deploy create-pix-payment --no-verify-jwt
+npx supabase functions deploy webhook-mercadopago --no-verify-jwt
+npx supabase functions deploy create-stripe-checkout --no-verify-jwt
+npx supabase functions deploy webhook-stripe --no-verify-jwt
 ```
 
-> **Alternativa pelo painel Web:** caso prefira aplicar o SQL manualmente, cole o conteúdo de [`supabase/migrations/20261122_phase6_secure_backend.sql`](../supabase/migrations/20261122_phase6_secure_backend.sql) no **SQL Editor** do Supabase e execute.
+### URLs dos Webhooks (Fase 7)
+- **Mercado Pago (`webhook-mercadopago`):**
+  `https://<seu-project-ref>.supabase.co/functions/v1/webhook-mercadopago` (marque evento **Pagamentos / `payment`** e copie a chave secreta para `MERCADOPAGO_WEBHOOK_SECRET`).
+- **Stripe (`webhook-stripe`):**
+  `https://<seu-project-ref>.supabase.co/functions/v1/webhook-stripe` (eventos **`checkout.session.completed`**, **`checkout.session.async_payment_succeeded`**, **`checkout.session.expired`** e **`checkout.session.async_payment_failed`**; copie o signing secret `whsec_...` para `STRIPE_WEBHOOK_SECRET`).
+
+> **Alternativa pelo painel Web:** caso prefira aplicar o SQL manualmente, cole [`supabase/migrations/20261122_phase6_secure_backend.sql`](../supabase/migrations/20261122_phase6_secure_backend.sql) seguido de [`supabase/migrations/20261122_phase7_prices_and_payments.sql`](../supabase/migrations/20261122_phase7_prices_and_payments.sql) no **SQL Editor** do Supabase.
+
+---
+
+## 4. Deploy do Frontend na Cloudflare Pages (Domínio Próprio)
+
+1. Conecte o repositório na **Cloudflare Pages**:
+   - **Framework preset:** Vite
+   - **Build command:** `npm run build`
+   - **Build output directory:** `dist`
+2. O arquivo [`public/_redirects`](../public/_redirects) (`/* /index.html 200`) já garante que rotas SPA (`/tree/:username`, `/rankings`) funcionem diretamente ao recarregar.
+3. Adicione em **Settings → Environment variables** (Production) apenas variáveis públicas `VITE_*`:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_CONTRIBUTION_YEAR=2026`
+   - Opcionais de campanha: `VITE_PIX_KEY`, `VITE_PIX_BR_CODE`, `VITE_PIX_RECIPIENT_NAME`, `VITE_PIX_RECIPIENT_CITY`
+4. Ao ativar seu domínio próprio (ex.: `https://seu-dominio.com`), atualize:
+   - **GitHub OAuth App** (Homepage URL) e **Supabase → Authentication → URL Configuration** (`Site URL` + `Redirect URLs`).
+   - Segredo CORS das Edge Functions:
+     ```bash
+     npx supabase secrets set ALLOWED_ORIGINS="https://seu-dominio.com,http://localhost:5173"
+     ```
 
 ---
 

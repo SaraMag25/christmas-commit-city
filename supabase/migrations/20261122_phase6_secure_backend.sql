@@ -212,6 +212,15 @@ grant select on public.user_unlocks to authenticated;
 grant select on public.tree_gifts to authenticated;
 grant select on public.payment_orders to authenticated;
 
+-- Backend Edge Functions & webhooks authenticate with `service_role`; grant explicitly so
+-- restrictive SQL-Editor default table ACLs never block server-side tree sync or webhooks.
+grant all privileges on table public.shop_catalog to service_role;
+grant all privileges on table public.trees to service_role;
+grant all privileges on table public.user_unlocks to service_role;
+grant all privileges on table public.tree_gifts to service_role;
+grant all privileges on table public.payment_orders to service_role;
+grant usage, select on sequence public.trees_plot_index_seq to service_role;
+
 drop policy if exists "Public reads active shop catalog" on public.shop_catalog;
 create policy "Public reads active shop catalog"
   on public.shop_catalog for select
@@ -265,7 +274,7 @@ from public.trees t;
 
 alter view public.public_trees set (security_invoker = false);
 revoke all on public.public_trees from public;
-grant select on public.public_trees to anon, authenticated;
+grant select on public.public_trees to anon, authenticated, service_role;
 
 create or replace function public.get_public_tree_gift_counts()
 returns table (

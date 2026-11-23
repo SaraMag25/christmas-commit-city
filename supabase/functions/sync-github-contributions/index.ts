@@ -158,7 +158,12 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser(token)
 
     if (userError || !user) {
-      return jsonResponse({ error: 'Invalid or expired Supabase session.' }, 401, corsHeaders)
+      console.error('[sync] Auth user validation failed:', userError?.message ?? 'missing user')
+      return jsonResponse(
+        { error: 'Invalid or expired Supabase session.', code: 'INVALID_SESSION' },
+        401,
+        corsHeaders,
+      )
     }
 
     // Extract verified GitHub username strictly from the authenticated user's GitHub OAuth identity
@@ -212,7 +217,12 @@ Deno.serve(async (req: Request) => {
       .maybeSingle<ExistingTreeRow>()
 
     if (existingErr) {
-      return jsonResponse({ error: 'Failed to read existing tree state.' }, 500, corsHeaders)
+      console.error('[sync] Failed to read existing tree state:', existingErr.code, existingErr.message)
+      return jsonResponse(
+        { error: 'Failed to read existing tree state.', code: existingErr.code ?? 'DB_READ_ERROR' },
+        500,
+        corsHeaders,
+      )
     }
 
     // Enforce 5-minute sync cooldown per user to prevent GitHub API abuse
@@ -292,9 +302,16 @@ Deno.serve(async (req: Request) => {
 
     if (!ghRes.ok) {
       const errorText = await ghRes.text()
+      console.error('[sync] GitHub GraphQL non-OK response:', ghRes.status, errorText.slice(0, 300))
       return jsonResponse(
-        { error: `GitHub GraphQL returned ${ghRes.status}: ${errorText}` },
-        502,
+        {
+          error:
+            ghRes.status === 401
+              ? 'GitHub OAuth token expired or revoked. Please sign out and connect with GitHub again.'
+              : `GitHub GraphQL returned ${ghRes.status}: ${errorText}`,
+          code: ghRes.status === 401 ? 'GITHUB_TOKEN_INVALID' : 'GITHUB_API_ERROR',
+        },
+        ghRes.status === 401 ? 400 : 502,
         corsHeaders,
       )
     }
@@ -366,7 +383,19 @@ Deno.serve(async (req: Request) => {
         .single<ExistingTreeRow>()
 
       if (updateErr || !updated) {
-        return jsonResponse({ error: 'Failed to persist updated tree contributions.' }, 500, corsHeaders)
+        console.error(
+          '[sync] Failed to persist updated tree contributions:',
+          updateErr?.code,
+          updateErr?.message,
+        )
+        return jsonResponse(
+          {
+            error: 'Failed to persist updated tree contributions.',
+            code: updateErr?.code ?? 'DB_UPDATE_ERROR',
+          },
+          500,
+          corsHeaders,
+        )
       }
       persistedTree = updated
     } else {
@@ -389,7 +418,19 @@ Deno.serve(async (req: Request) => {
         .single<ExistingTreeRow>()
 
       if (insertErr || !inserted) {
-        return jsonResponse({ error: 'Failed to create developer tree record.' }, 500, corsHeaders)
+        console.error(
+          '[sync] Failed to create developer tree record:',
+          insertErr?.code,
+          insertErr?.message,
+        )
+        return jsonResponse(
+          {
+            error: 'Failed to create developer tree record.',
+            code: insertErr?.code ?? 'DB_INSERT_ERROR',
+          },
+          500,
+          corsHeaders,
+        )
       }
       persistedTree = inserted
     }

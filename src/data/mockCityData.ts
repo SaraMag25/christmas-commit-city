@@ -8,7 +8,6 @@ import {
   selectStratifiedTreePlots,
 } from '../game/layout/treePlacement'
 import type {
-  CityCommunityStats,
   CityTree,
   GitHubContributionStats,
   GitHubContributionWeek,
@@ -421,20 +420,3 @@ function buildForestCommunityTrees(): CityTree[] {
 }
 
 export const MOCK_CITY_TREES: readonly CityTree[] = buildForestCommunityTrees()
-
-export function computeCommunityStats(trees: readonly CityTree[]): CityCommunityStats {
-  return trees.reduce<CityCommunityStats>(
-    (acc, tree) => ({
-      totalTrees: acc.totalTrees + 1,
-      totalContributions: acc.totalContributions + tree.contribution_count,
-      totalGifts: acc.totalGifts + tree.gifts.length,
-      illuminatedTrees: acc.illuminatedTrees + (tree.tree_level >= 4 ? 1 : 0),
-    }),
-    {
-      totalTrees: 0,
-      totalContributions: 0,
-      totalGifts: 0,
-      illuminatedTrees: 0,
-    },
-  )
-}

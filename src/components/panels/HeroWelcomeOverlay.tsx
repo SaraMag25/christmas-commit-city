@@ -1,23 +1,25 @@
-import { Compass, Heart, Terminal, X } from 'lucide-react'
+import { Compass, Heart, Terminal, Trees, X } from 'lucide-react'
 import { STANDARD_CONTRIBUTION_YEAR } from '../../config/githubPeriod'
+import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
 import { GitHubIcon } from '../icons/GitHubIcon'
-import type { CityCommunityStats } from '../../types/city'
 
 interface HeroWelcomeOverlayProps {
-  stats: CityCommunityStats
   onExploreCity: () => void
   onConnectGitHub: () => void
+  onGoToMyTree: () => void
   onFocusCreatorTree: () => void
 }
 
 export function HeroWelcomeOverlay({
-  stats,
   onExploreCity,
   onConnectGitHub,
+  onGoToMyTree,
   onFocusCreatorTree,
 }: HeroWelcomeOverlayProps) {
-  const { language, t } = useLocale()
+  const { session, currentUserTree } = useCity()
+  const { t } = useLocale()
+  const isAuthenticated = Boolean(session)
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex items-end justify-center p-3 pb-16 sm:items-center sm:p-6">
@@ -57,27 +59,7 @@ export function HeroWelcomeOverlay({
           </div>
         </div>
 
-        <div className="mt-4 rounded-sm border border-slate-800 bg-[#040811]/90 p-3 text-xs">
-          <p className="text-[11px] font-semibold text-slate-400">[ status ]</p>
-          <dl className="mt-2 grid grid-cols-2 gap-y-1 sm:grid-cols-3 sm:gap-x-4">
-            <div className="flex items-center justify-between sm:block">
-              <dt className="text-[11px] text-slate-400">{t.header.trees}</dt>
-              <dd className="font-semibold text-emerald-400">{stats.totalTrees}</dd>
-            </div>
-            <div className="flex items-center justify-between sm:block">
-              <dt className="text-[11px] text-slate-400">{t.header.commits}</dt>
-              <dd className="font-semibold text-amber-300">
-                {stats.totalContributions.toLocaleString(language)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between sm:block">
-              <dt className="text-[11px] text-slate-400">{t.header.lights}</dt>
-              <dd className="font-semibold text-slate-200">{stats.illuminatedTrees}</dd>
-            </div>
-          </dl>
-        </div>
-
-        <div className="mt-4">
+        <div className="mt-5">
           <p className="mb-2 text-[11px] text-slate-400">[ actions ]</p>
           <div className="flex flex-wrap items-center gap-2.5">
             <button
@@ -89,14 +71,30 @@ export function HeroWelcomeOverlay({
               <span>{t.welcome.exploreBtn}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={onConnectGitHub}
-              className="pixel-btn pixel-btn-red flex-1 rounded-sm px-3.5 py-2 text-xs font-semibold"
-            >
-              <GitHubIcon className="h-3.5 w-3.5" />
-              <span>{t.welcome.connectBtn}</span>
-            </button>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={onGoToMyTree}
+                title={
+                  currentUserTree
+                    ? `@${currentUserTree.profile.github_username}`
+                    : undefined
+                }
+                className="pixel-btn pixel-btn-gold flex-1 rounded-sm px-3.5 py-2 text-xs font-semibold"
+              >
+                <Trees className="h-3.5 w-3.5" />
+                <span>{t.welcome.myTreeBtn}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onConnectGitHub}
+                className="pixel-btn pixel-btn-red flex-1 rounded-sm px-3.5 py-2 text-xs font-semibold"
+              >
+                <GitHubIcon className="h-3.5 w-3.5" />
+                <span>{t.welcome.connectBtn}</span>
+              </button>
+            )}
           </div>
         </div>
 

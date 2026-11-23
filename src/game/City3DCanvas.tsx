@@ -129,6 +129,7 @@ export function City3DCanvas({ trees, decorativeTrees = [] }: City3DCanvasProps)
     let companionHandles: Array<{ companion: BuiltCompanion; phase: number }> = []
     let selectedTreeId: string | null = null
     let hoveredTreeId: string | null = null
+    let pendingFocusIdentifier: string | null = null
 
     const disposeGroupGeometries = (group: THREE.Object3D) => {
       group.traverse((obj) => {
@@ -540,9 +541,33 @@ export function City3DCanvas({ trees, decorativeTrees = [] }: City3DCanvasProps)
     }
     window.addEventListener('resize', handleResize)
 
+    const focusTreeByIdentifier = (identifier: string) => {
+      const norm = identifier.trim().toLowerCase()
+      let target = treeHandles.get(identifier)
+      if (!target) {
+        for (const h of treeHandles.values()) {
+          if (h.tree.profile.github_username.toLowerCase() === norm) {
+            target = h
+            break
+          }
+        }
+      }
+      if (!target) {
+        pendingFocusIdentifier = identifier
+        return
+      }
+      pendingFocusIdentifier = null
+      highlightSelected(target.tree.id)
+      focusOnPos(target.worldPos.x, target.worldPos.z, 24)
+      gameEventBus.emit('city:tree-selected', target.tree)
+    }
+
     const unsubs = [
       gameEventBus.on('city:trees-updated', (nextTrees) => {
         rebuildTrees(nextTrees)
+        if (pendingFocusIdentifier) {
+          focusTreeByIdentifier(pendingFocusIdentifier)
+        }
       }),
       gameEventBus.on('city:zoom-in', () => {
         camState.desiredDistance = THREE.MathUtils.clamp(camState.desiredDistance * 0.82, 14, 120)
@@ -559,24 +584,17 @@ export function City3DCanvas({ trees, decorativeTrees = [] }: City3DCanvasProps)
       gameEventBus.on('city:orbit-right', () => {
         camState.desiredAzimuth += Math.PI * 0.25
       }),
-      gameEventBus.on('city:focus-tree', (identifier) => {
-        const norm = identifier.trim().toLowerCase()
-        let target = treeHandles.get(identifier)
-        if (!target) {
+      gameEventBus.on('city:focus-tree', focusTreeByIdentifier),
+      gameEventBus.on('city:focus-creator', () => {
+        let creator: TreeHandle | undefined = treeHandles.get('creator-ufc')
+        if (!creator) {
           for (const h of treeHandles.values()) {
-            if (h.tree.profile.github_username.toLowerCase() === norm) {
-              target = h
+            if (h.tree.is_creator_special) {
+              creator = h
               break
             }
           }
         }
-        if (!target) return
-        highlightSelected(target.tree.id)
-        focusOnPos(target.worldPos.x, target.worldPos.z, 24)
-        gameEventBus.emit('city:tree-selected', target.tree)
-      }),
-      gameEventBus.on('city:focus-creator', () => {
-        const creator = treeHandles.get('creator-ufc')
         if (!creator) return
         highlightSelected(creator.tree.id)
         focusOnPos(creator.worldPos.x, creator.worldPos.z, 24)

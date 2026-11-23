@@ -532,9 +532,6 @@ export const UI_TRANSLATIONS = {
   'pt-BR': {
     header: {
       subtitle: '// polo norte 3d',
-      trees: 'árvores',
-      commits: 'commits',
-      lights: 'iluminadas',
       city: 'floresta',
       find: 'buscar colega',
       findTitle: 'Procurar árvore de um colega (/)',
@@ -545,13 +542,16 @@ export const UI_TRANSLATIONS = {
       myTreeTitle: 'Ir para minha árvore',
       resyncTitle: 'Sincronizar contribuições do GitHub',
       signOutTitle: 'Sair da conta GitHub',
+      syncing: 'sincronizando...',
+      syncPending: 'sync pendente',
+      retrySyncBtn: 'Sincronizar novamente',
+      signOutBtn: 'Sair da conta',
     },
     explorer: {
       buttonLabel: 'Procurar colega',
       placeholder: 'buscar @username ou nome...',
       all: 'todas',
       illuminated: 'iluminadas',
-      special: '★ criadora',
       empty: 'Nenhum colega encontrado.',
       openProfile: 'Abrir página da árvore',
       closeHint: 'ESC para fechar',
@@ -562,7 +562,8 @@ export const UI_TRANSLATIONS = {
       line2: 'Cada commit do GitHub vira uma bola verde luminosa na copa.',
       exploreBtn: '$ explorar --polo-norte',
       connectBtn: '$ conectar --github',
-      campaignLine: 'Campanha voluntária da criadora rumo à formatura',
+      myTreeBtn: '$ ir --minha-arvore',
+      campaignLine: 'Ajude uma estudante a se formar',
       viewCreatorBtn: 'ver árvore & apoiar',
     },
     camera: {
@@ -577,6 +578,9 @@ export const UI_TRANSLATIONS = {
     home: {
       syncWarning: 'Aviso na sincronização GitHub',
       close: 'Fechar',
+      paymentSuccessBanner: 'Pagamento confirmado! Seu item ou presente foi liberado.',
+      paymentPendingBanner: 'Pagamento recebido — finalizando confirmação automática...',
+      paymentCancelledBanner: 'Checkout cancelado. Nenhuma cobrança foi realizada.',
     },
     treePanel: {
       user: 'USER',
@@ -646,11 +650,13 @@ export const UI_TRANSLATIONS = {
       placedFeedback: 'Presente colocado na árvore em 3D!',
       onTreeCount: 'na árvore',
       selectHint: 'Clique em um item do catálogo ao lado para visualizar na árvore 3D.',
-      note: 'Presentes gratuitos e prévias visuais de itens especiais ficam salvos localmente no navegador e aparecem imediatamente na árvore 3D (verificação Pix BRL e Stripe USD nas fases finais).',
+      note: 'Presentes gratuitos são salvos na hora; presentes especiais usam Pix (Mercado Pago) ou Stripe com confirmação via webhook.',
       phase7Notice:
-        'Checkout automático (Pix BRL / Cartão USD) em ativação na Fase 7. Enquanto isso, a prévia 3D acima funciona 100% e você também pode apoiar pela campanha da criadora!',
+        'Checkout real ativo: selecione Pix (BRL) ou Cartão via Stripe (USD) — o presente aparece na árvore assim que o webhook confirmar.',
       loginRequiredFree:
         'Conecte sua conta GitHub primeiro para enviar presentes gratuitos em produção.',
+      loginRequiredPaid:
+        'Conecte sua conta GitHub para enviar presentes especiais via Pix ou Cartão.',
       sendingBtn: 'Enviando...',
       back: 'Fechar',
     },
@@ -752,7 +758,21 @@ export const UI_TRANSLATIONS = {
       previewNote:
         'Modo prévia local: salva no navegador e está estruturado para confirmação automática via webhook + Supabase (Fases 6–7).',
       phase7Notice:
-        'Checkout automático (Pix BRL / Stripe USD) em ativação na Fase 7 — desbloqueios por commits já são validados e salvos no Supabase!',
+        'Checkout real ativo: Pix (Mercado Pago) em BRL e Stripe em USD com confirmação automática via webhook.',
+      generatePixBtn: 'Gerar QR Code Pix',
+      payWithStripeBtn: 'Pagar com Cartão (Stripe)',
+      generatingCheckout: 'Gerando pagamento...',
+      pixWaitingTitle: 'Pix QR Code / Copia e Cola',
+      pixExpiresAt: 'expira às',
+      pixCopyCodeLabel: 'Código Pix Copia e Cola',
+      pixAutoConfirmHint:
+        'Pague no app do seu banco — a liberação acontece automaticamente em segundos após o webhook confirmar.',
+      checkStatusBtn: 'Verificar pagamento',
+      pixConfirmed: 'Pagamento Pix confirmado! Atualizando sua árvore...',
+      pixExpiredOrFailed: 'Este Pix expirou ou foi cancelado. Gere um novo código se desejar.',
+      loginRequiredPaid:
+        'Conecte sua conta GitHub para desbloquear via Pix ou Cartão com segurança.',
+      paymentConfirmedUnlocked: 'Pagamento confirmado e desbloqueado na sua conta!',
       confirmPreview: 'Confirmar Desbloqueio (Prévia Local)',
       cancel: 'Cancelar',
       currencyBrlLabel: '🇧🇷 BRL (Pix)',
@@ -769,8 +789,18 @@ export const UI_TRANSLATIONS = {
         `Desbloqueia os ${COMPANION_SPECIES_CATALOG.length} companheiros e todos os ${COMPANION_ACCESSORIES_CATALOG.length} acessórios com um único apoio simbólico (ideal para pagamentos internacionais sem taxas repetidas).`,
       supporterCta: 'Desbloquear Tudo por',
       supporterDone: 'Pacote Apoiador já desbloqueado nesta árvore!',
-      directTitle: 'Contribuição Direta para a Formatura',
-      directPixDesc: 'Envie qualquer valor via Pix diretamente para apoiar a campanha de formatura.',
+      directTitle: 'Apoio Voluntário Direto para a Formatura',
+      directPixFreeBadge: 'Valor livre · Banco Inter',
+      directPixDesc:
+        'Apoie meus estudos enviando qualquer valor pelo app do seu banco via QR Code ou Pix Copia e Cola (apoio voluntário, sem vínculo com desbloqueios automáticos).',
+      directPixPhase7Note:
+        'Para desbloquear o Pacote Apoiador (R$ 10,00) ou itens/presentes automaticamente na árvore, use o botão dourado acima ou a loja (checkout automático via Pix).',
+      pixQrAlt: 'QR Code Pix do Banco Inter para apoio voluntário aos estudos',
+      pixRecipientLabel: 'Recebedor',
+      pixBrCodeLabel: 'Pix Copia e Cola (BR Code)',
+      copyPixBrCodeBtn: 'Copiar Pix Copia e Cola',
+      pixRandomKeyLabel: 'Chave Aleatória',
+      copyRandomKeyBtn: 'Copiar Chave Aleatória',
       directUsdDesc:
         'Apoie de qualquer lugar do mundo via Cartão / Checkout Internacional em USD.',
       close: 'Fechar',
@@ -779,9 +809,6 @@ export const UI_TRANSLATIONS = {
   en: {
     header: {
       subtitle: '// north pole 3d',
-      trees: 'trees',
-      commits: 'commits',
-      lights: 'lit',
       city: 'forest',
       find: 'find dev',
       findTitle: 'Find a colleague tree (/)',
@@ -792,13 +819,16 @@ export const UI_TRANSLATIONS = {
       myTreeTitle: 'Jump to my tree',
       resyncTitle: 'Sync GitHub contributions',
       signOutTitle: 'Sign out of GitHub',
+      syncing: 'syncing...',
+      syncPending: 'sync pending',
+      retrySyncBtn: 'Retry sync',
+      signOutBtn: 'Sign out',
     },
     explorer: {
       buttonLabel: 'Find colleague',
       placeholder: 'search @username or name...',
       all: 'all',
       illuminated: 'lit',
-      special: '★ creator',
       empty: 'No matching colleague found.',
       openProfile: 'Open tree profile page',
       closeHint: 'ESC to close',
@@ -809,7 +839,8 @@ export const UI_TRANSLATIONS = {
       line2: 'Every GitHub commit lights up an official green bauble on your tree.',
       exploreBtn: '$ explore --north-pole',
       connectBtn: '$ connect --github',
-      campaignLine: "Voluntary creator's graduation campaign in the forest",
+      myTreeBtn: '$ go --my-tree',
+      campaignLine: 'Help a student graduate',
       viewCreatorBtn: 'view tree & support',
     },
     camera: {
@@ -824,6 +855,9 @@ export const UI_TRANSLATIONS = {
     home: {
       syncWarning: 'GitHub sync notice',
       close: 'Close',
+      paymentSuccessBanner: 'Payment confirmed! Your item or gift has been unlocked.',
+      paymentPendingBanner: 'Payment received — finalizing webhook confirmation...',
+      paymentCancelledBanner: 'Checkout cancelled. No charge was made.',
     },
     treePanel: {
       user: 'USER',
@@ -893,11 +927,13 @@ export const UI_TRANSLATIONS = {
       placedFeedback: 'Gift placed on the 3D tree!',
       onTreeCount: 'on tree',
       selectHint: 'Click any item in the catalog to preview it on the 3D tree.',
-      note: 'Free gifts and special-item local previews save directly in browser storage and appear immediately on the 3D tree (live Pix BRL and Stripe USD checkout verification arrives in the final phases).',
+      note: 'Free gifts save right away; special gifts use verified Pix (Mercado Pago) or Stripe webhook checkout.',
       phase7Notice:
-        'Automated checkout (Pix BRL / USD Card) is launching in Phase 7. Meanwhile, the 3D live preview works 100% and you can also support via the creator campaign!',
+        'Live checkout active: choose Pix (BRL) or Stripe Card (USD) — your gift appears on the tree once the webhook confirms.',
       loginRequiredFree:
         'Connect your GitHub account first to send free gifts in production.',
+      loginRequiredPaid:
+        'Connect your GitHub account first to send special gifts via Pix or Card.',
       sendingBtn: 'Sending...',
       back: 'Close',
     },
@@ -999,7 +1035,21 @@ export const UI_TRANSLATIONS = {
       previewNote:
         'Local preview mode: saved in browser storage and modeled for Phases 6–7 Supabase + webhook verification.',
       phase7Notice:
-        'Automated checkout (Pix BRL / Stripe USD) is launching in Phase 7 — commit-based unlocks are already validated and persisted in Supabase!',
+        'Live checkout active: Pix (Mercado Pago) in BRL and Stripe in USD with automatic webhook verification.',
+      generatePixBtn: 'Generate Pix QR Code',
+      payWithStripeBtn: 'Pay with Card (Stripe)',
+      generatingCheckout: 'Creating checkout...',
+      pixWaitingTitle: 'Pix QR Code Checkout',
+      pixExpiresAt: 'expires at',
+      pixCopyCodeLabel: 'Pix Copy & Paste Code',
+      pixAutoConfirmHint:
+        'Pay in your banking app — your unlock activates automatically within seconds once confirmed.',
+      checkStatusBtn: 'Check payment status',
+      pixConfirmed: 'Pix payment confirmed! Updating your tree...',
+      pixExpiredOrFailed: 'This Pix code expired or was cancelled. Generate a new one if needed.',
+      loginRequiredPaid:
+        'Connect your GitHub account to unlock securely via Pix or Card.',
+      paymentConfirmedUnlocked: 'Payment confirmed and unlocked on your account!',
       confirmPreview: 'Confirm Unlock (Local Preview)',
       cancel: 'Cancel',
       currencyBrlLabel: '🇧🇷 BRL (Pix)',
@@ -1016,8 +1066,18 @@ export const UI_TRANSLATIONS = {
         `Unlocks all ${COMPANION_SPECIES_CATALOG.length} companions and all ${COMPANION_ACCESSORIES_CATALOG.length} accessories with a single contribution (avoids repeated international micro-transaction fees).`,
       supporterCta: 'Unlock Everything for',
       supporterDone: 'Supporter Bundle already unlocked on this tree!',
-      directTitle: 'Direct Graduation Contribution',
-      directPixDesc: 'Send any amount via Brazilian Pix to support the graduation campaign.',
+      directTitle: 'Direct Voluntary Support for Graduation',
+      directPixFreeBadge: 'Any amount · Banco Inter',
+      directPixDesc:
+        'Support her studies by sending any amount through your Brazilian bank app via QR Code or Pix Copy & Paste (voluntary gift without automatic unlock).',
+      directPixPhase7Note:
+        'To automatically unlock the Supporter Bundle or shop items/gifts on your tree, use the gold checkout button above (automatic Pix / Card checkout).',
+      pixQrAlt: 'Banco Inter Pix QR Code for voluntary graduation support',
+      pixRecipientLabel: 'Recipient',
+      pixBrCodeLabel: 'Pix Copy & Paste (BR Code)',
+      copyPixBrCodeBtn: 'Copy Pix BR Code',
+      pixRandomKeyLabel: 'Random Pix Key',
+      copyRandomKeyBtn: 'Copy Random Key',
       directUsdDesc: 'Contribute from anywhere worldwide using International Card / USD Checkout.',
       close: 'Close',
     },

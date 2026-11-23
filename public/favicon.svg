@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img" aria-label="Christmas Commit City">
+  <!-- Night sky background -->
+  <rect width="16" height="16" rx="3" fill="#0a1633" />
+  <rect x="0.5" y="0.5" width="15" height="15" rx="2.5" fill="none" stroke="#1e3a5f" />
+
+  <!-- Distant night stars -->
+  <rect x="2" y="2" width="1" height="1" fill="#7dd3fc" />
+  <rect x="13" y="3" width="1" height="1" fill="#fde047" />
+  <rect x="3" y="7" width="1" height="1" fill="#cbd5e1" opacity="0.65" />
+
+  <!-- Top golden star -->
+  <rect x="7" y="1" width="2" height="1" fill="#fde047" />
+  <rect x="6" y="2" width="4" height="1" fill="#fbbf24" />
+  <rect x="7" y="2" width="2" height="1" fill="#fef08a" />
+
+  <!-- Pixel pine tiers -->
+  <rect x="7" y="3" width="2" height="1" fill="#268049" />
+  <rect x="6" y="4" width="4" height="2" fill="#1b5e36" />
+  <rect x="8" y="4" width="2" height="2" fill="#268049" />
+
+  <rect x="5" y="6" width="6" height="2" fill="#1b5e36" />
+  <rect x="8" y="6" width="3" height="2" fill="#268049" />
+
+  <rect x="4" y="8" width="8" height="2" fill="#16522e" />
+  <rect x="8" y="8" width="4" height="2" fill="#268049" />
+
+  <rect x="3" y="10" width="10" height="2" fill="#16522e" />
+  <rect x="8" y="10" width="5" height="2" fill="#268049" />
+
+  <!-- Official GitHub green glowing commit baubles -->
+  <rect x="7" y="4" width="1" height="1" fill="#9be9a8" />
+  <rect x="6" y="7" width="1" height="1" fill="#39d353" />
+  <rect x="9" y="6" width="1" height="1" fill="#9be9a8" />
+  <rect x="5" y="9" width="1" height="1" fill="#40c463" />
+  <rect x="10" y="9" width="1" height="1" fill="#39d353" />
+  <rect x="4" y="11" width="1" height="1" fill="#9be9a8" />
+  <rect x="8" y="11" width="1" height="1" fill="#ef4444" />
+  <rect x="11" y="10" width="1" height="1" fill="#40c463" />
+
+  <!-- Wood trunk & snowy base -->
+  <rect x="7" y="12" width="2" height="2" fill="#78472a" />
+  <rect x="2" y="14" width="12" height="2" fill="#e2e8f0" />
+  <rect x="3" y="14" width="10" height="1" fill="#ffffff" />
+</svg>

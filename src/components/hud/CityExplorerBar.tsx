@@ -24,7 +24,7 @@ export function CityExplorerBar({
 }: CityExplorerBarProps) {
   const { language, t } = useLocale()
   const [query, setQuery] = useState('')
-  const [stageFilter, setStageFilter] = useState<'all' | 'illuminated' | 'special'>('all')
+  const [stageFilter, setStageFilter] = useState<'all' | 'illuminated'>('all')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -48,7 +48,6 @@ export function CityExplorerBar({
     const normalized = query.trim().replace(/^@/, '').toLowerCase()
     const matches = realTrees.filter((tree) => {
       if (stageFilter === 'illuminated' && tree.tree_level < 4) return false
-      if (stageFilter === 'special' && !tree.is_creator_special && tree.tree_level < 6) return false
       if (!normalized) return true
       return (
         tree.profile.github_username.toLowerCase().includes(normalized) ||
@@ -66,8 +65,6 @@ export function CityExplorerBar({
           const bExact = bUser === normalized ? 0 : bUser.startsWith(normalized) ? 1 : 2
           if (aExact !== bExact) return aExact - bExact
         }
-        if (a.is_creator_special && !b.is_creator_special) return -1
-        if (!a.is_creator_special && b.is_creator_special) return 1
         return b.contribution_count - a.contribution_count
       })
       .slice(0, 40)
@@ -89,7 +86,7 @@ export function CityExplorerBar({
         <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
             <Search className="h-3.5 w-3.5" />
-            <span>$ tree find --devs ({realTrees.length})</span>
+            <span>$ tree find --devs</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden text-[10px] text-slate-500 sm:inline">
@@ -116,19 +113,18 @@ export function CityExplorerBar({
             className="w-full rounded-sm border border-slate-700 bg-[#040811] px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
           />
 
-          <div className="mt-2 flex gap-1.5 text-[10px]">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
             {(
               [
                 ['all', t.explorer.all],
                 ['illuminated', t.explorer.illuminated],
-                ['special', t.explorer.special],
               ] as const
             ).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setStageFilter(key)}
-                className={`flex-1 rounded-sm border px-2 py-1 cursor-pointer ${
+                className={`rounded-sm border px-2 py-1 cursor-pointer ${
                   stageFilter === key
                     ? 'border-emerald-400/60 bg-emerald-500/15 font-semibold text-emerald-300'
                     : 'border-slate-800 bg-[#040811]/70 text-slate-400 hover:border-slate-600'
@@ -170,7 +166,7 @@ export function CityExplorerBar({
                         />
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-slate-100">
-                            {tree.is_creator_special ? '★ ' : ''}@{tree.profile.github_username}
+                            @{tree.profile.github_username}
                             {tree.profile.github_name &&
                               tree.profile.github_name !== tree.profile.github_username && (
                                 <span className="ml-1.5 font-normal text-slate-400">

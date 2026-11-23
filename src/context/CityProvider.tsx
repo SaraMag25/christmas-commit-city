@@ -13,10 +13,14 @@ import {
 } from '../config/companions'
 import { normalizeTreeGiftSummary } from '../config/gifts'
 import { SUPPORTER_BUNDLE } from '../config/supportCampaign'
-import { computeCommunityStats, MOCK_CITY_TREES } from '../data/mockCityData'
+import { MOCK_CITY_TREES } from '../data/mockCityData'
 import { gameEventBus } from '../game/eventBus'
 import { allocateTreePosition } from '../game/layout/treePlacement'
 import {
+  cacheGitHubProviderToken,
+  cleanEmptyOAuthHashFromUrl,
+  clearCachedGitHubProviderToken,
+  extractSessionGitHubUser,
   signInWithGitHubReadOnly,
   signOutFromCity,
   syncAuthenticatedGitHubTree,
@@ -425,7 +429,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
     let active = true
     fetchPublicCityTrees()
       .then((loaded) => {
-        if (!active) return
+        if (!active || syncedSessionUserRef.current) return
         setTrees(loaded)
         emitForestUpdate(loaded)
       })
@@ -1099,31 +1103,51 @@ export function CityProvider({ children }: { children: ReactNode }) {
     if (!supabase || !isSupabaseConfigured) return
 
     let active = true
+    const shouldFocusOnHome = () =>
+      window.location.pathname === '/' && !new URLSearchParams(window.location.search).has('focus')
+
+    const applyAuthenticatedSession = (nextSession: Session, focusOnComplete: boolean) => {
+      cleanEmptyOAuthHashFromUrl()
+      if (nextSession.provider_token) {
+        cacheGitHubProviderToken(nextSession.provider_token)
+      }
+      const ghUser = extractSessionGitHubUser(nextSession)
+      if (ghUser?.username) {
+        setAuthenticatedUsername((prev) => prev ?? ghUser.username)
+      }
+      if (syncedSessionUserRef.current !== nextSession.user.id) {
+        syncedSessionUserRef.current = nextSession.user.id
+        void syncFromSession(nextSession, focusOnComplete)
+      }
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return
+      cleanEmptyOAuthHashFromUrl()
       const current = data.session
       setSession(current)
-      if (current && syncedSessionUserRef.current !== current.user.id) {
-        syncedSessionUserRef.current = current.user.id
-        void syncFromSession(current, true)
+      if (current) {
+        applyAuthenticatedSession(current, shouldFocusOnHome())
       }
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      cleanEmptyOAuthHashFromUrl()
       setSession(nextSession)
       if (!nextSession) {
+        clearCachedGitHubProviderToken()
         syncedSessionUserRef.current = null
         ownerGiftsRef.current = null
         setAuthenticatedUsername(null)
+        setIsConnecting(false)
         void refreshSupabaseTreesAndOwner()
         return
       }
-      if (syncedSessionUserRef.current !== nextSession.user.id) {
-        syncedSessionUserRef.current = nextSession.user.id
-        void syncFromSession(nextSession, event === 'SIGNED_IN')
-      }
+      const shouldFocusEvent =
+        (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && shouldFocusOnHome()
+      applyAuthenticatedSession(nextSession, shouldFocusEvent)
     })
 
     return () => {
@@ -1151,14 +1175,28 @@ export function CityProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resyncMyTree = useCallback(async () => {
-    if (!session) return
-    await syncFromSession(session, true)
+    const latestSession = supabase
+      ? ((await supabase.auth.getSession()).data.session ?? session)
+      : session
+    if (!latestSession) return
+    setSession(latestSession)
+    await syncFromSession(latestSession, true)
   }, [session, syncFromSession])
+
+  const refreshCityState = useCallback(async () => {
+    if (!isSupabaseConfigured) return
+    const latestSession = supabase
+      ? ((await supabase.auth.getSession()).data.session ?? session)
+      : session
+    await refreshSupabaseTreesAndOwner(latestSession?.user?.id)
+  }, [session, refreshSupabaseTreesAndOwner])
 
   const signOut = useCallback(async () => {
     await signOutFromCity()
     setSession(null)
     setAuthenticatedUsername(null)
+    setAuthError(null)
+    setIsConnecting(false)
     syncedSessionUserRef.current = null
     ownerGiftsRef.current = null
     if (isSupabaseConfigured) {
@@ -1167,8 +1205,6 @@ export function CityProvider({ children }: { children: ReactNode }) {
       await refreshSupabaseTreesAndOwner()
     }
   }, [refreshSupabaseTreesAndOwner])
-
-  const stats = useMemo(() => computeCommunityStats(trees), [trees])
 
   const currentUserTree = useMemo(() => {
     if (!authenticatedUsername) return null
@@ -1181,7 +1217,6 @@ export function CityProvider({ children }: { children: ReactNode }) {
       value={{
         trees,
         decorativeTrees,
-        stats,
         session,
         currentUserTree,
         isSupabaseReady: isSupabaseConfigured,
@@ -1191,6 +1226,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         authError,
         connectWithGitHub,
         resyncMyTree,
+        refreshCityState,
         signOut,
         clearAuthError: () => setAuthError(null),
         getCompanionLoadout,

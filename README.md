@@ -36,7 +36,7 @@ Visitantes podem explorar a cidade vista de cima, conhecer desenvolvedores, envi
 - **Motor 2D:** Phaser.js (`pixelArt: true`)
 - **Backend & Banco:** Supabase (Auth, PostgreSQL + RLS, Edge Functions)
 - **Integrações:** GitHub OAuth, GitHub GraphQL API, Pix (BR Code + QR Code)
-- **Hospedagem:** Vercel (Frontend) + Supabase (Banco e Funções)
+- **Hospedagem:** Cloudflare Pages (Frontend) + Supabase (Banco e Funções)
 
 ---
 
