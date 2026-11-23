@@ -412,8 +412,8 @@ export function formatBackendActionError(rawMessage: string, language: 'pt-BR' |
   }
   if (msg.includes('GIFT_NOT_FREE_OR_INVALID')) {
     return language === 'en'
-      ? 'Paid gifts require checkout confirmation (Phase 7).'
-      : 'Presentes pagos exigem confirmação de pagamento (Fase 7).'
+      ? 'Paid gifts require payment confirmation.'
+      : 'Presentes pagos exigem confirmação de pagamento.'
   }
   if (msg.includes('RATE_LIMIT_SENDER_WINDOW')) {
     return language === 'en'
