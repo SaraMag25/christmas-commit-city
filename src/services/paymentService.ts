@@ -1,3 +1,4 @@
+import { toSafeHttpUrl } from '../utils/urlSafety'
 import { parseEdgeFunctionError } from './edgeFunctionError'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
 
@@ -62,8 +63,8 @@ async function formatPaymentInvokeError(
     }
     if (status === 503 || code.endsWith('_NOT_CONFIGURED')) {
       return fnName === 'create-pix-payment'
-        ? 'Pix automático ainda não configurado no servidor (MERCADOPAGO_ACCESS_TOKEN).'
-        : 'Stripe ainda não configurado no servidor (STRIPE_SECRET_KEY).'
+        ? 'Pix automático ainda não configurado no servidor.'
+        : 'Checkout internacional ainda não configurado no servidor.'
     }
     return serverMessage || `Falha no checkout (${code || `HTTP ${status}`}).`
   }
@@ -139,10 +140,14 @@ export async function createStripeCheckout(params: {
   if (error) {
     throw new Error(await formatPaymentInvokeError(error, 'create-stripe-checkout'))
   }
-  if (!data?.orderId || !data?.checkoutUrl) {
+  const safeCheckoutUrl = toSafeHttpUrl(data?.checkoutUrl)
+  if (!data?.orderId || !safeCheckoutUrl) {
     throw new Error('Resposta inválida ao iniciar o Checkout Stripe.')
   }
-  return data
+  return {
+    ...data,
+    checkoutUrl: safeCheckoutUrl,
+  }
 }
 
 /**

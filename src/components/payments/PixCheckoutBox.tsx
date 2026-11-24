@@ -6,6 +6,7 @@ import {
   fetchMyPaymentOrderStatus,
   type PixPaymentOrder,
 } from '../../services/paymentService'
+import { toSafeHttpUrl } from '../../utils/urlSafety'
 
 interface PixCheckoutBoxProps {
   order: PixPaymentOrder
@@ -78,6 +79,7 @@ export function PixCheckoutBox({
     }
   }
 
+  const safeTicketUrl = toSafeHttpUrl(order.ticketUrl)
   const formattedAmount = formatBrlPrice(order.amountCents / 100)
   const expiresTime = (() => {
     const parsed = Date.parse(order.expiresAt)
@@ -157,11 +159,11 @@ export function PixCheckoutBox({
               <span>{t.shop.checkStatusBtn}</span>
             </button>
 
-            {order.ticketUrl && (
+            {safeTicketUrl && (
               <a
-                href={order.ticketUrl}
+                href={safeTicketUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-[10px] text-sky-300 hover:underline"
               >
                 <span>Mercado Pago</span>

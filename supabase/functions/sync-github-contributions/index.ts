@@ -308,7 +308,7 @@ Deno.serve(async (req: Request) => {
           error:
             ghRes.status === 401
               ? 'GitHub OAuth token expired or revoked. Please sign out and connect with GitHub again.'
-              : `GitHub GraphQL returned ${ghRes.status}: ${errorText}`,
+              : 'GitHub GraphQL API request failed.',
           code: ghRes.status === 401 ? 'GITHUB_TOKEN_INVALID' : 'GITHUB_API_ERROR',
         },
         ghRes.status === 401 ? 400 : 502,
@@ -466,7 +466,7 @@ Deno.serve(async (req: Request) => {
       corsHeaders,
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unexpected server error.'
-    return jsonResponse({ error: message }, 500, corsHeaders)
+    console.error('[sync] Unexpected error:', err)
+    return jsonResponse({ error: 'Unexpected server error.' }, 500, corsHeaders)
   }
 })

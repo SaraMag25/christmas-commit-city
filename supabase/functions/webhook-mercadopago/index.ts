@@ -148,10 +148,20 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Matching order not found.' }, 404)
     }
 
+    if (order.provider !== 'pix') {
+      return jsonResponse({ error: 'Payment provider mismatch.' }, 400)
+    }
+
+    const mpPaymentIdStr = String(mpPayment.id)
+    if (order.provider_payment_id && order.provider_payment_id !== mpPaymentIdStr) {
+      console.error('[webhook-mercadopago] Payment ID mismatch for order:', order.id)
+      return jsonResponse({ error: 'Payment ID mismatch.' }, 400)
+    }
+
     if (!order.provider_payment_id) {
       await service.adminClient
         .from('payment_orders')
-        .update({ provider_payment_id: String(mpPayment.id) })
+        .update({ provider_payment_id: mpPaymentIdStr })
         .eq('id', order.id)
     }
 
@@ -176,7 +186,14 @@ Deno.serve(async (req: Request) => {
     const paidCents = Math.round(Number(mpPayment.transaction_amount ?? 0) * 100)
     const currencyUpper = mpPayment.currency_id?.trim().toUpperCase() ?? 'BRL'
 
-    if (order.currency !== 'BRL' || currencyUpper !== 'BRL' || paidCents < order.amount_cents) {
+    if (
+      !Number.isFinite(paidCents) ||
+      paidCents <= 0 ||
+      order.amount_cents <= 0 ||
+      order.currency !== 'BRL' ||
+      currencyUpper !== 'BRL' ||
+      paidCents < order.amount_cents
+    ) {
       console.error('[webhook-mercadopago] Amount or currency mismatch:', {
         orderId: order.id,
         paidCents,
@@ -213,9 +230,6 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true, fulfillment: rpcResult }, 200)
   } catch (err) {
     console.error('[webhook-mercadopago] Unexpected error:', err)
-    return jsonResponse(
-      { error: err instanceof Error ? err.message : 'Unexpected server error.' },
-      500,
-    )
+    return jsonResponse({ error: 'Unexpected server error.' }, 500)
   }
 })

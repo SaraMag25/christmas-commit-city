@@ -266,6 +266,33 @@ export async function validateOrderCreationInput(params: {
     }
   }
 
+  const rateWindowIso = new Date(Date.now() - 10 * 60_000).toISOString()
+  const { count: recentOrdersCount, error: rateErr } = await adminClient
+    .from('payment_orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('buyer_user_id', user.id)
+    .gte('created_at', rateWindowIso)
+
+  if (rateErr) {
+    console.error('[payments] Failed checking checkout rate limit:', rateErr.code, rateErr.message)
+    return jsonResponse(
+      { error: 'Failed to validate checkout limits.', code: 'RATE_LIMIT_CHECK_ERROR' },
+      500,
+      corsHeaders,
+    )
+  }
+
+  if ((recentOrdersCount ?? 0) >= 15) {
+    return jsonResponse(
+      {
+        error: 'Too many checkout attempts. Please wait a few minutes before trying again.',
+        code: 'RATE_LIMIT_CHECKOUT',
+      },
+      429,
+      corsHeaders,
+    )
+  }
+
   const { data: senderTree } = await adminClient
     .from('trees')
     .select('github_username')
@@ -276,7 +303,7 @@ export async function validateOrderCreationInput(params: {
   const identityData = (githubIdentity?.identity_data ?? {}) as Record<string, unknown>
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>
 
-  const senderUsername =
+  const rawSenderUsername =
     senderTree?.github_username?.trim() ||
     (typeof identityData.user_name === 'string' && identityData.user_name.trim()) ||
     (typeof identityData.preferred_username === 'string' &&
@@ -284,6 +311,16 @@ export async function validateOrderCreationInput(params: {
     (typeof meta.user_name === 'string' && meta.user_name.trim()) ||
     (typeof meta.preferred_username === 'string' && meta.preferred_username.trim()) ||
     'github-dev'
+
+  const senderUsername =
+    Array.from(rawSenderUsername)
+      .filter((ch) => {
+        const code = ch.charCodeAt(0)
+        return code >= 32 && code !== 127 && ch !== '<' && ch !== '>'
+      })
+      .join('')
+      .trim()
+      .slice(0, 39) || 'github-dev'
 
   return {
     shopItem,
