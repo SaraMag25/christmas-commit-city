@@ -24,7 +24,7 @@ export const COMPANION_SPECIES_CATALOG: readonly CompanionSpeciesItem[] = [
     subtitle: 'Guardião do Brejo Nevado',
     description: 'Sapo compacto e simpático que adora acompanhar deploys noturnos.',
     story:
-      'Um sapinho aprendiz de magia que trocou o brejo pela neve. Acredita firmemente que um bom feitiço — e um git rebase bem feito — resolve qualquer bug de inverno.',
+      'Um sapinho aprendiz de magia que trocou o brejo pela neve. Acredita firmemente que um bom feitiço e um git rebase bem feito resolvem qualquer bug de inverno.',
     priceCommits: 250,
     priceBrl: 4.0,
     priceUsd: 2.0,
@@ -203,7 +203,7 @@ export const COMPANION_ACCESSORIES_CATALOG: readonly CompanionAccessoryItem[] = 
     slot: 'head',
     name: 'Patinho de Debug',
     description:
-      'Mini patinho de borracha amarelo equilibrado na cabeça — o melhor ouvinte para resolver qualquer bug.',
+      'Mini patinho de borracha amarelo equilibrado na cabeça. O melhor ouvinte para resolver qualquer bug.',
     priceCommits: 150,
     priceBrl: 2.0,
     priceUsd: 1.5,

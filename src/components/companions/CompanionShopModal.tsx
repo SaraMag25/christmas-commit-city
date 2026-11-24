@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   Coins,
@@ -126,6 +126,12 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const [pixOrder, setPixOrder] = useState<PixPaymentOrder | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const checkoutSectionRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!pendingPayment && !pixOrder) return
+    checkoutSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [pendingPayment, pixOrder])
 
   const effectivePreviewEquipped: EquippedAccessories = useMemo(
     () => ({
@@ -213,7 +219,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
         return
       }
       setPreviewSpeciesId(item.id)
-      setFeedback(`${speciesLabels[item.id].name} — ${t.shop.activeOnTree}!`)
+      setFeedback(`${speciesLabels[item.id].name}: ${t.shop.activeOnTree}!`)
     } finally {
       setIsMutating(false)
     }
@@ -229,7 +235,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
         return
       }
       setPreviewAccessoryOverride((prev) => setSlotOverride(prev, item.slot, undefined))
-      setFeedback(`${accessoryLabels[item.id].name} — ${t.shop.activeOnTree}!`)
+      setFeedback(`${accessoryLabels[item.id].name}: ${t.shop.activeOnTree}!`)
     } finally {
       setIsMutating(false)
     }
@@ -281,7 +287,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
           return
         }
         setPreviewSpeciesId(pendingPayment.item.id)
-        setFeedback(`${speciesLabels[pendingPayment.item.id].name} — ${t.shop.activeOnTree}!`)
+        setFeedback(`${speciesLabels[pendingPayment.item.id].name}: ${t.shop.activeOnTree}!`)
       } else {
         const slot = pendingPayment.item.slot
         const res = await unlockAndEquipAccessory(username, pendingPayment.item.id, method, currency)
@@ -290,7 +296,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
           return
         }
         setPreviewAccessoryOverride((prev) => setSlotOverride(prev, slot, undefined))
-        setFeedback(`${accessoryLabels[pendingPayment.item.id].name} — ${t.shop.activeOnTree}!`)
+        setFeedback(`${accessoryLabels[pendingPayment.item.id].name}: ${t.shop.activeOnTree}!`)
       }
       setPendingPayment(null)
     } finally {
@@ -309,12 +315,12 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     } else if (confirmedItem?.kind === 'species') {
       setPreviewSpeciesId(confirmedItem.item.id)
       setFeedback(
-        `${speciesLabels[confirmedItem.item.id].name} — ${t.shop.paymentConfirmedUnlocked}`,
+        `${speciesLabels[confirmedItem.item.id].name}: ${t.shop.paymentConfirmedUnlocked}`,
       )
     } else if (confirmedItem?.kind === 'accessory') {
       setPreviewAccessoryOverride((prev) => setSlotOverride(prev, confirmedItem.item.slot, undefined))
       setFeedback(
-        `${accessoryLabels[confirmedItem.item.id].name} — ${t.shop.paymentConfirmedUnlocked}`,
+        `${accessoryLabels[confirmedItem.item.id].name}: ${t.shop.paymentConfirmedUnlocked}`,
       )
     } else {
       setFeedback(t.shop.paymentConfirmedUnlocked)
@@ -374,13 +380,13 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${t.shop.title} — @${username}`}
+      aria-label={`${t.shop.title} (@${username})`}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-xs sm:p-6"
     >
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto pixel-night-panel rounded-md p-4 sm:p-6">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-x-hidden overflow-y-auto pixel-night-panel rounded-md p-4 sm:p-6">
         {/* Terminal Header + Currency Toggle */}
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 pb-3.5">
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] text-emerald-400">
               $ companion shop --user=@{username} --currency={currency}
             </p>
@@ -467,9 +473,9 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
         </div>
 
         {/* Main 2-Column Layout */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-[296px_1fr]">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[296px_minmax(0,1fr)]">
           {/* Left Column: Front 3/4 Live Preview + Direct Adopt / Buy / Equip Action Box */}
-          <aside className="flex flex-col items-center rounded-sm border border-slate-800 bg-[#060c1a]/90 p-3.5">
+          <aside className="flex min-w-0 flex-col items-center rounded-sm border border-slate-800 bg-[#060c1a]/90 p-3.5">
             <div className="flex w-full items-center justify-between text-[10px] text-slate-400">
               <span>{t.shop.livePreview}</span>
               <span className="font-semibold text-amber-300">
@@ -584,7 +590,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                           void equipSpecies(username, focusedSpecies.id).then((res) => {
                             if (res.ok) {
                               setPreviewSpeciesId(focusedSpecies.id)
-                              setFeedback(`${focusedDisplayName} — ${t.shop.activeOnTree}!`)
+                              setFeedback(`${focusedDisplayName}: ${t.shop.activeOnTree}!`)
                             } else if (res.error) {
                               setFeedback(res.error)
                             }
@@ -599,7 +605,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                               setPreviewAccessoryOverride((prev) =>
                                 setSlotOverride(prev, focusedAccessory.slot, undefined),
                               )
-                              setFeedback(`${focusedDisplayName} — ${t.shop.activeOnTree}!`)
+                              setFeedback(`${focusedDisplayName}: ${t.shop.activeOnTree}!`)
                             } else if (res.error) {
                               setFeedback(res.error)
                             }
@@ -672,19 +678,19 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
               <div className="flex justify-between gap-2">
                 <dt className="text-slate-500">{t.shop.headLabel}</dt>
                 <dd className="truncate text-slate-200">
-                  {activeHead ? accessoryLabels[activeHead.id].name : '—'}
+                  {activeHead ? accessoryLabels[activeHead.id].name : t.shop.noneLabel}
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-slate-500">{t.shop.bodyLabel}</dt>
                 <dd className="truncate text-slate-200">
-                  {activeBody ? accessoryLabels[activeBody.id].name : '—'}
+                  {activeBody ? accessoryLabels[activeBody.id].name : t.shop.noneLabel}
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-slate-500">{t.shop.handLabel}</dt>
                 <dd className="truncate text-slate-200">
-                  {activeHand ? accessoryLabels[activeHand.id].name : '—'}
+                  {activeHand ? accessoryLabels[activeHand.id].name : t.shop.noneLabel}
                 </dd>
               </div>
             </dl>
@@ -705,7 +711,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
           </aside>
 
           {/* Right Column: Tabs, 3x2 Species Grid, Accessories, Supporter Bundle & Checkout */}
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-col">
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -895,9 +901,9 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
             {/* Supporter Pack / Bundle Card */}
             <div className="mt-3 rounded-sm border border-amber-400/40 bg-gradient-to-r from-[#1a1333]/90 via-[#101c3a]/90 to-[#0d2621]/90 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="max-w-lg">
+                <div className="min-w-0 max-w-lg">
                   <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                    <Sparkles className="h-3.5 w-3.5" />
+                    <Sparkles className="h-3.5 w-3.5 shrink-0" />
                     <span>{t.shop.supporterTitle}</span>
                   </p>
                   <p className="mt-0.5 text-[11px] leading-snug text-slate-300">
@@ -912,7 +918,10 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setPendingPayment({ kind: 'bundle' })}
+                    onClick={() => {
+                      setPixOrder(null)
+                      setPendingPayment({ kind: 'bundle' })
+                    }}
                     className="pixel-btn pixel-btn-gold shrink-0 rounded-sm px-3.5 py-2 text-xs font-bold"
                   >
                     <Heart className="h-3.5 w-3.5" />
@@ -926,124 +935,135 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
 
             {/* Dual Payment Panel (Real Mercado Pago Pix / Stripe Checkout in production, Local Preview offline) */}
             {pendingPayment && paymentPreview && (
-              <div className="mt-3 rounded-sm border-2 border-amber-400/55 bg-[#111c36] p-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                      {currency === 'BRL' ? (
-                        <QrCode className="h-3.5 w-3.5 text-emerald-300" />
-                      ) : (
-                        <CreditCard className="h-3.5 w-3.5 text-sky-300" />
-                      )}
-                      {currency === 'BRL' ? t.shop.checkoutPixTitle : t.shop.checkoutUsdTitle} —{' '}
-                      {pendingName}
-                    </p>
-                    <p className="mt-1 text-[11px] text-slate-300">
-                      <strong className="text-emerald-300">
-                        {formatCurrencyPrice(paymentPreview.amount, currency)}
-                      </strong>
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPendingPayment(null)
+              <div ref={checkoutSectionRef} className="min-w-0">
+                {isSupabaseReady && session && pixOrder && currency === 'BRL' ? (
+                  <PixCheckoutBox
+                    order={pixOrder}
+                    itemLabel={pendingName}
+                    onConfirmed={handlePixPaymentConfirmed}
+                    onCancel={() => {
                       setPixOrder(null)
+                      setPendingPayment(null)
                     }}
-                    className="text-[10px] text-slate-400 hover:text-white cursor-pointer"
-                  >
-                    {t.shop.cancel}
-                  </button>
-                </div>
-
-                {isSupabaseReady ? (
-                  !session ? (
-                    <div className="mt-3 space-y-2">
-                      <p className="rounded-sm border border-sky-400/35 bg-[#040811]/90 p-2.5 text-[11px] text-sky-100">
-                        {t.shop.loginRequiredPaid}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void connectWithGitHub()}
-                        className="pixel-btn pixel-btn-red rounded-sm px-3.5 py-2 text-xs font-bold"
-                      >
-                        <GitHubIcon className="h-3.5 w-3.5" />
-                        <span>{t.connectModal.authorize}</span>
-                      </button>
-                    </div>
-                  ) : pixOrder && currency === 'BRL' ? (
-                    <PixCheckoutBox
-                      order={pixOrder}
-                      itemLabel={pendingName}
-                      onConfirmed={handlePixPaymentConfirmed}
-                      onCancel={() => setPixOrder(null)}
-                    />
-                  ) : (
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[10px] text-sky-200/85">{t.shop.phase7Notice}</p>
-                      <button
-                        type="button"
-                        disabled={isMutating}
-                        onClick={() => void handleConfirmPaymentUnlock()}
-                        className="pixel-btn pixel-btn-gold shrink-0 rounded-sm px-3.5 py-2 text-xs font-bold disabled:opacity-60"
-                      >
-                        {isMutating ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : currency === 'BRL' ? (
-                          <QrCode className="h-3.5 w-3.5" />
-                        ) : (
-                          <CreditCard className="h-3.5 w-3.5" />
-                        )}
-                        <span>
-                          {isMutating
-                            ? t.shop.generatingCheckout
-                            : currency === 'BRL'
-                              ? t.shop.generatePixBtn
-                              : t.shop.payWithStripeBtn}
-                        </span>
-                      </button>
-                    </div>
-                  )
+                  />
                 ) : (
-                  <>
-                    {currency === 'USD' && (
-                      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-700 bg-[#040811]/90 px-3 py-2 text-[11px]">
-                        {toSafeHttpUrl(paymentPreview.checkoutUrl) ? (
-                          <>
-                            <span className="text-slate-300">
-                              Ref:{' '}
-                              <code className="text-sky-300">
-                                {paymentPreview.externalReference}
-                              </code>
-                            </span>
-                            <a
-                              href={toSafeHttpUrl(paymentPreview.checkoutUrl) ?? '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-sm border border-sky-400/50 bg-sky-500/20 px-2.5 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/30"
-                            >
-                              <span>{t.shop.openCheckout}</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </>
-                        ) : (
-                          <p className="text-[10px] text-sky-200/90">{t.shop.noCheckoutEnv}</p>
-                        )}
+                  <div className="mt-3 min-w-0 rounded-sm border-2 border-amber-400/55 bg-[#111c36] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-amber-300">
+                          {currency === 'BRL' ? (
+                            <QrCode className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                          ) : (
+                            <CreditCard className="h-3.5 w-3.5 shrink-0 text-sky-300" />
+                          )}
+                          <span className="break-words">
+                            {currency === 'BRL' ? t.shop.checkoutPixTitle : t.shop.checkoutUsdTitle}:{' '}
+                            {pendingName}
+                          </span>
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-300">
+                          <strong className="text-emerald-300">
+                            {formatCurrencyPrice(paymentPreview.amount, currency)}
+                          </strong>
+                        </p>
                       </div>
-                    )}
-
-                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[10px] text-sky-200/80">{t.shop.previewNote}</p>
                       <button
                         type="button"
-                        disabled={isMutating}
-                        onClick={() => void handleConfirmPaymentUnlock()}
-                        className="pixel-btn pixel-btn-pine rounded-sm px-3.5 py-1.5 text-[11px] font-bold disabled:opacity-60"
+                        onClick={() => {
+                          setPendingPayment(null)
+                          setPixOrder(null)
+                        }}
+                        className="shrink-0 rounded-sm border border-slate-700/80 px-2 py-1 text-[10px] text-slate-300 hover:border-slate-500 hover:text-white cursor-pointer"
                       >
-                        {t.shop.confirmPreview}
+                        {t.shop.cancel}
                       </button>
                     </div>
-                  </>
+
+                    {isSupabaseReady ? (
+                      !session ? (
+                        <div className="mt-3 space-y-2">
+                          <p className="rounded-sm border border-sky-400/35 bg-[#040811]/90 p-2.5 text-[11px] text-sky-100">
+                            {t.shop.loginRequiredPaid}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void connectWithGitHub()}
+                            className="pixel-btn pixel-btn-red rounded-sm px-3.5 py-2 text-xs font-bold"
+                          >
+                            <GitHubIcon className="h-3.5 w-3.5" />
+                            <span>{t.connectModal.authorize}</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                          <p className="min-w-0 flex-1 text-[10px] leading-relaxed text-sky-200/85">
+                            {t.shop.phase7Notice}
+                          </p>
+                          <button
+                            type="button"
+                            disabled={isMutating}
+                            onClick={() => void handleConfirmPaymentUnlock()}
+                            className="pixel-btn pixel-btn-gold shrink-0 rounded-sm px-3.5 py-2 text-xs font-bold disabled:opacity-60"
+                          >
+                            {isMutating ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : currency === 'BRL' ? (
+                              <QrCode className="h-3.5 w-3.5" />
+                            ) : (
+                              <CreditCard className="h-3.5 w-3.5" />
+                            )}
+                            <span>
+                              {isMutating
+                                ? t.shop.generatingCheckout
+                                : currency === 'BRL'
+                                  ? t.shop.generatePixBtn
+                                  : t.shop.payWithStripeBtn}
+                            </span>
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <>
+                        {currency === 'USD' && (
+                          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-700 bg-[#040811]/90 px-3 py-2 text-[11px]">
+                            {toSafeHttpUrl(paymentPreview.checkoutUrl) ? (
+                              <>
+                                <span className="min-w-0 truncate text-slate-300">
+                                  Ref:{' '}
+                                  <code className="text-sky-300">
+                                    {paymentPreview.externalReference}
+                                  </code>
+                                </span>
+                                <a
+                                  href={toSafeHttpUrl(paymentPreview.checkoutUrl) ?? '#'}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-sky-400/50 bg-sky-500/20 px-2.5 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/30"
+                                >
+                                  <span>{t.shop.openCheckout}</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </>
+                            ) : (
+                              <p className="text-[10px] text-sky-200/90">{t.shop.noCheckoutEnv}</p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] text-sky-200/80">{t.shop.previewNote}</p>
+                          <button
+                            type="button"
+                            disabled={isMutating}
+                            onClick={() => void handleConfirmPaymentUnlock()}
+                            className="pixel-btn pixel-btn-pine rounded-sm px-3.5 py-1.5 text-[11px] font-bold disabled:opacity-60"
+                          >
+                            {t.shop.confirmPreview}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             )}

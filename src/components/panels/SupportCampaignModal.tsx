@@ -117,7 +117,7 @@ export function SupportCampaignModal({
       aria-label={t.supportModal.title}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-xs sm:p-6"
     >
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto pixel-night-panel rounded-md p-5 sm:p-6">
+      <div className="max-h-[90vh] w-full max-w-xl overflow-x-hidden overflow-y-auto pixel-night-panel rounded-md p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
           <div>
             <p className="text-[11px] text-emerald-400">

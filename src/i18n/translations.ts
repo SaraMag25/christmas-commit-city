@@ -219,7 +219,7 @@ export const SPECIES_COPY: Record<AppLanguage, Record<CompanionSpeciesId, Locali
       subtitle: 'Guardião do Brejo Nevado',
       description: 'Sapo compacto e simpático que adora acompanhar deploys noturnos.',
       story:
-        'Um sapinho aprendiz de magia que trocou o brejo pela neve. Acredita firmemente que um bom feitiço — e um git rebase bem feito — resolve qualquer bug de inverno.',
+        'Um sapinho aprendiz de magia que trocou o brejo pela neve. Acredita firmemente que um bom feitiço e um git rebase bem feito resolvem qualquer bug de inverno.',
     },
     snake: {
       defaultName: 'Pip',
@@ -269,7 +269,7 @@ export const SPECIES_COPY: Record<AppLanguage, Record<CompanionSpeciesId, Locali
       subtitle: 'Snowy Pond Guardian',
       description: 'A chubby, cheerful frog who loves keeping watch over late-night deploys.',
       story:
-        'An apprentice magic frog who traded the swamp for the snow. Firmly believes that a good spell—and a clean git rebase—can fix any winter bug.',
+        'An apprentice magic frog who traded the swamp for the snow. Firmly believes that a good spell and a clean git rebase can fix any winter bug.',
     },
     snake: {
       defaultName: 'Pip',
@@ -385,7 +385,7 @@ export const ACCESSORY_COPY: Record<
     rubber_duck: {
       name: 'Patinho de Debug',
       description:
-        'Mini patinho de borracha amarelo equilibrado na cabeça — o melhor ouvinte para resolver qualquer bug.',
+        'Mini patinho de borracha amarelo equilibrado na cabeça. O melhor ouvinte para resolver qualquer bug.',
     },
     code_visor: {
       name: 'Visor de Código Neon',
@@ -419,7 +419,7 @@ export const ACCESSORY_COPY: Record<
     },
     'white-fish': {
       name: 'Little White Fish',
-      description: 'Fresh silver-white fish caught by the frozen lake—Maria’s favorite snack.',
+      description: 'Fresh silver-white fish caught by the frozen lake. Maria’s favorite snack.',
     },
     'santa-hat': {
       name: 'Santa Hat',
@@ -473,7 +473,7 @@ export const ACCESSORY_COPY: Record<
     rubber_duck: {
       name: 'Rubber Duck Debugger',
       description:
-        'Tiny yellow rubber duck balanced on top—the ultimate listener for rubber duck debugging.',
+        'Tiny yellow rubber duck balanced on top. The ultimate listener for rubber duck debugging.',
     },
     code_visor: {
       name: 'Neon Code Visor',
@@ -579,7 +579,7 @@ export const UI_TRANSLATIONS = {
       syncWarning: 'Aviso na sincronização GitHub',
       close: 'Fechar',
       paymentSuccessBanner: 'Pagamento confirmado! Seu item ou presente foi liberado.',
-      paymentPendingBanner: 'Pagamento recebido — finalizando confirmação automática...',
+      paymentPendingBanner: 'Pagamento recebido, finalizando confirmação automática...',
       paymentCancelledBanner: 'Checkout cancelado. Nenhuma cobrança foi realizada.',
     },
     treePanel: {
@@ -652,7 +652,7 @@ export const UI_TRANSLATIONS = {
       selectHint: 'Clique em um item do catálogo ao lado para visualizar na árvore 3D.',
       note: 'Presentes gratuitos são adicionados na hora; presentes especiais aparecem assim que o pagamento é confirmado.',
       phase7Notice:
-        'Selecione Pix (BRL) ou Cartão (USD) — o presente aparece na árvore logo após a confirmação do pagamento.',
+        'Selecione Pix (BRL) ou Cartão (USD). O presente aparece na árvore logo após a confirmação do pagamento.',
       loginRequiredFree:
         'Conecte sua conta GitHub para enviar presentes gratuitos.',
       loginRequiredPaid:
@@ -720,6 +720,7 @@ export const UI_TRANSLATIONS = {
       headLabel: 'CABEÇA',
       bodyLabel: 'CORPO',
       handLabel: 'ITEM',
+      noneLabel: 'Nenhum',
       removePet: 'Guardar companheiro',
       tabSpecies: 'Escolher Amigo',
       tabCustomize: 'Customizar',
@@ -738,7 +739,7 @@ export const UI_TRANSLATIONS = {
       supporterTitle: 'Pacote Apoiador Completo (Combo Total)',
       supporterDesc:
         `Desbloqueie todos os ${COMPANION_SPECIES_CATALOG.length} bichinhos + todos os ${COMPANION_ACCESSORIES_CATALOG.length} acessórios de uma só vez.`,
-      supporterUnlocked: 'Pacote Apoiador Ativo — Tudo Desbloqueado!',
+      supporterUnlocked: 'Pacote Apoiador Ativo: Tudo Desbloqueado!',
       supporterBtn: 'Desbloquear Tudo',
       petNameLabel: 'Nome do seu amigo',
       petNamePlaceholder: 'Ex: Maria',
@@ -761,11 +762,11 @@ export const UI_TRANSLATIONS = {
       generatePixBtn: 'Gerar QR Code Pix',
       payWithStripeBtn: 'Pagar com Cartão (Stripe)',
       generatingCheckout: 'Gerando pagamento...',
-      pixWaitingTitle: 'Pix QR Code / Copia e Cola',
+      pixWaitingTitle: 'Pix',
       pixExpiresAt: 'expira às',
       pixCopyCodeLabel: 'Código Pix Copia e Cola',
       pixAutoConfirmHint:
-        'Pague no app do seu banco — a liberação acontece automaticamente em segundos após a confirmação.',
+        'Pague no app do seu banco. A liberação acontece automaticamente em segundos após a confirmação.',
       checkStatusBtn: 'Verificar pagamento',
       pixConfirmed: 'Pagamento Pix confirmado! Atualizando sua árvore...',
       pixExpiredOrFailed: 'Este Pix expirou ou foi cancelado. Gere um novo código se desejar.',
@@ -855,7 +856,7 @@ export const UI_TRANSLATIONS = {
       syncWarning: 'GitHub sync notice',
       close: 'Close',
       paymentSuccessBanner: 'Payment confirmed! Your item or gift has been unlocked.',
-      paymentPendingBanner: 'Payment received — finalizing confirmation...',
+      paymentPendingBanner: 'Payment received, finalizing confirmation...',
       paymentCancelledBanner: 'Checkout cancelled. No charge was made.',
     },
     treePanel: {
@@ -928,7 +929,7 @@ export const UI_TRANSLATIONS = {
       selectHint: 'Click any item in the catalog to preview it on the 3D tree.',
       note: 'Free gifts appear on the tree right away; special gifts are delivered as soon as payment is confirmed.',
       phase7Notice:
-        'Choose Pix (BRL) or Card (USD) — your gift appears on the tree as soon as payment is confirmed.',
+        'Choose Pix (BRL) or Card (USD). Your gift appears on the tree as soon as payment is confirmed.',
       loginRequiredFree:
         'Connect your GitHub account to send free gifts.',
       loginRequiredPaid:
@@ -996,6 +997,7 @@ export const UI_TRANSLATIONS = {
       headLabel: 'HEAD',
       bodyLabel: 'BODY',
       handLabel: 'ITEM',
+      noneLabel: 'None',
       removePet: 'Store companion away',
       tabSpecies: 'Choose Companion',
       tabCustomize: 'Customize',
@@ -1014,7 +1016,7 @@ export const UI_TRANSLATIONS = {
       supporterTitle: 'Full Supporter Pack (All-Access Bundle)',
       supporterDesc:
         `Unlock all ${COMPANION_SPECIES_CATALOG.length} pets + all ${COMPANION_ACCESSORIES_CATALOG.length} accessories at once.`,
-      supporterUnlocked: 'Supporter Pack Active — Everything Unlocked!',
+      supporterUnlocked: 'Supporter Pack Active: Everything Unlocked!',
       supporterBtn: 'Unlock All',
       petNameLabel: "Your companion's name",
       petNamePlaceholder: 'e.g. Maria',
@@ -1037,11 +1039,11 @@ export const UI_TRANSLATIONS = {
       generatePixBtn: 'Generate Pix QR Code',
       payWithStripeBtn: 'Pay with Card (Stripe)',
       generatingCheckout: 'Creating checkout...',
-      pixWaitingTitle: 'Pix QR Code Checkout',
+      pixWaitingTitle: 'Pix',
       pixExpiresAt: 'expires at',
       pixCopyCodeLabel: 'Pix Copy & Paste Code',
       pixAutoConfirmHint:
-        'Pay in your banking app — your unlock activates automatically within seconds once confirmed.',
+        'Pay in your banking app. Your unlock activates automatically within seconds once confirmed.',
       checkStatusBtn: 'Check payment status',
       pixConfirmed: 'Pix payment confirmed! Updating your tree...',
       pixExpiredOrFailed: 'This Pix code expired or was cancelled. Generate a new one if needed.',

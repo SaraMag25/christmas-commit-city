@@ -176,7 +176,7 @@ export function GiftCatalogPreviewModal({
       aria-label={headerTitle}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-xs sm:p-6"
     >
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto pixel-wood-panel rounded-sm p-4 sm:p-6">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-x-hidden overflow-y-auto pixel-wood-panel rounded-sm p-4 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#8c5835] pb-3">
           <div>
             <h2 className="flex items-center gap-2 font-pixel-title text-xs text-amber-300 sm:text-sm">
@@ -250,9 +250,9 @@ export function GiftCatalogPreviewModal({
         )}
 
         {/* Two-column layout: Live 3D Preview (left) + Clickable Gift Catalog (right) */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-[316px_1fr] lg:items-start">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[316px_minmax(0,1fr)] lg:items-start">
           {/* Column 1: Sticky 3D Live Preview & Confirmation Action */}
-          <aside className="flex flex-col items-center rounded-sm border border-[#8c5835] bg-[#060c1a]/95 p-3.5 lg:sticky lg:top-0">
+          <aside className="flex min-w-0 flex-col items-center rounded-sm border border-[#8c5835] bg-[#060c1a]/95 p-3.5 lg:sticky lg:top-0">
             <div className="flex w-full items-center justify-between gap-2 text-[10px]">
               <span className="inline-flex items-center gap-1 rounded-sm border border-emerald-500/35 bg-emerald-950/60 px-1.5 py-0.5 font-semibold text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
