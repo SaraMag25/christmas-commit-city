@@ -27,10 +27,10 @@ export const CREATOR_CAMPAIGN: PixCampaignConfig = {
     import.meta.env.VITE_PIX_KEY?.trim() || '864ddb09-dc5f-43bd-8012-c7387964e00b',
   pixBrCode:
     import.meta.env.VITE_PIX_BR_CODE?.trim() ||
-    '00020101021126580014br.gov.bcb.pix0136864ddb09-dc5f-43bd-8012-c7387964e00b5204000053039865802BR5919SARA DE S MAGALHAES6008AMONTADA62070503***63043E9F',
+    '00020101021126580014br.gov.bcb.pix0136864ddb09-dc5f-43bd-8012-c7387964e00b5204000053039865802BR5919SARA DE S MAGALHAES6006BRASIL62070503***63041A7E',
   pixQrImageUrl: '/images/pix-support-qr.png',
   recipientName: import.meta.env.VITE_PIX_RECIPIENT_NAME?.trim() || 'SARA DE S MAGALHAES',
-  recipientCity: import.meta.env.VITE_PIX_RECIPIENT_CITY?.trim() || 'AMONTADA',
+  recipientCity: import.meta.env.VITE_PIX_RECIPIENT_CITY?.trim() || 'BRASIL',
   goalAmount: Number(import.meta.env.VITE_PIX_GOAL_AMOUNT || 5000),
   // Placeholder display amount for Phase 1 visual showcase (never auto-confirmed on click)
   raisedAmount: 0,

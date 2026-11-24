@@ -42,7 +42,7 @@ VITE_CONTRIBUTION_YEAR=2026
 VITE_PIX_KEY=<sua-chave-pix>
 VITE_PIX_BR_CODE=<seu-pix-copia-e-cola>
 VITE_PIX_RECIPIENT_NAME=<seu-nome>
-VITE_PIX_RECIPIENT_CITY=<sua-cidade>
+VITE_PIX_RECIPIENT_CITY=BRASIL
 ```
 
 ### Backend (Secrets da Edge Function no Supabase)

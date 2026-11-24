@@ -283,7 +283,6 @@ export function SupportCampaignModal({
                     <span className="font-semibold text-slate-100">
                       {CREATOR_CAMPAIGN.recipientName}
                     </span>
-                    <span className="text-slate-400"> · {CREATOR_CAMPAIGN.recipientCity}</span>
                   </div>
 
                   {/* Pix Copia e Cola (EMV BR Code) */}
