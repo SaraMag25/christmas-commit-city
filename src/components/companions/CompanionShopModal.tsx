@@ -38,6 +38,7 @@ import {
   createStripeCheckout,
   type PixPaymentOrder,
 } from '../../services/paymentService'
+import { toSafeHttpUrl } from '../../utils/urlSafety'
 import type { CityTree } from '../../types/city'
 import type {
   AccessorySlot,
@@ -1007,7 +1008,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                   <>
                     {currency === 'USD' && (
                       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-700 bg-[#040811]/90 px-3 py-2 text-[11px]">
-                        {paymentPreview.checkoutUrl ? (
+                        {toSafeHttpUrl(paymentPreview.checkoutUrl) ? (
                           <>
                             <span className="text-slate-300">
                               Ref:{' '}
@@ -1016,9 +1017,9 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                               </code>
                             </span>
                             <a
-                              href={paymentPreview.checkoutUrl}
+                              href={toSafeHttpUrl(paymentPreview.checkoutUrl) ?? '#'}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 rounded-sm border border-sky-400/50 bg-sky-500/20 px-2.5 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/30"
                             >
                               <span>{t.shop.openCheckout}</span>

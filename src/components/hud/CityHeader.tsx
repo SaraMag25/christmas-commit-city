@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
 import { extractSessionGitHubUser } from '../../services/githubSyncService'
+import { toSafeHttpUrl } from '../../utils/urlSafety'
 import { GitHubIcon } from '../icons/GitHubIcon'
 
 interface CityHeaderProps {
@@ -30,6 +31,12 @@ export function CityHeader({
   const navigate = useNavigate()
   const isHome = location.pathname === '/'
   const sessionUser = !currentUserTree ? extractSessionGitHubUser(session) : null
+  const myTreeAvatarUrl = currentUserTree
+    ? toSafeHttpUrl(currentUserTree.profile.avatar_url, { allowRelative: true })
+    : null
+  const sessionAvatarUrl = sessionUser
+    ? toSafeHttpUrl(sessionUser.avatarUrl, { allowRelative: true })
+    : null
 
   const handleBrandClick = () => {
     if (isHome && onShowWelcome) {
@@ -163,11 +170,15 @@ export function CityHeader({
                 className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold"
                 title={t.header.myTreeTitle}
               >
-                <img
-                  src={currentUserTree.profile.avatar_url}
-                  alt={currentUserTree.profile.github_username}
-                  className="h-3.5 w-3.5 rounded-[2px] border border-emerald-400/50"
-                />
+                {myTreeAvatarUrl ? (
+                  <img
+                    src={myTreeAvatarUrl}
+                    alt={currentUserTree.profile.github_username}
+                    className="h-3.5 w-3.5 rounded-[2px] border border-emerald-400/50"
+                  />
+                ) : (
+                  <GitHubIcon className="h-3.5 w-3.5" />
+                )}
                 <span>@{currentUserTree.profile.github_username}</span>
               </button>
 
@@ -201,9 +212,9 @@ export function CityHeader({
                 className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-semibold disabled:opacity-70"
                 title={t.header.resyncTitle}
               >
-                {sessionUser?.avatarUrl ? (
+                {sessionUser && sessionAvatarUrl ? (
                   <img
-                    src={sessionUser.avatarUrl}
+                    src={sessionAvatarUrl}
                     alt={sessionUser.username}
                     className="h-3.5 w-3.5 rounded-[2px] border border-emerald-400/50"
                   />

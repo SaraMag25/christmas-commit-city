@@ -43,7 +43,7 @@ export function TreeProfilePage() {
     return trees.find((tItem) => tItem.profile.github_username.toLowerCase() === normalized)
   }, [trees, username])
 
-  const shareUrl = `${window.location.origin}/tree/${tree?.profile.github_username ?? username}`
+  const shareUrl = `${window.location.origin}/tree/${encodeURIComponent(tree?.profile.github_username ?? username)}`
 
   const handleCopyLink = async () => {
     try {
@@ -253,9 +253,9 @@ export function TreeProfilePage() {
                       @{tree.profile.github_username}
                     </p>
                     <a
-                      href={`https://github.com/${tree.profile.github_username}`}
+                      href={`https://github.com/${encodeURIComponent(tree.profile.github_username)}`}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="mt-1.5 inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline"
                     >
                       <span>{t.treePanel.viewGithub}</span>

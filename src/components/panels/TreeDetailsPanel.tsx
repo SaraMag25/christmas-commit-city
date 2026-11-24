@@ -75,7 +75,7 @@ export function TreeDetailsPanel({
       : 'SEEDLING'
 
   const handleCopyShareLink = async () => {
-    const shareUrl = `${window.location.origin}/tree/${tree.profile.github_username}`
+    const shareUrl = `${window.location.origin}/tree/${encodeURIComponent(tree.profile.github_username)}`
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
@@ -190,9 +190,9 @@ export function TreeDetailsPanel({
 
         <div className="mt-2.5 border-t border-slate-800/80 pt-2">
           <a
-            href={`https://github.com/${tree.profile.github_username}`}
+            href={`https://github.com/${encodeURIComponent(tree.profile.github_username)}`}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 hover:text-emerald-300 hover:underline"
           >
             <span>{t.treePanel.viewGithub}</span>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toSafeHttpUrl } from '../../utils/urlSafety'
 
 interface AvatarBadgeProps {
   username: string
@@ -15,13 +16,14 @@ const SIZE_CLASSES: Record<NonNullable<AvatarBadgeProps['size']>, string> = {
 
 export function AvatarBadge({ username, name, avatarUrl, size = 'md' }: AvatarBadgeProps) {
   const [imgError, setImgError] = useState(false)
+  const safeAvatarUrl = toSafeHttpUrl(avatarUrl, { allowRelative: true })
   const initials = name
     .split(' ')
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
 
-  if (imgError) {
+  if (imgError || !safeAvatarUrl) {
     return (
       <div
         className={`flex shrink-0 items-center justify-center rounded-sm border-2 border-amber-400 bg-[#174636] font-pixel-title text-amber-200 ${SIZE_CLASSES[size]}`}
@@ -33,7 +35,7 @@ export function AvatarBadge({ username, name, avatarUrl, size = 'md' }: AvatarBa
 
   return (
     <img
-      src={avatarUrl}
+      src={safeAvatarUrl}
       alt={`Avatar de ${name}`}
       onError={() => setImgError(true)}
       className={`shrink-0 rounded-sm border-2 border-amber-400 bg-[#0d1833] object-cover ${SIZE_CLASSES[size]}`}

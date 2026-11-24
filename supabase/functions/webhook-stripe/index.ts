@@ -166,6 +166,15 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Matching payment order not found.' }, 404)
     }
 
+    if (order.provider !== 'stripe') {
+      return jsonResponse({ error: 'Payment provider mismatch.' }, 400)
+    }
+
+    if (order.provider_payment_id && order.provider_payment_id !== verifiedSession.id) {
+      console.error('[webhook-stripe] Session ID mismatch for order:', order.id)
+      return jsonResponse({ error: 'Session ID mismatch.' }, 400)
+    }
+
     if (order.status === 'paid') {
       return jsonResponse({ received: true, alreadyProcessed: true }, 200)
     }
@@ -173,7 +182,14 @@ Deno.serve(async (req: Request) => {
     const amountTotal = Number(verifiedSession.amount_total ?? 0)
     const sessionCurrency = verifiedSession.currency?.trim().toLowerCase() ?? ''
 
-    if (order.currency !== 'USD' || sessionCurrency !== 'usd' || amountTotal < order.amount_cents) {
+    if (
+      !Number.isFinite(amountTotal) ||
+      amountTotal <= 0 ||
+      order.amount_cents <= 0 ||
+      order.currency !== 'USD' ||
+      sessionCurrency !== 'usd' ||
+      amountTotal < order.amount_cents
+    ) {
       console.error('[webhook-stripe] Amount or currency mismatch:', {
         orderId: order.id,
         amountTotal,
@@ -210,9 +226,6 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ received: true, fulfillment: rpcResult }, 200)
   } catch (err) {
     console.error('[webhook-stripe] Unexpected error:', err)
-    return jsonResponse(
-      { error: err instanceof Error ? err.message : 'Unexpected server error.' },
-      500,
-    )
+    return jsonResponse({ error: 'Unexpected server error.' }, 500)
   }
 })

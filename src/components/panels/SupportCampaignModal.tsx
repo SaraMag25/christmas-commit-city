@@ -24,6 +24,7 @@ import {
   createStripeCheckout,
   type PixPaymentOrder,
 } from '../../services/paymentService'
+import { toSafeHttpUrl } from '../../utils/urlSafety'
 import { GitHubIcon } from '../icons/GitHubIcon'
 import { PixCheckoutBox } from '../payments/PixCheckoutBox'
 
@@ -53,7 +54,7 @@ export function SupportCampaignModal({
 
   const campaignCopy = CAMPAIGN_COPY[language]
   const loadout = getCompanionLoadout(targetUsername)
-  const checkoutUrl = getInternationalCheckoutUrl()
+  const checkoutUrl = toSafeHttpUrl(getInternationalCheckoutUrl())
   const bundlePrice =
     currency === 'BRL' ? SUPPORTER_BUNDLE.priceBrl : SUPPORTER_BUNDLE.priceUsd
 
@@ -350,7 +351,7 @@ export function SupportCampaignModal({
                 <a
                   href={checkoutUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="pixel-btn pixel-btn-pine inline-flex rounded-sm px-4 py-2 text-xs font-bold"
                 >
                   <span>{t.shop.openCheckout}</span>

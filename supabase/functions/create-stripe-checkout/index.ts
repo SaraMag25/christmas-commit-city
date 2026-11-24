@@ -179,7 +179,7 @@ Deno.serve(async (req: Request) => {
     console.error('[create-stripe-checkout] Unexpected error:', err)
     return jsonResponse(
       {
-        error: err instanceof Error ? err.message : 'Unexpected server error.',
+        error: 'Unexpected server error.',
         code: 'INTERNAL_ERROR',
       },
       500,
