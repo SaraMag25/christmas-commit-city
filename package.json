@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed:city": "node scripts/seed-city.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

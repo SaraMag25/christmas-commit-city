@@ -86,6 +86,7 @@ export interface CityTree {
   tree_level: TreeLevelId
   tree_position: TreePosition
   plotIndex?: number
+  claimed?: boolean
   isDecorative?: boolean
   gifts: TreeGiftSummary[]
   companion?: TreeCompanionState

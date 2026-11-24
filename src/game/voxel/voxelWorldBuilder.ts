@@ -265,6 +265,7 @@ function buildTerrainAndRivers(
     pier: [],
     bridgeWood: [],
     earthBase: [],
+    horizonSnow: [],
   }
 
   for (let gy = skyRows - pad; gy < rows + pad; gy += 1) {
@@ -399,13 +400,22 @@ function buildTerrainAndRivers(
     }
   }
 
+  buckets.horizonSnow.push({
+    x: 0,
+    y: -0.44,
+    z: 0,
+    sx: 780,
+    sy: 0.38,
+    sz: 780,
+  })
+
   buckets.earthBase.push({
     x: 0,
-    y: -1.4,
+    y: -1.48,
     z: 0,
-    sx: totalCols * TILE_WORLD,
+    sx: Math.max(780, totalCols * TILE_WORLD),
     sy: 1.8,
-    sz: totalRows * TILE_WORLD,
+    sz: Math.max(780, totalRows * TILE_WORLD),
   })
 
   const palette: Record<keyof typeof buckets, string> = {
@@ -422,6 +432,7 @@ function buildTerrainAndRivers(
     pier: CITY_PALETTE.woodLight,
     bridgeWood: CITY_PALETTE.woodMid,
     earthBase: '#1b2b4d',
+    horizonSnow: CITY_PALETTE.snowIce,
   }
 
   for (const [key, items] of Object.entries(buckets)) {
@@ -534,10 +545,10 @@ function buildNightSky(
 
   for (let i = 0; i < count; i += 1) {
     const angle = (i * 137.5 * Math.PI) / 180
-    const radius = 125 + (i % 9) * 10
-    const y = 22 + (i % 16) * 2.8
+    const radius = 230 + (i % 10) * 14
+    const y = 32 + (i % 16) * 3.4
     dummy.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius)
-    const s = i % 4 === 0 ? 0.65 : 0.35
+    const s = i % 4 === 0 ? 0.95 : 0.55
     dummy.scale.set(s, s, s)
     dummy.updateMatrix()
     stars.setMatrixAt(i, dummy.matrix)
@@ -548,16 +559,16 @@ function buildNightSky(
   // Aurora Borealis ribbons dancing above the North Pole mountains (exempt from horizon fog)
   const auroraColors = ['#34d399', '#2dd4bf', '#38bdf8', '#a7f3d0']
   for (let i = 0; i < 28; i += 1) {
-    const x = -80 + i * 5.9
-    const z = -104 + Math.sin(i * 0.42) * 7
-    const baseY = 38 + Math.cos(i * 0.48) * 3.8
+    const x = -150 + i * 10.8
+    const z = -205 + Math.sin(i * 0.42) * 10
+    const baseY = 52 + Math.cos(i * 0.48) * 5.2
     const bar = createVoxelMesh(
       x,
       baseY,
       z,
-      5.0,
-      6.8 + (i % 3) * 1.9,
-      1.2,
+      9.0,
+      9.5 + (i % 3) * 2.4,
+      1.6,
       auroraColors[i % auroraColors.length],
       true,
       0.18,
@@ -568,9 +579,9 @@ function buildNightSky(
   }
 
   const moonGroup = new THREE.Group()
-  moonGroup.position.set(70, 50, -102)
-  moonGroup.add(createVoxelMesh(0, 0, 0, 4.8, 4.8, 1.5, '#fef08a', true, 1, false))
-  moonGroup.add(createVoxelMesh(1.7, 1.3, 0.3, 3.4, 3.4, 1.6, CITY_PALETTE.nightBg, true, 1, false))
+  moonGroup.position.set(118, 76, -198)
+  moonGroup.add(createVoxelMesh(0, 0, 0, 7.2, 7.2, 1.8, '#fef08a', true, 1, false))
+  moonGroup.add(createVoxelMesh(2.5, 1.9, 0.4, 5.1, 5.1, 1.9, CITY_PALETTE.nightBg, true, 1, false))
   starGroup.add(moonGroup)
 
   root.add(starGroup)

@@ -101,7 +101,8 @@ function jsonResponse(
 
 interface ExistingTreeRow {
   id: string
-  user_id: string
+  user_id: string | null
+  claimed?: boolean
   github_username: string
   display_name: string
   avatar_url: string
@@ -200,19 +201,26 @@ Deno.serve(async (req: Request) => {
       year?: number
     }
 
-    // Always enforce the current standardized contribution year server-side
-    const year = new Date().getUTCFullYear()
+    const currentUtcYear = new Date().getUTCFullYear()
+    const year =
+      typeof payload.year === 'number' &&
+      Number.isInteger(payload.year) &&
+      payload.year >= 2020 &&
+      payload.year <= currentUtcYear + 1
+        ? payload.year
+        : currentUtcYear
 
     // Privileged service-role client used ONLY inside this verified Edge Function
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
-    const { data: existingTree, error: existingErr } = await adminClient
+    const selectFields =
+      'id, user_id, claimed, github_username, display_name, avatar_url, total_commits, spent_commits, contribution_calendar, plot_index, last_synced_at, created_at'
+
+    const { data: ownTree, error: existingErr } = await adminClient
       .from('trees')
-      .select(
-        'id, user_id, github_username, display_name, avatar_url, total_commits, spent_commits, contribution_calendar, plot_index, last_synced_at, created_at',
-      )
+      .select(selectFields)
       .eq('user_id', user.id)
       .maybeSingle<ExistingTreeRow>()
 
@@ -225,8 +233,46 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Enforce 5-minute sync cooldown per user to prevent GitHub API abuse
-    if (existingTree?.last_synced_at) {
+    let existingTree: ExistingTreeRow | null = ownTree
+
+    // If user doesn't have a claimed tree yet, look for an existing unclaimed seeded/discovered tree
+    if (!existingTree) {
+      const { data: claimCandidate, error: claimLookupErr } = await adminClient
+        .from('trees')
+        .select(selectFields)
+        .eq('github_username_lower', githubLogin.toLowerCase())
+        .maybeSingle<ExistingTreeRow>()
+
+      if (claimLookupErr) {
+        console.error(
+          '[sync] Failed to lookup claimable tree:',
+          claimLookupErr.code,
+          claimLookupErr.message,
+        )
+        return jsonResponse(
+          {
+            error: 'Failed to verify existing city tree for claiming.',
+            code: claimLookupErr.code ?? 'DB_READ_ERROR',
+          },
+          500,
+          corsHeaders,
+        )
+      }
+
+      if (claimCandidate) {
+        if (claimCandidate.user_id && claimCandidate.user_id !== user.id) {
+          return jsonResponse(
+            { error: 'This GitHub tree is already claimed by another session.', code: 'TREE_ALREADY_CLAIMED' },
+            409,
+            corsHeaders,
+          )
+        }
+        existingTree = claimCandidate
+      }
+    }
+
+    // Enforce 5-minute sync cooldown ONLY when the tree is already owned & claimed by this user
+    if (existingTree?.user_id === user.id && existingTree.claimed !== false && existingTree.last_synced_at) {
       const lastMs = Date.parse(existingTree.last_synced_at)
       if (!Number.isNaN(lastMs) && Date.now() - lastMs < SYNC_COOLDOWN_MS) {
         const calendarWeeks = Array.isArray(existingTree.contribution_calendar)
@@ -267,7 +313,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const githubToken =
-      payload.providerToken?.trim() || Deno.env.get('GITHUB_READONLY_TOKEN')?.trim() || ''
+      payload.providerToken?.trim() ||
+      Deno.env.get('GITHUB_TOKEN')?.trim() ||
+      Deno.env.get('GITHUB_READONLY_TOKEN')?.trim() ||
+      ''
 
     if (!githubToken) {
       return jsonResponse(
@@ -364,10 +413,13 @@ Deno.serve(async (req: Request) => {
     let persistedTree: ExistingTreeRow | null = null
 
     if (existingTree) {
+      const isClaimingUnclaimed = existingTree.user_id === null
       const safeSpent = Math.min(existingTree.spent_commits, totalContributions)
-      const { data: updated, error: updateErr } = await adminClient
+      let updateQuery = adminClient
         .from('trees')
         .update({
+          user_id: user.id,
+          claimed: true,
           github_username: ghUser.login,
           display_name: displayName,
           avatar_url: ghUser.avatarUrl,
@@ -377,9 +429,15 @@ Deno.serve(async (req: Request) => {
           last_synced_at: syncedAt,
         })
         .eq('id', existingTree.id)
-        .select(
-          'id, user_id, github_username, display_name, avatar_url, total_commits, spent_commits, contribution_calendar, plot_index, last_synced_at, created_at',
-        )
+
+      if (isClaimingUnclaimed) {
+        updateQuery = updateQuery.is('user_id', null)
+      } else {
+        updateQuery = updateQuery.eq('user_id', user.id)
+      }
+
+      const { data: updated, error: updateErr } = await updateQuery
+        .select(selectFields)
         .single<ExistingTreeRow>()
 
       if (updateErr || !updated) {
@@ -397,42 +455,100 @@ Deno.serve(async (req: Request) => {
           corsHeaders,
         )
       }
+
+      // Bind any pre-existing gifts received before the owner joined the city
+      if (isClaimingUnclaimed) {
+        await adminClient
+          .from('tree_gifts')
+          .update({ recipient_user_id: user.id })
+          .eq('recipient_tree_id', updated.id)
+          .is('recipient_user_id', null)
+      }
+
       persistedTree = updated
     } else {
-      // Insert new tree; PostgreSQL sequence atomically assigns a unique `plot_index`
-      const { data: inserted, error: insertErr } = await adminClient
+      // Check one more time by canonical GitHub login from GraphQL response in case login casing/alias differed
+      const { data: canonicalUnclaimed } = await adminClient
         .from('trees')
-        .insert({
-          user_id: user.id,
-          github_username: ghUser.login,
-          display_name: displayName,
-          avatar_url: ghUser.avatarUrl,
-          total_commits: totalContributions,
-          spent_commits: 0,
-          contribution_calendar: calendarWeeks,
-          last_synced_at: syncedAt,
-        })
-        .select(
-          'id, user_id, github_username, display_name, avatar_url, total_commits, spent_commits, contribution_calendar, plot_index, last_synced_at, created_at',
-        )
-        .single<ExistingTreeRow>()
+        .select(selectFields)
+        .eq('github_username_lower', ghUser.login.toLowerCase())
+        .is('user_id', null)
+        .maybeSingle<ExistingTreeRow>()
 
-      if (insertErr || !inserted) {
-        console.error(
-          '[sync] Failed to create developer tree record:',
-          insertErr?.code,
-          insertErr?.message,
-        )
-        return jsonResponse(
-          {
-            error: 'Failed to create developer tree record.',
-            code: insertErr?.code ?? 'DB_INSERT_ERROR',
-          },
-          500,
-          corsHeaders,
-        )
+      if (canonicalUnclaimed) {
+        const safeSpent = Math.min(canonicalUnclaimed.spent_commits, totalContributions)
+        const { data: claimedRow, error: claimErr } = await adminClient
+          .from('trees')
+          .update({
+            user_id: user.id,
+            claimed: true,
+            github_username: ghUser.login,
+            display_name: displayName,
+            avatar_url: ghUser.avatarUrl,
+            total_commits: totalContributions,
+            spent_commits: safeSpent,
+            contribution_calendar: calendarWeeks,
+            last_synced_at: syncedAt,
+          })
+          .eq('id', canonicalUnclaimed.id)
+          .is('user_id', null)
+          .select(selectFields)
+          .single<ExistingTreeRow>()
+
+        if (claimErr || !claimedRow) {
+          console.error('[sync] Failed to claim existing tree:', claimErr?.code, claimErr?.message)
+          return jsonResponse(
+            {
+              error: 'Failed to claim existing city tree.',
+              code: claimErr?.code ?? 'DB_CLAIM_ERROR',
+            },
+            500,
+            corsHeaders,
+          )
+        }
+
+        await adminClient
+          .from('tree_gifts')
+          .update({ recipient_user_id: user.id })
+          .eq('recipient_tree_id', claimedRow.id)
+          .is('recipient_user_id', null)
+
+        persistedTree = claimedRow
+      } else {
+        // Insert new tree; PostgreSQL sequence atomically assigns a unique `plot_index`
+        const { data: inserted, error: insertErr } = await adminClient
+          .from('trees')
+          .insert({
+            user_id: user.id,
+            claimed: true,
+            github_username: ghUser.login,
+            display_name: displayName,
+            avatar_url: ghUser.avatarUrl,
+            total_commits: totalContributions,
+            spent_commits: 0,
+            contribution_calendar: calendarWeeks,
+            last_synced_at: syncedAt,
+          })
+          .select(selectFields)
+          .single<ExistingTreeRow>()
+
+        if (insertErr || !inserted) {
+          console.error(
+            '[sync] Failed to create developer tree record:',
+            insertErr?.code,
+            insertErr?.message,
+          )
+          return jsonResponse(
+            {
+              error: 'Failed to create developer tree record.',
+              code: insertErr?.code ?? 'DB_INSERT_ERROR',
+            },
+            500,
+            corsHeaders,
+          )
+        }
+        persistedTree = inserted
       }
-      persistedTree = inserted
     }
 
     return jsonResponse(

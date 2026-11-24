@@ -6,13 +6,14 @@ import {
   getSpeciesById,
   sanitizeCompanionName,
 } from '../config/companions'
-import { CITY_MAP_CONFIG, MIN_TREE_SPACING_GRID } from '../config/cityMapConfig'
+import { MIN_TREE_SPACING_GRID } from '../config/cityMapConfig'
 import { GIFTS_CATALOG } from '../config/gifts'
 import { CREATOR_CAMPAIGN, SUPPORTER_BUNDLE } from '../config/supportCampaign'
 import { resolveTreeStage } from '../config/treeLevels'
 import {
   allocateTreePosition,
   CURATED_TREE_PLOTS,
+  getSpiralPlotPosition,
   selectStratifiedTreePlots,
 } from '../game/layout/treePlacement'
 import type {
@@ -38,16 +39,13 @@ import type {
   UnlockItemRpcResult,
   UserCompanionLoadout,
 } from '../types/companion'
-import { normalizeGitHubContributionStats } from './githubSyncService'
+import { normalizeGitHubContributionStats, normalizeGitHubUsernameInput } from './githubSyncService'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
 
-const CENTERED_CURATED_PLOTS: readonly TreePosition[] = [...CURATED_TREE_PLOTS].sort((a, b) => {
-  const cx = CITY_MAP_CONFIG.plazaCenter.gridX
-  const cy = CITY_MAP_CONFIG.plazaCenter.gridY
-  const da = Math.hypot(a.gridX - cx, a.gridY - cy)
-  const db = Math.hypot(b.gridX - cx, b.gridY - cy)
-  return da - db
-})
+const PUBLIC_TREE_SELECT =
+  'id, github_username, display_name, avatar_url, total_commits, contribution_calendar, plot_index, active_companion_id, companion_custom_name, equipped_head_id, equipped_body_id, equipped_hand_id, last_synced_at, claimed'
+
+const TREE_PAGE_SIZE = 1000
 
 export function resolveTreePositionFromPlotIndex(
   plotIndex: number | null | undefined,
@@ -55,9 +53,7 @@ export function resolveTreePositionFromPlotIndex(
   username: string,
 ): TreePosition {
   if (typeof plotIndex === 'number' && Number.isInteger(plotIndex) && plotIndex >= 0) {
-    if (plotIndex < CENTERED_CURATED_PLOTS.length) {
-      return CENTERED_CURATED_PLOTS[plotIndex]
-    }
+    return getSpiralPlotPosition(plotIndex)
   }
   return allocateTreePosition(occupiedPositions, username)
 }
@@ -87,41 +83,20 @@ function toCompanionStateFromRow(row: {
   }
 }
 
-export async function fetchPublicCityTrees(): Promise<CityTree[]> {
-  if (!supabase || !isSupabaseConfigured) return []
-
-  const [treesRes, countsRes] = await Promise.all([
-    supabase
-      .from('public_trees')
-      .select(
-        'id, github_username, display_name, avatar_url, total_commits, contribution_calendar, plot_index, active_companion_id, companion_custom_name, equipped_head_id, equipped_body_id, equipped_hand_id, last_synced_at',
-      )
-      .order('plot_index', { ascending: true }),
-    supabase.rpc('get_public_tree_gift_counts'),
-  ])
-
-  if (treesRes.error) {
-    throw new Error(treesRes.error.message || 'Erro ao carregar árvores do Polo Norte.')
-  }
-
-  const rows = (treesRes.data ?? []) as SupabasePublicTreeRow[]
-  const countRows = countsRes.error
-    ? []
-    : ((countsRes.data ?? []) as SupabasePublicGiftCountRow[])
-
+export function expandGiftCountsToSummaries(
+  treeId: string,
+  countRows: ReadonlyArray<{ gift_id: string; gift_count: number }>,
+): TreeGiftSummary[] {
   const giftById = new Map(GIFTS_CATALOG.map((g) => [g.id, g]))
-  const giftsByTreeId = new Map<string, TreeGiftSummary[]>()
+  const list: TreeGiftSummary[] = []
 
   for (const row of countRows) {
     const giftMeta = giftById.get(row.gift_id)
     if (!giftMeta) continue
     const qty = Math.max(0, Math.min(200, Math.floor(Number(row.gift_count) || 0)))
-    if (qty <= 0) continue
-
-    const list = giftsByTreeId.get(row.recipient_tree_id) ?? []
     for (let i = 0; i < qty; i += 1) {
       list.push({
-        id: `pub-${row.recipient_tree_id}-${giftMeta.id}-${i}`,
+        id: `pub-${treeId}-${giftMeta.id}-${i}`,
         gift_id: giftMeta.id,
         gift_slug: giftMeta.slug,
         gift_name: giftMeta.name,
@@ -131,61 +106,136 @@ export async function fetchPublicCityTrees(): Promise<CityTree[]> {
         created_at: new Date(0).toISOString(),
       })
     }
-    giftsByTreeId.set(row.recipient_tree_id, list)
+  }
+
+  return list
+}
+
+export function mapPublicTreeRowToCityTree(
+  row: SupabasePublicTreeRow,
+  gifts: TreeGiftSummary[],
+  occupiedPositions: readonly TreePosition[] = [],
+  periodYear?: number,
+): CityTree {
+  const position = resolveTreePositionFromPlotIndex(
+    row.plot_index,
+    occupiedPositions,
+    row.github_username,
+  )
+  const calendarWeeks = Array.isArray(row.contribution_calendar)
+    ? (row.contribution_calendar as GitHubContributionWeek[])
+    : []
+  const totalCommits = Math.max(0, Math.floor(Number(row.total_commits) || 0))
+  const stage = resolveTreeStage(totalCommits)
+  const isCreator = row.github_username.trim().toLowerCase() === 'saramag25'
+  const syncedAt = row.last_synced_at ?? new Date().toISOString()
+
+  return {
+    id: row.id,
+    user_id: row.id,
+    profile: {
+      id: row.id,
+      github_username: row.github_username,
+      github_name: row.display_name || row.github_username,
+      avatar_url: row.avatar_url,
+      created_at: syncedAt,
+    },
+    contribution_count: totalCommits,
+    tree_level: stage.level,
+    tree_position: position,
+    plotIndex: row.plot_index,
+    claimed: row.claimed ?? true,
+    gifts,
+    companion: toCompanionStateFromRow(row),
+    stats: normalizeGitHubContributionStats(
+      {
+        periodYear,
+        totalContributions: totalCommits,
+        commits: totalCommits,
+        pullRequests: 0,
+        issues: 0,
+        calendarWeeks,
+      },
+      totalCommits,
+    ),
+    custom_message: isCreator ? CREATOR_CAMPAIGN.message : undefined,
+    is_creator_special: isCreator,
+    last_synced_at: syncedAt,
+  }
+}
+
+export async function fetchPublicCityTrees(): Promise<CityTree[]> {
+  if (!supabase || !isSupabaseConfigured) return []
+
+  const allRows: SupabasePublicTreeRow[] = []
+  let from = 0
+
+  // Paginate cleanly past PostgREST 1000-row cap so giant cities load completely
+  while (true) {
+    const { data, error } = await supabase
+      .from('public_trees')
+      .select(PUBLIC_TREE_SELECT)
+      .order('plot_index', { ascending: true })
+      .range(from, from + TREE_PAGE_SIZE - 1)
+
+    if (error) {
+      throw new Error(error.message || 'Erro ao carregar árvores do Polo Norte.')
+    }
+
+    const batch = (data ?? []) as SupabasePublicTreeRow[]
+    allRows.push(...batch)
+    if (batch.length < TREE_PAGE_SIZE) break
+    from += TREE_PAGE_SIZE
+  }
+
+  const countsRes = await supabase.rpc('get_public_tree_gift_counts')
+  const countRows = countsRes.error
+    ? []
+    : ((countsRes.data ?? []) as SupabasePublicGiftCountRow[])
+
+  const countsByTreeId = new Map<string, Array<{ gift_id: string; gift_count: number }>>()
+  for (const row of countRows) {
+    const list = countsByTreeId.get(row.recipient_tree_id) ?? []
+    list.push({ gift_id: row.gift_id, gift_count: row.gift_count })
+    countsByTreeId.set(row.recipient_tree_id, list)
   }
 
   const occupiedPositions: TreePosition[] = []
   const result: CityTree[] = []
 
-  for (const row of rows) {
-    const position = resolveTreePositionFromPlotIndex(
-      row.plot_index,
-      occupiedPositions,
-      row.github_username,
-    )
-    occupiedPositions.push(position)
-
-    const calendarWeeks = Array.isArray(row.contribution_calendar)
-      ? (row.contribution_calendar as GitHubContributionWeek[])
-      : []
-    const totalCommits = Math.max(0, Math.floor(Number(row.total_commits) || 0))
-    const stage = resolveTreeStage(totalCommits)
-    const isCreator = row.github_username.trim().toLowerCase() === 'saramag25'
-    const syncedAt = row.last_synced_at ?? new Date().toISOString()
-
-    result.push({
-      id: row.id,
-      user_id: row.id,
-      profile: {
-        id: row.id,
-        github_username: row.github_username,
-        github_name: row.display_name || row.github_username,
-        avatar_url: row.avatar_url,
-        created_at: syncedAt,
-      },
-      contribution_count: totalCommits,
-      tree_level: stage.level,
-      tree_position: position,
-      plotIndex: row.plot_index,
-      gifts: giftsByTreeId.get(row.id) ?? [],
-      companion: toCompanionStateFromRow(row),
-      stats: normalizeGitHubContributionStats(
-        {
-          totalContributions: totalCommits,
-          commits: totalCommits,
-          pullRequests: 0,
-          issues: 0,
-          calendarWeeks,
-        },
-        totalCommits,
-      ),
-      custom_message: isCreator ? CREATOR_CAMPAIGN.message : undefined,
-      is_creator_special: isCreator,
-      last_synced_at: syncedAt,
-    })
+  for (const row of allRows) {
+    const rawCounts = countsByTreeId.get(row.id) ?? []
+    const gifts = expandGiftCountsToSummaries(row.id, rawCounts)
+    const tree = mapPublicTreeRowToCityTree(row, gifts, occupiedPositions)
+    occupiedPositions.push(tree.tree_position)
+    result.push(tree)
   }
 
   return result
+}
+
+export async function findPublicTreeByUsername(rawUsername: string): Promise<CityTree | null> {
+  if (!supabase || !isSupabaseConfigured) return null
+  const clean = normalizeGitHubUsernameInput(rawUsername)
+  if (!clean) return null
+
+  const { data, error } = await supabase
+    .from('public_trees')
+    .select(PUBLIC_TREE_SELECT)
+    .eq('github_username_lower', clean.toLowerCase())
+    .maybeSingle<SupabasePublicTreeRow>()
+
+  if (error || !data) return null
+
+  const countsRes = await supabase.rpc('get_public_tree_gift_counts')
+  const countRows = countsRes.error
+    ? []
+    : ((countsRes.data ?? []) as SupabasePublicGiftCountRow[])
+        .filter((r) => r.recipient_tree_id === data.id)
+        .map((r) => ({ gift_id: r.gift_id, gift_count: r.gift_count }))
+
+  const gifts = expandGiftCountsToSummaries(data.id, countRows)
+  return mapPublicTreeRowToCityTree(data, gifts)
 }
 
 export interface OwnerPrivateState {

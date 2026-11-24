@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Check,
   Compass,
@@ -24,24 +24,53 @@ import { STANDARD_CONTRIBUTION_YEAR } from '../config/githubPeriod'
 import { resolveTreeStage, TREE_STAGES } from '../config/treeLevels'
 import { useCity } from '../context/cityContextStore'
 import { useLocale } from '../context/localeContextStore'
+import { normalizeGitHubUsernameInput } from '../services/githubSyncService'
 import {
   SPECIES_COPY,
   TREE_STAGE_COPY,
 } from '../i18n/translations'
 
 export function TreeProfilePage() {
-  const { trees, currentUserTree, isSupabaseReady, isLoadingTrees } = useCity()
+  const { trees, currentUserTree, isSupabaseReady, isLoadingTrees, discoverGitHubTree } = useCity()
   const { language, t } = useLocale()
   const { username = '' } = useParams<{ username: string }>()
   const [showGiftModal, setShowGiftModal] = useState(false)
   const [showCompanionModal, setShowCompanionModal] = useState(false)
   const [showSupportModal, setShowSupportModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [resolvedAttemptKey, setResolvedAttemptKey] = useState<string | null>(null)
 
   const tree = useMemo(() => {
     const normalized = username.trim().toLowerCase()
     return trees.find((tItem) => tItem.profile.github_username.toLowerCase() === normalized)
   }, [trees, username])
+
+  const cleanParamUsername = normalizeGitHubUsernameInput(username)
+  const cleanParamKey = cleanParamUsername?.toLowerCase() ?? null
+  const isResolvingProfile = Boolean(
+    cleanParamKey && !tree && !isLoadingTrees && isSupabaseReady && resolvedAttemptKey !== cleanParamKey,
+  )
+
+  useEffect(() => {
+    if (!cleanParamUsername || !cleanParamKey || tree || isLoadingTrees || !isSupabaseReady) return
+    if (resolvedAttemptKey === cleanParamKey) return
+
+    let active = true
+    void discoverGitHubTree(cleanParamUsername).finally(() => {
+      if (active) setResolvedAttemptKey(cleanParamKey)
+    })
+    return () => {
+      active = false
+    }
+  }, [
+    cleanParamUsername,
+    cleanParamKey,
+    tree,
+    isLoadingTrees,
+    isSupabaseReady,
+    resolvedAttemptKey,
+    discoverGitHubTree,
+  ])
 
   const shareUrl = `${window.location.origin}/tree/${encodeURIComponent(tree?.profile.github_username ?? username)}`
 
@@ -107,7 +136,7 @@ export function TreeProfilePage() {
         ) : undefined
       }
     >
-      {isLoadingTrees && !tree ? (
+      {(isLoadingTrees || isResolvingProfile) && !tree ? (
         <section className="pixel-night-panel rounded-sm p-8 text-center">
           <p className="text-xs text-emerald-300">{t.profile.loadingTrees}</p>
         </section>

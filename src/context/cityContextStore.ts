@@ -23,6 +23,12 @@ export interface TreeGiftActionResult {
   paymentPendingPhase7?: boolean
 }
 
+export interface TreeDiscoveryResult {
+  ok: boolean
+  tree?: CityTree
+  error?: string
+}
+
 export interface CityContextValue {
   trees: readonly CityTree[]
   decorativeTrees: readonly CityTree[]
@@ -36,6 +42,7 @@ export interface CityContextValue {
   connectWithGitHub: () => Promise<boolean>
   resyncMyTree: () => Promise<void>
   refreshCityState: () => Promise<void>
+  discoverGitHubTree: (rawUsername: string) => Promise<TreeDiscoveryResult>
   signOut: () => Promise<void>
   clearAuthError: () => void
   getCompanionLoadout: (username: string) => UserCompanionLoadout

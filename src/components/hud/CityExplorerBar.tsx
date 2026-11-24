@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ExternalLink, MapPin, Search, X } from 'lucide-react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ExternalLink, Globe, Loader2, MapPin, Search, Sparkles, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { resolveTreeStage } from '../../config/treeLevels'
+import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
 import { TREE_STAGE_COPY } from '../../i18n/translations'
+import { normalizeGitHubUsernameInput } from '../../services/githubSyncService'
 import type { CityTree } from '../../types/city'
 import { AvatarBadge } from '../common/AvatarBadge'
 
@@ -22,9 +24,12 @@ export function CityExplorerBar({
   onClose,
   onSelectTree,
 }: CityExplorerBarProps) {
+  const { discoverGitHubTree, isSupabaseReady } = useCity()
   const { language, t } = useLocale()
   const [query, setQuery] = useState('')
   const [stageFilter, setStageFilter] = useState<'all' | 'illuminated'>('all')
+  const [isDiscovering, setIsDiscovering] = useState(false)
+  const [lookupError, setLookupError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -43,32 +48,91 @@ export function CityExplorerBar({
   }, [isOpen, onClose])
 
   const realTrees = useMemo(() => trees.filter((tree) => !tree.isDecorative), [trees])
+  const rawQueryTerm = query.trim().replace(/^@+/, '')
+  const normalizedLower = rawQueryTerm.toLowerCase()
+  const validGithubUsername = normalizeGitHubUsernameInput(rawQueryTerm)
+
+  const exactLocalMatch = useMemo(() => {
+    if (!normalizedLower) return null
+    return (
+      realTrees.find((tree) => tree.profile.github_username.toLowerCase() === normalizedLower) ??
+      null
+    )
+  }, [realTrees, normalizedLower])
 
   const filteredTrees = useMemo(() => {
-    const normalized = query.trim().replace(/^@/, '').toLowerCase()
     const matches = realTrees.filter((tree) => {
       if (stageFilter === 'illuminated' && tree.tree_level < 4) return false
-      if (!normalized) return true
+      if (!normalizedLower) return true
       return (
-        tree.profile.github_username.toLowerCase().includes(normalized) ||
-        tree.profile.github_name.toLowerCase().includes(normalized)
+        tree.profile.github_username.toLowerCase().includes(normalizedLower) ||
+        tree.profile.github_name.toLowerCase().includes(normalizedLower)
       )
     })
 
     return matches
       .slice()
       .sort((a, b) => {
-        if (normalized) {
+        if (normalizedLower) {
           const aUser = a.profile.github_username.toLowerCase()
           const bUser = b.profile.github_username.toLowerCase()
-          const aExact = aUser === normalized ? 0 : aUser.startsWith(normalized) ? 1 : 2
-          const bExact = bUser === normalized ? 0 : bUser.startsWith(normalized) ? 1 : 2
+          const aExact = aUser === normalizedLower ? 0 : aUser.startsWith(normalizedLower) ? 1 : 2
+          const bExact = bUser === normalizedLower ? 0 : bUser.startsWith(normalizedLower) ? 1 : 2
           if (aExact !== bExact) return aExact - bExact
         }
         return b.contribution_count - a.contribution_count
       })
       .slice(0, 40)
-  }, [realTrees, query, stageFilter])
+  }, [realTrees, normalizedLower, stageFilter])
+
+  const handleUniversalLookup = async (usernameToLookup: string) => {
+    if (isDiscovering) return
+    setLookupError(null)
+
+    const clean = normalizeGitHubUsernameInput(usernameToLookup)
+    if (!clean) {
+      setLookupError(t.explorer.invalidUsername)
+      return
+    }
+
+    setIsDiscovering(true)
+    try {
+      const res = await discoverGitHubTree(clean)
+      if (!res.ok || !res.tree) {
+        setLookupError(res.error ?? t.explorer.empty)
+        return
+      }
+      onSelectTree(res.tree)
+      setQuery('')
+      setLookupError(null)
+      onClose()
+    } finally {
+      setIsDiscovering(false)
+    }
+  }
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (exactLocalMatch) {
+      onSelectTree(exactLocalMatch)
+      setQuery('')
+      setLookupError(null)
+      onClose()
+      return
+    }
+
+    if (normalizedLower && validGithubUsername && isSupabaseReady) {
+      void handleUniversalLookup(validGithubUsername)
+      return
+    }
+
+    if (filteredTrees.length === 1 && normalizedLower) {
+      onSelectTree(filteredTrees[0])
+      setQuery('')
+      setLookupError(null)
+      onClose()
+    }
+  }
 
   if (!isOpen) return null
 
@@ -86,7 +150,10 @@ export function CityExplorerBar({
         <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
             <Search className="h-3.5 w-3.5" />
-            <span>$ tree find --devs</span>
+            <span>$ tree find --github</span>
+            <span className="rounded-sm border border-emerald-500/30 bg-emerald-950/70 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+              {realTrees.length.toLocaleString(language)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden text-[10px] text-slate-500 sm:inline">
@@ -103,15 +170,35 @@ export function CityExplorerBar({
           </div>
         </div>
 
-        <div className="mt-2.5">
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t.explorer.placeholder}
-            className="w-full rounded-sm border border-slate-700 bg-[#040811] px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
-          />
+        <form onSubmit={handleSubmit} className="mt-2.5">
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={inputRef}
+              type="text"
+              enterKeyHint="search"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                if (lookupError) setLookupError(null)
+              }}
+              placeholder={t.explorer.placeholder}
+              className="min-w-0 flex-1 rounded-sm border border-slate-700 bg-[#040811] px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
+            />
+            {rawQueryTerm && !exactLocalMatch && validGithubUsername && isSupabaseReady && (
+              <button
+                type="submit"
+                disabled={isDiscovering}
+                className="pixel-btn pixel-btn-pine shrink-0 rounded-sm px-2.5 py-2 text-[11px] font-bold disabled:opacity-60"
+              >
+                {isDiscovering ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Globe className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">{t.explorer.searchGithubCta}</span>
+              </button>
+            )}
+          </div>
 
           <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
             {(
@@ -135,9 +222,55 @@ export function CityExplorerBar({
             ))}
           </div>
 
-          <ul className="mt-2.5 max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
+          {!rawQueryTerm && (
+            <p className="mt-2 text-[10px] leading-snug text-slate-400">
+              {t.explorer.searchGithubHint}
+            </p>
+          )}
+
+          {rawQueryTerm && !exactLocalMatch && validGithubUsername && (
+            <div className="mt-2">
+              {isSupabaseReady ? (
+                <button
+                  type="button"
+                  disabled={isDiscovering}
+                  onClick={() => void handleUniversalLookup(validGithubUsername)}
+                  className="flex w-full items-center justify-between gap-2 rounded-sm border border-emerald-400/55 bg-emerald-950/60 px-3 py-2 text-left text-[11px] text-emerald-200 transition hover:bg-emerald-900/60 disabled:opacity-70 cursor-pointer"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {isDiscovering ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-300" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                    )}
+                    <span className="truncate font-semibold">
+                      {isDiscovering
+                        ? t.explorer.searchingGithub
+                        : `${t.explorer.searchGithubCta}: @${validGithubUsername}`}
+                    </span>
+                  </span>
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                </button>
+              ) : (
+                <p className="rounded-sm border border-slate-800 bg-[#040811]/80 px-2.5 py-2 text-[10px] text-slate-400">
+                  {t.explorer.offlineLookupNote}
+                </p>
+              )}
+            </div>
+          )}
+
+          {lookupError && (
+            <p
+              role="alert"
+              className="mt-2 rounded-sm border border-rose-500/50 bg-rose-950/70 px-2.5 py-1.5 text-[11px] text-rose-200"
+            >
+              {lookupError}
+            </p>
+          )}
+
+          <ul className="mt-2.5 max-h-64 space-y-1.5 overflow-y-auto pr-0.5">
             {filteredTrees.length === 0 ? (
-              <li className="py-5 text-center text-[11px] text-slate-400">{t.explorer.empty}</li>
+              <li className="py-4 text-center text-[11px] text-slate-400">{t.explorer.empty}</li>
             ) : (
               filteredTrees.map((tree) => {
                 const stage = resolveTreeStage(tree.contribution_count)
@@ -199,7 +332,7 @@ export function CityExplorerBar({
               })
             )}
           </ul>
-        </div>
+        </form>
       </div>
     </div>
   )

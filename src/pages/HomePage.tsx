@@ -26,10 +26,12 @@ export function HomePage() {
     session,
     currentUserTree,
     isSupabaseReady,
+    isLoadingTrees,
     isSyncing,
     authError,
     resyncMyTree,
     refreshCityState,
+    discoverGitHubTree,
     signOut,
     clearAuthError,
   } = useCity()
@@ -79,6 +81,7 @@ export function HomePage() {
   const [bootLogVisible, setBootLogVisible] = useState(true)
   const isCityReadyRef = useRef(false)
   const autoFocusedUserRef = useRef<string | null>(null)
+  const focusHandledRef = useRef<string | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setBootLogVisible(false), 4500)
@@ -194,23 +197,36 @@ export function HomePage() {
   }, [])
 
   useEffect(() => {
-    if (!focusParam) return
+    if (!focusParam || isLoadingTrees) return
+    if (focusHandledRef.current === focusParam) return
 
-    const focusNow = () => {
+    const focusNow = async () => {
+      if (focusHandledRef.current === focusParam) return
+      focusHandledRef.current = focusParam
+      const cleanParam = focusParam.trim().replace(/^@+/, '').toLowerCase()
+      const alreadyLoaded = trees.some(
+        (item) => !item.isDecorative && item.profile.github_username.toLowerCase() === cleanParam,
+      )
+      if (!alreadyLoaded && isSupabaseReady) {
+        await discoverGitHubTree(focusParam)
+      }
       gameEventBus.emit('city:focus-tree', focusParam)
       setSearchParams({}, { replace: true })
     }
 
     if (isCityReadyRef.current) {
-      focusNow()
+      void focusNow()
       return
     }
 
-    const unsubReady = gameEventBus.on('city:ready', focusNow)
+    const onReady = () => {
+      void focusNow()
+    }
+    const unsubReady = gameEventBus.on('city:ready', onReady)
     return () => {
       unsubReady()
     }
-  }, [focusParam, setSearchParams])
+  }, [focusParam, isLoadingTrees, trees, isSupabaseReady, discoverGitHubTree, setSearchParams])
 
   const handleFocusMyTree = () => {
     setWelcomeMode('closed')
@@ -229,6 +245,24 @@ export function HomePage() {
     setPropDialogue(null)
     gameEventBus.emit('city:focus-creator')
   }
+
+  const handleExploreRandomTree = () => {
+    const realTrees = trees.filter((item) => !item.isDecorative)
+    if (realTrees.length === 0) return
+    const candidates =
+      realTrees.length > 1 && activeSelectedTree
+        ? realTrees.filter((item) => item.id !== activeSelectedTree.id)
+        : realTrees
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)] ?? realTrees[0]
+    if (!chosen) return
+    setWelcomeMode('closed')
+    setShowSearch(false)
+    setPropDialogue(null)
+    setSelectedTree(chosen)
+    gameEventBus.emit('city:focus-tree', chosen.profile.github_username)
+  }
+
+  const realTreesCount = trees.filter((item) => !item.isDecorative).length
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#0a1633]">
@@ -438,11 +472,15 @@ export function HomePage() {
 
       <CameraControls
         hoveredTree={hoveredTree}
+        totalTreesCount={realTreesCount}
+        hasMyTree={Boolean(currentUserTree)}
         onZoomIn={() => gameEventBus.emit('city:zoom-in')}
         onZoomOut={() => gameEventBus.emit('city:zoom-out')}
         onOrbitLeft={() => gameEventBus.emit('city:orbit-left')}
         onOrbitRight={() => gameEventBus.emit('city:orbit-right')}
         onResetCamera={() => gameEventBus.emit('city:reset-camera')}
+        onExploreRandom={handleExploreRandomTree}
+        onFocusMyTree={handleFocusMyTree}
       />
 
       {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} />}

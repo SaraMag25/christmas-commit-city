@@ -157,6 +157,8 @@ export interface SupabasePublicTreeRow {
   equipped_body_id: string | null
   equipped_hand_id: string | null
   last_synced_at: string | null
+  claimed?: boolean
+  github_username_lower?: string
 }
 
 export interface SupabasePrivateTreeRow {

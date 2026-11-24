@@ -8,6 +8,8 @@ import { useLocale } from '../../context/localeContextStore'
 import { hashUsername } from '../../game/layout/treePlacement'
 import { resolveTreeTheme } from '../../game/voxel/voxelTreeBuilder'
 import {
+  ACCESSORY_COPY,
+  SLOT_LABELS_BY_LANG,
   SPECIES_COPY,
   TREE_STAGE_COPY,
 } from '../../i18n/translations'
@@ -70,9 +72,23 @@ export function TreeDetailsPanel({
   const levelFormatted = String(stage.level).padStart(2, '0')
   const statusLabel = tree.is_creator_special
     ? t.treePanel.creatorStatus
-    : tree.contribution_count > 0
-      ? 'ACTIVE'
-      : 'SEEDLING'
+    : tree.claimed === false
+      ? t.treePanel.unclaimedStatus
+      : tree.contribution_count > 0
+        ? 'ACTIVE'
+        : 'SEEDLING'
+
+  const accessoryCopy = ACCESSORY_COPY[language]
+  const slotLabels = SLOT_LABELS_BY_LANG[language]
+  const equippedAccessoryEntries = (
+    [
+      ['head', tree.companion?.equipped.head],
+      ['body', tree.companion?.equipped.body],
+      ['hand', tree.companion?.equipped.hand],
+    ] as const
+  )
+    .map(([slot, id]) => (id ? { slot: slotLabels[slot], name: accessoryCopy[id].name } : null))
+    .filter((entry): entry is { slot: string; name: string } => entry !== null)
 
   const handleCopyShareLink = async () => {
     const shareUrl = `${window.location.origin}/tree/${encodeURIComponent(tree.profile.github_username)}`
@@ -225,12 +241,24 @@ export function TreeDetailsPanel({
         </div>
       )}
 
-      {/* Companion Summary */}
+      {/* Companion Summary & Equipped Items */}
       <div className="mt-3.5 rounded-sm border border-slate-800 bg-[#040811]/85 p-2.5 text-[11px]">
         <span className="flex items-center gap-1.5 font-semibold text-slate-200">
           <PawPrint className="h-3.5 w-3.5 text-amber-300" />
           <span>{companionName ?? t.treePanel.companionNone}</span>
         </span>
+        {equippedAccessoryEntries.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1 border-t border-slate-800/80 pt-2">
+            {equippedAccessoryEntries.map((item) => (
+              <span
+                key={`${item.slot}:${item.name}`}
+                className="rounded-sm border border-slate-700/80 bg-slate-900/75 px-1.5 py-0.5 text-[10px] text-slate-300"
+              >
+                <span className="text-slate-500">{item.slot}:</span> {item.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Gifts Received */}

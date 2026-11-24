@@ -7,10 +7,18 @@ import type {
   ProfileSummary,
   TreeLevelId,
 } from '../types/city'
+import type { SupabasePublicTreeRow } from '../types/companion'
 import { parseEdgeFunctionError } from './edgeFunctionError'
 import { isSupabaseConfigured, supabase } from './supabaseClient'
 
 const PROVIDER_TOKEN_SESSION_KEY = 'ccc_gh_provider_token_v1'
+export const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/
+
+export function normalizeGitHubUsernameInput(raw: string): string | null {
+  const clean = raw.trim().replace(/^@+/, '').trim()
+  if (!GITHUB_USERNAME_REGEX.test(clean)) return null
+  return clean
+}
 
 export interface SessionGitHubUser {
   username: string
@@ -387,4 +395,78 @@ export async function syncAuthenticatedGitHubTree(
     stats: normalizedStats,
     treeLevel: resolvedStage.level,
   }
+}
+
+export interface ResolvePublicGitHubTreeResult {
+  tree: SupabasePublicTreeRow
+  giftCounts: Array<{ gift_id: string; gift_count: number }>
+  alreadyExists: boolean
+  periodYear: number
+}
+
+export async function resolvePublicGitHubTree(
+  rawUsername: string,
+): Promise<ResolvePublicGitHubTreeResult> {
+  if (!supabase || !isSupabaseConfigured) {
+    throw new Error('SUPABASE_NOT_CONFIGURED')
+  }
+
+  const cleanUsername = normalizeGitHubUsernameInput(rawUsername)
+  if (!cleanUsername) {
+    throw new Error('Nome de usuário do GitHub inválido.')
+  }
+
+  const { year } = getStandardContributionWindow()
+  const { data, error } = await supabase.functions.invoke<ResolvePublicGitHubTreeResult>(
+    'resolve-github-tree',
+    {
+      body: {
+        username: cleanUsername,
+        year,
+      },
+    },
+  )
+
+  if (error) {
+    const detail = await parseEdgeFunctionError(error, 'resolve-github-tree')
+
+    if (detail.isFetchError) {
+      throw new Error(
+        `Não foi possível conectar à Edge Function resolve-github-tree para ${window.location.origin}. Confira ALLOWED_ORIGINS no Supabase.`,
+      )
+    }
+
+    if (detail.status === 404 && detail.code !== 'GITHUB_USER_NOT_FOUND') {
+      throw new Error(
+        'Edge Function "resolve-github-tree" não encontrada (HTTP 404). Execute: npx supabase functions deploy resolve-github-tree --no-verify-jwt.',
+      )
+    }
+
+    if (detail.code === 'GITHUB_USER_NOT_FOUND') {
+      throw new Error(`Usuário "@${cleanUsername}" não encontrado no GitHub.`)
+    }
+
+    if (detail.code === 'MISSING_GITHUB_TOKEN' || detail.status === 503) {
+      throw new Error(
+        detail.serverMessage ||
+          'Secret GITHUB_TOKEN não configurado no Supabase (npx supabase secrets set GITHUB_TOKEN=...).',
+      )
+    }
+
+    if (detail.status === 429 || detail.code === 'RATE_LIMITED' || detail.code === 'GITHUB_RATE_LIMITED') {
+      throw new Error(
+        'Muitas buscas consecutivas no GitHub agora. Aguarde um minuto e tente novamente.',
+      )
+    }
+
+    throw new Error(
+      detail.serverMessage || `Não foi possível buscar "@${cleanUsername}" no GitHub.`,
+    )
+  }
+
+  if (!data || !data.tree || typeof data.tree.github_username !== 'string') {
+    throw new Error('Resposta inválida ao buscar usuário no GitHub.')
+  }
+
+  return data
 }

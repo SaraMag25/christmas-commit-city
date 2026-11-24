@@ -365,6 +365,112 @@ function buildSpacedForestPlots(): TreePosition[] {
 export const CURATED_TREE_PLOTS: readonly TreePosition[] = buildSpacedForestPlots()
 
 /**
+ * Curated inner-village plots ordered radially outward from the North Pole plaza
+ * so early community trees fill the cozy central village first before expanding outward.
+ */
+export const CENTERED_CURATED_PLOTS: readonly TreePosition[] = [...CURATED_TREE_PLOTS].sort(
+  (a, b) => {
+    const cx = CITY_MAP_CONFIG.plazaCenter.gridX
+    const cy = CITY_MAP_CONFIG.plazaCenter.gridY
+    const da = Math.hypot(a.gridX - cx, a.gridY - cy)
+    const db = Math.hypot(b.gridX - cx, b.gridY - cy)
+    return da - db
+  },
+)
+
+const OUTER_STEP_X = 2.15
+const OUTER_STEP_Y = 1.86
+const outerSpiralCache: TreePosition[] = []
+let generatedOuterRingLimit = 0
+
+function isInsideInnerVillageOrMountains(gx: number, gy: number): boolean {
+  const { cols, rows, skyRows } = CITY_MAP_CONFIG
+  const inInnerVillage =
+    gx >= -1.2 && gx <= cols + 0.4 && gy >= skyRows - 1.2 && gy <= rows + 0.4
+  const inNorthernMountains =
+    gx >= -7.0 && gx <= cols + 7.0 && gy >= skyRows - 6.8 && gy <= skyRows - 0.5
+  return inInnerVillage || inNorthernMountains
+}
+
+function ensureOuterSpiralCapacity(minLength: number): void {
+  if (outerSpiralCache.length >= minLength) return
+
+  const cx = CITY_MAP_CONFIG.plazaCenter.gridX
+  const cy = CITY_MAP_CONFIG.plazaCenter.gridY
+
+  while (outerSpiralCache.length < minLength) {
+    const prevRing = generatedOuterRingLimit
+    const nextRing = Math.max(prevRing + 18, 28)
+    const batch: Array<{ gridX: number; gridY: number; radius: number; angle: number }> = []
+
+    const maxRow = Math.ceil((nextRing + 20) / OUTER_STEP_Y) + 4
+    const maxCol = Math.ceil((nextRing + 24) / OUTER_STEP_X) + 4
+
+    for (let r = -maxRow; r <= maxRow; r += 1) {
+      const gy = Number((cy + r * OUTER_STEP_Y).toFixed(2))
+      const staggerX = Math.abs(r) % 2 === 1 ? OUTER_STEP_X * 0.5 : 0
+      for (let c = -maxCol; c <= maxCol; c += 1) {
+        const gx = Number((cx + c * OUTER_STEP_X + staggerX).toFixed(2))
+        const radius = Math.hypot((gx - cx) * 0.86, gy - cy)
+        if (radius <= prevRing || radius > nextRing) continue
+        if (isInsideInnerVillageOrMountains(gx, gy)) continue
+        batch.push({
+          gridX: gx,
+          gridY: gy,
+          radius,
+          angle: Math.atan2(gy - cy, gx - cx),
+        })
+      }
+    }
+
+    batch.sort((a, b) => {
+      const bucketA = Math.round(a.radius / 1.9)
+      const bucketB = Math.round(b.radius / 1.9)
+      if (bucketA !== bucketB) return bucketA - bucketB
+      if (Math.abs(a.angle - b.angle) > 0.001) return a.angle - b.angle
+      return a.radius - b.radius
+    })
+
+    for (let i = 0; i < batch.length; i += 1) {
+      outerSpiralCache.push({ gridX: batch[i].gridX, gridY: batch[i].gridY })
+    }
+    generatedOuterRingLimit = nextRing
+  }
+}
+
+/**
+ * Deterministic, collision-free spiral city plot lookup for ANY plotIndex >= 0.
+ * Fills inner North Pole lots first, then expands infinitely in concentric hex rings.
+ */
+export function getSpiralPlotPosition(plotIndex: number): TreePosition {
+  const safeIndex = Math.max(0, Math.floor(plotIndex))
+  if (safeIndex < CENTERED_CURATED_PLOTS.length) {
+    return CENTERED_CURATED_PLOTS[safeIndex]
+  }
+  const outerIdx = safeIndex - CENTERED_CURATED_PLOTS.length
+  ensureOuterSpiralCapacity(outerIdx + 1)
+  return outerSpiralCache[outerIdx]
+}
+
+export function isTreePlacementClear(
+  x: number,
+  y: number,
+  occupiedPositions: readonly TreePosition[],
+  minDistGrid = MIN_TREE_SPACING_GRID,
+): boolean {
+  const minDistSq = minDistGrid * minDistGrid
+  for (let i = 0; i < occupiedPositions.length; i += 1) {
+    const pos = occupiedPositions[i]
+    const dx = pos.gridX - x
+    const dy = pos.gridY - y
+    if (dx * dx + dy * dy < minDistSq) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
  * Selects `targetCount` plots evenly distributed across the entire north-to-south
  * and west-to-east forest span so center and outer regions maintain balanced spacing.
  */
@@ -386,41 +492,20 @@ export function selectStratifiedTreePlots(
 }
 
 /**
- * Allocates the next free non-overlapping plot in the North Pole forest honoring MIN_TREE_SPACING_GRID.
+ * Allocates the next free non-overlapping plot in the expanding city spiral
+ * honoring MIN_TREE_SPACING_GRID without ever collapsing onto duplicate coordinates.
  */
 export function allocateTreePosition(
   occupiedPositions: readonly TreePosition[],
-  username: string,
+  _username?: string,
 ): TreePosition {
-  const minDistSq = MIN_TREE_SPACING_GRID * MIN_TREE_SPACING_GRID
-  const isOccupied = (x: number, y: number) =>
-    occupiedPositions.some((pos) => {
-      const dx = pos.gridX - x
-      const dy = pos.gridY - y
-      return dx * dx + dy * dy < minDistSq
-    })
-
-  for (const slot of CURATED_TREE_PLOTS) {
-    if (!isOccupied(slot.gridX, slot.gridY)) {
-      return slot
+  void _username
+  const maxProbe = occupiedPositions.length + CENTERED_CURATED_PLOTS.length + 256
+  for (let idx = 0; idx < maxProbe; idx += 1) {
+    const candidate = getSpiralPlotPosition(idx)
+    if (isTreePlacementClear(candidate.gridX, candidate.gridY, occupiedPositions)) {
+      return candidate
     }
   }
-
-  // Fallback denser search still honoring strict minimum Euclidean tree spacing
-  const seed = hashUsername(username)
-  for (let attempt = 0; attempt < 600; attempt += 1) {
-    const gx = Number((1.5 + (((seed + attempt * 17) % ((CITY_MAP_CONFIG.cols - 3) * 10)) / 10)).toFixed(2))
-    const gy = Number(
-      (
-        CITY_MAP_CONFIG.skyRows +
-        1.4 +
-        (((seed + attempt * 23) % ((CITY_MAP_CONFIG.rows - 4) * 10)) / 10)
-      ).toFixed(2),
-    )
-    if (!isBlockedForTree(gx, gy) && !isOccupied(gx, gy)) {
-      return { gridX: gx, gridY: gy }
-    }
-  }
-
-  return { gridX: 4, gridY: 6 }
+  return getSpiralPlotPosition(occupiedPositions.length + CENTERED_CURATED_PLOTS.length)
 }

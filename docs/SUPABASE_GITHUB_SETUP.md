@@ -52,8 +52,9 @@ As variáveis `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` 
 # Origens permitidas para CORS em produção (separadas por vírgula)
 npx supabase secrets set ALLOWED_ORIGINS="https://seu-dominio.com,http://localhost:5173"
 
-# Token clássico read-only opcional para re-sincronizações após refresh de sessão
-npx supabase secrets set GITHUB_READONLY_TOKEN="ghp_seu_token_apenas_leitura"
+# Token de leitura pública do GitHub para busca universal de qualquer @username (`resolve-github-tree`)
+# e fallback de re-sincronização (`sync-github-contributions`)
+npx supabase secrets set GITHUB_TOKEN="github_pat_seu_token_leitura_publica"
 
 # Segredos da Fase 7 — Pagamentos Reais (Pix Mercado Pago + Cartão Internacional Stripe)
 npx supabase secrets set MERCADOPAGO_ACCESS_TOKEN="APP_USR-seu-token"
@@ -76,12 +77,21 @@ npx supabase link --project-ref <seu-project-ref>
 # 2. Aplicar todas as migrations SQL (Fase 6 + Fase 7 preços/pagamentos)
 npx supabase db push
 
-# 3. Fazer deploy das Edge Functions (validação JWT interna + webhooks HMAC)
+# 3. Fazer deploy das Edge Functions (validação JWT interna + webhooks HMAC + busca universal)
 npx supabase functions deploy sync-github-contributions --no-verify-jwt
+npx supabase functions deploy resolve-github-tree --no-verify-jwt
 npx supabase functions deploy create-pix-payment --no-verify-jwt
 npx supabase functions deploy webhook-mercadopago --no-verify-jwt
 npx supabase functions deploy create-stripe-checkout --no-verify-jwt
 npx supabase functions deploy webhook-stripe --no-verify-jwt
+```
+
+### Seed inicial da cidade (150–250 contas reais do GitHub)
+
+Com as variáveis `VITE_SUPABASE_URL` (ou `SUPABASE_URL`), `SUPABASE_SERVICE_ROLE_KEY` e `GITHUB_TOKEN` disponíveis no shell ou `.env`:
+
+```bash
+npm run seed:city
 ```
 
 ### URLs dos Webhooks (Fase 7)
