@@ -100,7 +100,7 @@ npm run seed:city
 - **Stripe (`webhook-stripe`):**
   `https://<seu-project-ref>.supabase.co/functions/v1/webhook-stripe` (eventos **`checkout.session.completed`**, **`checkout.session.async_payment_succeeded`**, **`checkout.session.expired`** e **`checkout.session.async_payment_failed`**; copie o signing secret `whsec_...` para `STRIPE_WEBHOOK_SECRET`).
 
-> **Alternativa pelo painel Web:** caso prefira aplicar o SQL manualmente, cole [`supabase/migrations/20261122_phase6_secure_backend.sql`](../supabase/migrations/20261122_phase6_secure_backend.sql), depois [`supabase/migrations/2026112301_phase7_prices_and_payments.sql`](../supabase/migrations/2026112301_phase7_prices_and_payments.sql) e por fim [`supabase/migrations/2026112302_bump_shop_brl_prices.sql`](../supabase/migrations/2026112302_bump_shop_brl_prices.sql) no **SQL Editor** do Supabase.
+> **Alternativa pelo painel Web:** caso prefira aplicar o SQL manualmente, execute todas as migrations em `supabase/migrations/` em ordem cronológica no **SQL Editor** do Supabase (incluindo [`2026112504_pix_exclusive_items.sql`](../supabase/migrations/2026112504_pix_exclusive_items.sql) e [`2026112505_creator_full_unlock.sql`](../supabase/migrations/2026112505_creator_full_unlock.sql)).
 
 ---
 
@@ -110,11 +110,12 @@ npm run seed:city
    - **Framework preset:** Vite
    - **Build command:** `npm run build`
    - **Build output directory:** `dist`
-2. O arquivo [`public/_redirects`](../public/_redirects) (`/* /index.html 200`) já garante que rotas SPA (`/tree/:username`, `/rankings`) funcionem diretamente ao recarregar.
+2. O arquivo [`public/_redirects`](../public/_redirects) (`/* /index.html 200`) garante rotas SPA e [`functions/tree/[username].ts`](../functions/tree/%5Busername%5D.ts) injeta meta tags Open Graph/Twitter dinâmicas em `/tree/:username`.
 3. Adicione em **Settings → Environment variables** (Production) apenas variáveis públicas `VITE_*`:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_CONTRIBUTION_YEAR=2026`
+   - `VITE_SITE_URL` (opcional, origem canônica pública ex.: `https://christmas-commit-city.pages.dev`)
    - Opcionais de campanha: `VITE_PIX_KEY`, `VITE_PIX_BR_CODE`, `VITE_PIX_RECIPIENT_NAME`, `VITE_PIX_RECIPIENT_CITY`
 4. Ao ativar seu domínio próprio (ex.: `https://seu-dominio.com`), atualize:
    - **GitHub OAuth App** (Homepage URL) e **Supabase → Authentication → URL Configuration** (`Site URL` + `Redirect URLs`).

@@ -9,9 +9,12 @@ import {
   EMPTY_EQUIPPED_ACCESSORIES,
   getAccessoryById,
   getSpeciesById,
+  isCatalogItemUnlocked,
+  isCreatorGithubUsername,
   sanitizeCompanionName,
+  withCreatorFullUnlock,
 } from '../config/companions'
-import { normalizeTreeGiftSummary } from '../config/gifts'
+import { GIFTS_CATALOG, normalizeTreeGiftSummary } from '../config/gifts'
 import { SUPPORTER_BUNDLE } from '../config/supportCampaign'
 import { MOCK_CITY_TREES } from '../data/mockCityData'
 import { gameEventBus } from '../game/eventBus'
@@ -41,6 +44,7 @@ import {
   resolveTreePositionFromPlotIndex,
   rpcEquipCompanionLoadout,
   rpcSendFreeGift,
+  rpcSendUnlockedGift,
   rpcUnlockItemWithCommits,
 } from '../services/supabaseCityService'
 import type { CityTree, GiftItem, TreeGiftSummary } from '../types/city'
@@ -129,7 +133,11 @@ function buildSeededLoadoutFromTree(tree: CityTree): UserCompanionLoadout | null
   const pixIds: string[] = []
   const transactions: CompanionTransactionRecord[] = []
 
-  if (tree.contribution_count >= species.priceCommits) {
+  if (
+    !species.pixOnly &&
+    species.priceCommits !== null &&
+    tree.contribution_count >= species.priceCommits
+  ) {
     runningSpent += species.priceCommits
     transactions.push({
       id: `seed-sp-${tree.id}`,
@@ -160,7 +168,11 @@ function buildSeededLoadoutFromTree(tree: CityTree): UserCompanionLoadout | null
   for (const accId of unlockedAccessories) {
     const item = getAccessoryById(accId)
     if (!item) continue
-    if (runningSpent + item.priceCommits <= tree.contribution_count) {
+    if (
+      !item.pixOnly &&
+      item.priceCommits !== null &&
+      runningSpent + item.priceCommits <= tree.contribution_count
+    ) {
       runningSpent += item.priceCommits
       transactions.push({
         id: `seed-acc-${tree.id}-${accId}`,
@@ -189,18 +201,20 @@ function buildSeededLoadoutFromTree(tree: CityTree): UserCompanionLoadout | null
     }
   }
 
-  return {
+  const seededLoadout: UserCompanionLoadout = {
     species: species.id,
     customName: sanitizeCompanionName(tree.companion.customName),
     equipped,
     unlockedSpecies: [species.id],
     unlockedAccessories,
+    unlockedGifts: [],
     spentCommits: runningSpent,
     supporterBundleUnlocked: false,
     unlockedViaPixIds: pixIds,
     transactions,
     updatedAt: tree.last_synced_at,
   }
+  return withCreatorFullUnlock(tree.profile.github_username, seededLoadout)
 }
 
 function migrateStoredSpeciesId(raw: string | null | undefined): CompanionSpeciesId | null {
@@ -234,6 +248,11 @@ function normalizeStoredLoadout(raw: UserCompanionLoadout): UserCompanionLoadout
     tx.itemType === 'species' && tx.itemId === 'duckling' ? { ...tx, itemId: 'snake' } : tx,
   )
 
+  const validGiftIds = new Set(GIFTS_CATALOG.map((g) => g.id))
+  const unlockedGifts = Array.from(
+    new Set((raw.unlockedGifts ?? []).filter((id) => validGiftIds.has(id))),
+  )
+
   return {
     ...raw,
     species,
@@ -245,6 +264,7 @@ function normalizeStoredLoadout(raw: UserCompanionLoadout): UserCompanionLoadout
     },
     unlockedSpecies,
     unlockedAccessories,
+    unlockedGifts,
     unlockedViaPixIds,
     transactions,
   }
@@ -286,7 +306,11 @@ function buildInitialMockLoadouts(): Record<string, UserCompanionLoadout> {
     }
   }
   const stored = readStoredLoadouts()
-  return { ...initial, ...stored }
+  const merged = { ...initial, ...stored }
+  for (const [key, value] of Object.entries(merged)) {
+    merged[key] = withCreatorFullUnlock(key, value)
+  }
+  return merged
 }
 
 function toTreeCompanionState(loadout: UserCompanionLoadout | undefined): TreeCompanionState | undefined {
@@ -553,8 +577,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
           const ownerTreeId = ownerState.treeRow.id
           protectedSwapIdsRef.current.add(ownerTreeId)
           const matchedTree = publicTrees.find((t) => t.id === ownerTreeId)
-          if (matchedTree && ownerState.loadout) {
-            const key = matchedTree.profile.github_username.toLowerCase()
+          const ownerUsernameForLoadout =
+            matchedTree?.profile.github_username ?? ownerState.treeRow.github_username
+          if (ownerUsernameForLoadout && ownerState.loadout) {
+            const key = ownerUsernameForLoadout.toLowerCase()
             const nextLoadouts = {
               ...loadoutsRef.current,
               [key]: ownerState.loadout,
@@ -631,18 +657,19 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const applyOfflineLoadoutUpdate = useCallback(
     (username: string, nextLoadout: UserCompanionLoadout) => {
       const key = username.trim().toLowerCase()
+      const hydrated = withCreatorFullUnlock(username, {
+        ...nextLoadout,
+        updatedAt: new Date().toISOString(),
+      })
       const nextMap = {
         ...loadoutsRef.current,
-        [key]: {
-          ...nextLoadout,
-          updatedAt: new Date().toISOString(),
-        },
+        [key]: hydrated,
       }
       loadoutsRef.current = nextMap
       setLoadoutsByUsername(nextMap)
       persistLoadouts(nextMap)
 
-      const nextCompanion = toTreeCompanionState(nextLoadout)
+      const nextCompanion = toTreeCompanionState(hydrated)
       setTrees((prevTrees) => {
         const nextTrees = prevTrees.map((t) =>
           t.profile.github_username.toLowerCase() === key
@@ -659,7 +686,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const getCompanionLoadout = useCallback(
     (username: string): UserCompanionLoadout => {
       const key = username.trim().toLowerCase()
-      return loadoutsByUsername[key] ?? DEFAULT_EMPTY_LOADOUT
+      const existing = loadoutsByUsername[key]
+      if (existing) return existing
+      if (!isSupabaseConfigured && isCreatorGithubUsername(key)) {
+        return withCreatorFullUnlock(key, DEFAULT_EMPTY_LOADOUT)
+      }
+      return DEFAULT_EMPTY_LOADOUT
     },
     [loadoutsByUsername],
   )
@@ -696,8 +728,19 @@ export function CityProvider({ children }: { children: ReactNode }) {
           return { ok: false, error: 'Conecte sua conta GitHub para personalizar seu companheiro.' }
         }
 
-        const alreadyOwned =
-          current.unlockedSpecies.includes(speciesId) || current.supporterBundleUnlocked
+        const alreadyOwned = isCatalogItemUnlocked(
+          species,
+          current.unlockedSpecies,
+          speciesId,
+          current.supporterBundleUnlocked,
+        )
+
+        if (!alreadyOwned && method === 'commits' && (species.pixOnly || species.priceCommits === null)) {
+          return {
+            ok: false,
+            error: 'Este item é exclusivo via Pix / Dinheiro e não pode ser comprado com commits.',
+          }
+        }
 
         if (!alreadyOwned && method !== 'commits') {
           return {
@@ -728,7 +771,14 @@ export function CityProvider({ children }: { children: ReactNode }) {
       }
 
       // Offline local preview mode
-      if (current.unlockedSpecies.includes(speciesId) || current.supporterBundleUnlocked) {
+      if (
+        isCatalogItemUnlocked(
+          species,
+          current.unlockedSpecies,
+          speciesId,
+          current.supporterBundleUnlocked,
+        )
+      ) {
         applyOfflineLoadoutUpdate(username, {
           ...current,
           species: speciesId,
@@ -740,6 +790,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       }
 
       if (method === 'commits') {
+        if (species.pixOnly || species.priceCommits === null) {
+          return {
+            ok: false,
+            error: 'Este item é exclusivo via Pix / Dinheiro e não pode ser comprado com commits.',
+          }
+        }
         const available = computeAvailableCommits(
           targetTree.contribution_count,
           current.spentCommits,
@@ -814,8 +870,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const current = loadoutsRef.current[key] ?? createEmptyCompanionLoadout()
       if (
         speciesId &&
-        !current.unlockedSpecies.includes(speciesId) &&
-        !current.supporterBundleUnlocked
+        !isCatalogItemUnlocked(
+          getSpeciesById(speciesId),
+          current.unlockedSpecies,
+          speciesId,
+          current.supporterBundleUnlocked,
+        )
       ) {
         return { ok: false, error: 'Espécie ainda não desbloqueada.' }
       }
@@ -876,8 +936,19 @@ export function CityProvider({ children }: { children: ReactNode }) {
         if (!session?.user?.id || authenticatedUsername?.toLowerCase() !== key) {
           return { ok: false, error: 'Conecte sua conta GitHub para desbloquear acessórios.' }
         }
-        const alreadyOwned =
-          current.unlockedAccessories.includes(accessoryId) || current.supporterBundleUnlocked
+        const alreadyOwned = isCatalogItemUnlocked(
+          item,
+          current.unlockedAccessories,
+          accessoryId,
+          current.supporterBundleUnlocked,
+        )
+
+        if (!alreadyOwned && method === 'commits' && (item.pixOnly || item.priceCommits === null)) {
+          return {
+            ok: false,
+            error: 'Este item é exclusivo via Pix / Dinheiro e não pode ser comprado com commits.',
+          }
+        }
 
         if (!alreadyOwned && method !== 'commits') {
           return {
@@ -907,7 +978,14 @@ export function CityProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (current.unlockedAccessories.includes(accessoryId) || current.supporterBundleUnlocked) {
+      if (
+        isCatalogItemUnlocked(
+          item,
+          current.unlockedAccessories,
+          accessoryId,
+          current.supporterBundleUnlocked,
+        )
+      ) {
         applyOfflineLoadoutUpdate(username, {
           ...current,
           equipped: nextEquipped,
@@ -919,6 +997,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       }
 
       if (method === 'commits') {
+        if (item.pixOnly || item.priceCommits === null) {
+          return {
+            ok: false,
+            error: 'Este item é exclusivo via Pix / Dinheiro e não pode ser comprado com commits.',
+          }
+        }
         const available = computeAvailableCommits(
           targetTree.contribution_count,
           current.spentCommits,
@@ -989,8 +1073,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const current = loadoutsRef.current[key] ?? createEmptyCompanionLoadout()
       if (
         accessoryId !== null &&
-        !current.unlockedAccessories.includes(accessoryId) &&
-        !current.supporterBundleUnlocked
+        !isCatalogItemUnlocked(
+          getAccessoryById(accessoryId),
+          current.unlockedAccessories,
+          accessoryId,
+          current.supporterBundleUnlocked,
+        )
       ) {
         return { ok: false, error: 'Acessório ainda não desbloqueado.' }
       }
@@ -1047,8 +1135,14 @@ export function CityProvider({ children }: { children: ReactNode }) {
       if (!targetTree) return { ok: false, error: 'Árvore não encontrada.' }
 
       const current = loadoutsRef.current[key] ?? createEmptyCompanionLoadout()
-      const allSpecies = COMPANION_SPECIES_CATALOG.map((s) => s.id)
-      const allAccessories = COMPANION_ACCESSORIES_CATALOG.map((a) => a.id)
+      const allClassicSpecies = COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).map((s) => s.id)
+      const allClassicAccessories = COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).map(
+        (a) => a.id,
+      )
+      const allSpecies = Array.from(new Set([...current.unlockedSpecies, ...allClassicSpecies]))
+      const allAccessories = Array.from(
+        new Set([...current.unlockedAccessories, ...allClassicAccessories]),
+      )
       const provider = currency === 'USD' ? 'international' : 'pix'
       const amount = currency === 'USD' ? SUPPORTER_BUNDLE.priceUsd : SUPPORTER_BUNDLE.priceBrl
       const bundleKey = `bundle:${SUPPORTER_BUNDLE.id}`
@@ -1126,17 +1220,27 @@ export function CityProvider({ children }: { children: ReactNode }) {
       if (!key) return { ok: false, error: 'Destinatário inválido.' }
 
       if (isSupabaseConfigured) {
-        if (gift.category !== 'free') {
+        if (!session?.user?.id) {
+          return {
+            ok: false,
+            error:
+              gift.category === 'free'
+                ? 'Conecte sua conta GitHub primeiro para enviar presentes gratuitos.'
+                : 'Conecte sua conta GitHub primeiro para enviar presentes.',
+          }
+        }
+        const viewerKey = authenticatedUsername?.trim().toLowerCase() ?? ''
+        const viewerLoadout = viewerKey ? loadoutsRef.current[viewerKey] : undefined
+        const hasUnlockedGift =
+          gift.category === 'free' ||
+          Boolean(viewerLoadout?.unlockedGifts?.includes(gift.id)) ||
+          isCreatorGithubUsername(authenticatedUsername)
+
+        if (!hasUnlockedGift) {
           return {
             ok: false,
             paymentPendingPhase7: true,
             error: PAID_CHECKOUT_PHASE7_MSG,
-          }
-        }
-        if (!session?.user?.id) {
-          return {
-            ok: false,
-            error: 'Conecte sua conta GitHub primeiro para enviar presentes gratuitos.',
           }
         }
         const targetTree = treesRef.current.find(
@@ -1147,7 +1251,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
         }
 
         try {
-          const res = await rpcSendFreeGift(targetTree.id, gift.id)
+          const res =
+            gift.category === 'free'
+              ? await rpcSendFreeGift(targetTree.id, gift.id)
+              : await rpcSendUnlockedGift(targetTree.id, gift.id)
           const confirmedGift: TreeGiftSummary = {
             id: res.id,
             gift_id: gift.id,

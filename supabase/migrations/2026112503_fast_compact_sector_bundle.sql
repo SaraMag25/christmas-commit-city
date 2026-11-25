@@ -101,20 +101,27 @@ as $$
     from selected s
     join public.trees t on t.id = s.id
   ),
+  gift_counts as (
+    select
+      tg.recipient_tree_id,
+      tg.gift_id,
+      count(*)::integer as n
+    from public.tree_gifts tg
+    where tg.recipient_tree_id in (select id from selected)
+    group by tg.recipient_tree_id, tg.gift_id
+  ),
   gifts_json as (
     select coalesce(
       jsonb_agg(
         jsonb_build_object(
-          'r', tg.recipient_tree_id,
-          'g', tg.gift_id,
-          'n', count(*)::integer
+          'r', gc.recipient_tree_id,
+          'g', gc.gift_id,
+          'n', gc.n
         )
       ),
       '[]'::jsonb
     ) as items
-    from public.tree_gifts tg
-    where tg.recipient_tree_id in (select id from selected)
-    group by tg.recipient_tree_id, tg.gift_id
+    from gift_counts gc
   )
   select jsonb_build_object(
     'trees', (select items from trees_json),

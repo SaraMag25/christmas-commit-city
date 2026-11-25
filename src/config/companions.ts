@@ -1,3 +1,4 @@
+import { GIFTS_CATALOG } from './gifts'
 import type {
   AccessorySlot,
   CompanionAccessoryId,
@@ -9,6 +10,11 @@ import type {
 } from '../types/companion'
 
 export const COMPANION_NAME_MAX_LENGTH = 20
+export const CREATOR_GITHUB_USERNAME = 'SaraMag25'
+
+export function isCreatorGithubUsername(username: string | null | undefined): boolean {
+  return (username ?? '').trim().toLowerCase() === 'saramag25'
+}
 
 export const EMPTY_EQUIPPED_ACCESSORIES: EquippedAccessories = {
   head: null,
@@ -100,6 +106,39 @@ export const COMPANION_SPECIES_CATALOG: readonly CompanionSpeciesItem[] = [
     priceUsd: 3.0,
     primaryColor: '#64748b',
     accentColor: '#cbd5e1',
+  },
+  // Exclusivos Apoiador (Pix / Dinheiro — não compráveis com commits)
+  {
+    id: 'clawd_cafe',
+    defaultName: 'Claude',
+    name: 'Claude (Mascote)',
+    subtitle: 'Bloco Coral · Mascote Original',
+    description:
+      'Mascote voxel coral/laranja em formato retangular clássico, com dois olhos pretos quadrados, bracinhos laterais curtos e quatro perninhas em baixo.',
+    story:
+      'O mascote coral oficial dos deploys noturnos no Polo Norte: mantém seu formato pixel retangular inconfundível junto à sua árvore.',
+    priceCommits: null,
+    priceBrl: 8.0,
+    priceUsd: 3.5,
+    pixOnly: true,
+    primaryColor: '#de7356',
+    accentColor: '#eb866a',
+  },
+  {
+    id: 'leaf_kitty',
+    defaultName: 'Astro',
+    name: 'Gato Alien',
+    subtitle: 'Mascote Verde · Anteninhas Luminosas & Orelhas',
+    description:
+      'Gatinho alienígena verde em estética voxel com duas anteninhas de pontinha amarela, orelhinhas pontudas, bigodes e traços espaciais.',
+    story:
+      'Um gatinho alienígena verde super simpático que pousou sob a aurora boreal. Suas duas anteninhas com pontas amarelas captam cada commit da árvore.',
+    priceCommits: null,
+    priceBrl: 8.0,
+    priceUsd: 3.5,
+    pixOnly: true,
+    primaryColor: '#22c55e',
+    accentColor: '#fef08a',
   },
 ] as const
 
@@ -313,6 +352,19 @@ export const COMPANION_ACCESSORIES_CATALOG: readonly CompanionAccessoryItem[] = 
     priceUsd: 2.0,
     accentColor: '#bae6fd',
   },
+  // Roupa Exclusiva Apoiador (Pix / Dinheiro — não comprável com commits)
+  {
+    id: 'programmer_tshirt',
+    slot: 'body',
+    name: 'Jaqueta Cyber Dev Neon',
+    description:
+      'Jaqueta preta cyber-invernal com capuz roxo elétrico, zíper dourado e emblema </> brilhando em verde-esmeralda neon.',
+    priceCommits: null,
+    priceBrl: 5.0,
+    priceUsd: 2.5,
+    pixOnly: true,
+    accentColor: '#a855f7',
+  },
 ] as const
 
 export const ACCESSORY_SLOT_LABELS: Record<AccessorySlot, string> = {
@@ -331,6 +383,20 @@ export function getAccessoryById(
 ): CompanionAccessoryItem | null {
   if (!id) return null
   return COMPANION_ACCESSORIES_CATALOG.find((a) => a.id === id) ?? null
+}
+
+/**
+ * Checks whether a catalog item is unlocked on an account loadout.
+ * Exclusive `pixOnly` items always require an individual unlock and are not granted by bundle fallback alone.
+ */
+export function isCatalogItemUnlocked(
+  item: { pixOnly?: boolean } | null | undefined,
+  unlockedIds: readonly string[],
+  itemId: string,
+  supporterBundleUnlocked: boolean,
+): boolean {
+  if (unlockedIds.includes(itemId)) return true
+  return Boolean(!item?.pixOnly && supporterBundleUnlocked)
 }
 
 export function sanitizeCompanionName(raw: string | undefined | null): string | undefined {
@@ -365,6 +431,7 @@ export const DEFAULT_EMPTY_LOADOUT: UserCompanionLoadout = {
   equipped: EMPTY_EQUIPPED_ACCESSORIES,
   unlockedSpecies: [],
   unlockedAccessories: [],
+  unlockedGifts: [],
   spentCommits: 0,
   supporterBundleUnlocked: false,
   unlockedViaPixIds: [],
@@ -378,6 +445,7 @@ export function createEmptyCompanionLoadout(): UserCompanionLoadout {
     equipped: { ...EMPTY_EQUIPPED_ACCESSORIES },
     unlockedSpecies: [],
     unlockedAccessories: [],
+    unlockedGifts: [],
     unlockedViaPixIds: [],
     transactions: [],
     updatedAt: new Date().toISOString(),
@@ -386,4 +454,34 @@ export function createEmptyCompanionLoadout(): UserCompanionLoadout {
 
 export function computeAvailableCommits(totalCommits: number, spentCommits: number): number {
   return Math.max(0, Math.floor(totalCommits) - Math.max(0, Math.floor(spentCommits)))
+}
+
+export function withCreatorFullUnlock(
+  username: string | null | undefined,
+  loadout: UserCompanionLoadout,
+): UserCompanionLoadout {
+  if (!isCreatorGithubUsername(username)) {
+    return loadout
+  }
+
+  const pixUnlockKeys = [
+    'bundle:supporter-bundle',
+    ...COMPANION_SPECIES_CATALOG.filter((s) => s.pixOnly).map((s) => `species:${s.id}`),
+    ...COMPANION_ACCESSORIES_CATALOG.filter((a) => a.pixOnly).map((a) => `accessory:${a.id}`),
+  ]
+
+  return {
+    ...loadout,
+    unlockedSpecies: Array.from(
+      new Set([...loadout.unlockedSpecies, ...COMPANION_SPECIES_CATALOG.map((s) => s.id)]),
+    ),
+    unlockedAccessories: Array.from(
+      new Set([...loadout.unlockedAccessories, ...COMPANION_ACCESSORIES_CATALOG.map((a) => a.id)]),
+    ),
+    unlockedGifts: Array.from(
+      new Set([...(loadout.unlockedGifts ?? []), ...GIFTS_CATALOG.map((g) => g.id)]),
+    ),
+    supporterBundleUnlocked: true,
+    unlockedViaPixIds: Array.from(new Set([...loadout.unlockedViaPixIds, ...pixUnlockKeys])),
+  }
 }

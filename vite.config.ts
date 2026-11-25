@@ -6,11 +6,14 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    // Phaser is loaded as a dedicated vendor chunk to keep app bundles lean.
-    chunkSizeWarningLimit: 1600,
+    // Split heavy vendor libraries so app updates preserve CDN & browser cache across deploys.
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('node_modules/three')) return 'three'
+          if (id.includes('node_modules/@supabase')) return 'supabase'
+          if (id.includes('node_modules/lucide-react')) return 'icons'
           if (id.includes('node_modules/phaser')) return 'phaser'
           if (id.includes('node_modules/react')) return 'react'
           return undefined

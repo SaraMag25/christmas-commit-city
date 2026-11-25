@@ -77,6 +77,16 @@ export const GIFT_CATALOG_COPY: Record<AppLanguage, Record<string, LocalizedGift
       description:
         'Um computador clássico de tubo com teclado e mouse deixado debaixo da árvore para maratonas de código.',
     },
+    'retro-rocket': {
+      name: 'Foguete Retrô Voxel',
+      description:
+        'Navezinha foguete retrô em voxel com fuselagem metálica/branca, detalhes vermelhos e azuis e chama pulsante na base ao lado da árvore.',
+    },
+    'lilac-ufo': {
+      name: 'OVNI Lilás',
+      description:
+        'Disco voador pastel lavanda/roxo e creme com estrelinhas brilhantes ao redor e feixe suave flutuando próximo à árvore.',
+    },
   },
   en: {
     'golden-star': {
@@ -116,6 +126,16 @@ export const GIFT_CATALOG_COPY: Record<AppLanguage, Record<string, LocalizedGift
       name: 'Retro PC',
       description:
         'A classic CRT desktop computer with keyboard and mouse placed under the tree for coding marathons.',
+    },
+    'retro-rocket': {
+      name: 'Retro Voxel Rocket',
+      description:
+        'Stylized retro spacecraft in voxel art with metallic white hull, red fins, blue porthole accents, and soft pulsing thruster flame.',
+    },
+    'lilac-ufo': {
+      name: 'Lilac UFO',
+      description:
+        'Pastel lavender, violet & cream flying saucer with twinkling stars and a soft downward glow beam hovering beside the tree.',
     },
   },
 }
@@ -261,6 +281,24 @@ export const SPECIES_COPY: Record<AppLanguage, Record<CompanionSpeciesId, Locali
       story:
         'A guardiã felina mais curiosa do Polo Norte. Passa as noites caçando peixinhos no lago congelado e tirando cochilos em cima do teclado quente enquanto os commits sobem.',
     },
+    clawd_cafe: {
+      defaultName: 'Claude',
+      name: 'Claude (Mascote)',
+      subtitle: 'Bloco Coral · Mascote Original',
+      description:
+        'Mascote voxel coral/laranja em bloco retangular fiel ao original, com dois olhos pretos quadrados, dois bracinhos laterais curtos e quatro perninhas em baixo.',
+      story:
+        'O icônico mascote coral dos deploys de inverno no Polo Norte em seu formato pixel retangular clássico e animado ao lado da árvore.',
+    },
+    leaf_kitty: {
+      defaultName: 'Astro',
+      name: 'Gato Alien',
+      subtitle: 'Mascote Verde · Anteninhas Amarelas',
+      description:
+        'Mascote/animal voxel verde com duas anteninhas de pontinha amarela, orelhinhas pontudas e traços fofos de gatinho alienígena.',
+      story:
+        'Um gatinho alienígena verde super curioso que aterrissou sob a aurora boreal. Suas duas anteninhas com pontas amarelas sintonizam cada novo commit.',
+    },
   },
   en: {
     frog: {
@@ -310,6 +348,24 @@ export const SPECIES_COPY: Record<AppLanguage, Record<CompanionSpeciesId, Locali
       description: 'A nuanced silver-grey tabby kitty with dark stripes and white whiskers.',
       story:
         'The most curious feline guardian of the North Pole. She spends her nights hunting little fish by the frozen lake and napping on warm keyboards while commits ship.',
+    },
+    clawd_cafe: {
+      defaultName: 'Claude',
+      name: 'Claude Mascot',
+      subtitle: 'Coral Pixel Block · Original Mascot',
+      description:
+        'Faithful coral-orange pixel-block mascot with two bold square black eyes, short side arms, and four stubby legs along the bottom.',
+      story:
+        'The iconic hat-free coral block mascot of North Pole winter deploys, bouncing cleanly beside your tree.',
+    },
+    leaf_kitty: {
+      defaultName: 'Astro',
+      name: 'Alien Cat',
+      subtitle: 'Green Mascot · Yellow-Tipped Antennae',
+      description:
+        'Leaf-green voxel alien kitty with twin yellow-tipped antennae, pointed ears, whiskers, and cosmic alien-cat charm.',
+      story:
+        'A friendly green alien kitty who landed beneath the aurora borealis. Its twin yellow-tipped antennae tune into every new commit beside your tree.',
     },
   },
 }
@@ -407,6 +463,11 @@ export const ACCESSORY_COPY: Record<
       description:
         'Mini laptop aberto com tela brilhando em código verde neon para fazer deploy na neve.',
     },
+    programmer_tshirt: {
+      name: 'Jaqueta Cyber Dev Neon',
+      description:
+        'Jaqueta estilosa preta cyber-invernal com capuz roxo elétrico, zíper metálico dourado e emblema </> em verde-esmeralda neon.',
+    },
   },
   en: {
     'leaf-scarf': {
@@ -494,6 +555,11 @@ export const ACCESSORY_COPY: Record<
       name: 'Coding Laptop',
       description:
         'Tiny open laptop with a glowing neon-green code screen for snowy midnight deploys.',
+    },
+    programmer_tshirt: {
+      name: 'Cyber Neon Dev Jacket',
+      description:
+        'Flashy obsidian cyber-winter dev jacket with electric purple hood trim, golden center zipper, emerald cuffs, and glowing </> neon chest crest.',
     },
   },
 }
@@ -630,9 +696,18 @@ export const UI_TRANSLATIONS = {
       giftBtn: 'presentear árvore',
       giftMyTreeBtn: 'presentear minha árvore',
       companionShopBtn: 'companheiro & loja',
+      removeCompanionBtn: 'Tirar da árvore',
       supportBtn: 'apoie o projeto',
       copyLink: 'copiar link da árvore',
       linkCopied: 'link copiado!',
+      shareSocial: 'compartilhar nas redes',
+      instagramCopied: 'Texto copiado para o Instagram!',
+      exportBtn: 'exportar',
+      exportPng: 'Exportar PNG',
+      exportGif: 'Exportar GIF (360°)',
+      exportCapturing: 'Capturando...',
+      exportGeneratingGif: 'Gerando GIF...',
+      exportError: 'Não foi possível exportar agora.',
     },
     howItWorks: {
       title: 'Como funciona o sistema',
@@ -664,7 +739,9 @@ export const UI_TRANSLATIONS = {
       subtitle: 'Selecione um presente para visualizar em 3D antes de confirmar.',
       subtitleOwn: 'Visualize presentes em 3D antes de colocá-los na sua árvore!',
       special: 'Especial',
+      pixOnlyBadge: 'Exclusivo Pix',
       free: 'Gratuito',
+      unlockedBadge: 'Desbloqueado',
       rarity: 'Raridade',
       placeGiftBtn: 'Colocar na árvore',
       addToMyTreeBtn: 'Colocar na minha árvore',
@@ -709,6 +786,7 @@ export const UI_TRANSLATIONS = {
       copyLink: 'Copiar link da árvore',
       linkCopied: 'Link copiado!',
       shareSocial: 'Compartilhar nas redes',
+      instagramCopied: 'Texto copiado para o Instagram!',
       noPet: 'Sem companheiro',
       equipped: 'Equipado',
       balance: 'Saldo',
@@ -720,6 +798,7 @@ export const UI_TRANSLATIONS = {
       sentBy: 'Enviado por',
       actionsLabel: 'Personalizar & Presentear',
       companionActiveLabel: 'Companheiro ativo na árvore',
+      removeCompanionBtn: 'Tirar da árvore',
       supportCampaignBtn: 'Apoiar Projeto',
     },
     calendar: {
@@ -743,13 +822,21 @@ export const UI_TRANSLATIONS = {
       spentInShop: 'Gastos na Loja',
       ruleBanner: 'Gastar saldo não reduz o nível nem os commits da sua árvore.',
       livePreview: 'LIVE_PREVIEW',
+      previewBadge: 'Prévia',
+      clearPreviewBtn: 'Limpar prévia',
       noPetHint: 'Adote um amigo ao lado para exibir ao lado da árvore!',
       headLabel: 'CABEÇA',
       bodyLabel: 'CORPO',
       handLabel: 'ITEM',
-      removePet: 'Guardar companheiro',
+      removePet: 'Tirar companheiro da árvore',
+      removePetShort: 'Tirar da árvore',
+      companionRemovedMsg: 'Companheiro removido da árvore!',
       tabSpecies: 'Escolher Amigo',
       tabCustomize: 'Customizar',
+      tabSceneProps: 'Cenário 3D (Pix)',
+      pixOnlyBadge: 'Exclusivo Pix · Dinheiro',
+      pixOnlyNotice: 'Exclusivo de apoiador em dinheiro (Pix / Cartão) — não usa commits.',
+      supporterExclusiveNote: 'Exclusivo Apoiador',
       activeOnTree: 'Ativo na árvore',
       unlockedClickEquip: 'Desbloqueado · Clique p/ equipar',
       equippedClickRemove: 'Equipado (clique p/ tirar)',
@@ -762,9 +849,9 @@ export const UI_TRANSLATIONS = {
       unlockPix: 'Desbloquear via Pix',
       unlockCard: 'Desbloquear via Cartão',
       unlockGlobal: 'Desbloquear Global',
-      supporterTitle: 'Pacote Apoiador Completo (Combo Total)',
+      supporterTitle: 'Pacote Apoiador Completo (Clássicos)',
       supporterDesc:
-        `Desbloqueie todos os ${COMPANION_SPECIES_CATALOG.length} bichinhos + todos os ${COMPANION_ACCESSORIES_CATALOG.length} acessórios de uma só vez.`,
+        `Desbloqueie todos os ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} bichinhos e ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} acessórios desbloqueáveis por commits de uma só vez.`,
       supporterUnlocked: 'Pacote Apoiador Ativo — Tudo Desbloqueado!',
       supporterBtn: 'Desbloquear Tudo',
       petNameLabel: 'Nome do seu amigo',
@@ -808,27 +895,27 @@ export const UI_TRANSLATIONS = {
       selectHint: 'Selecione um amigo ou acessório ao lado para adotar ou equipar.',
     },
     supportModal: {
-      title: 'Campanha da Criadora: Rumo à Formatura na UFC',
+      title: 'Apoie o Christmas Commit City',
       goal: 'Meta da campanha',
-      supporterTitle: 'Pacote Apoiador (Supporter Bundle)',
+      supporterTitle: 'Pacote Apoiador (Pacote Clássico)',
       supporterDesc:
-        `Desbloqueia os ${COMPANION_SPECIES_CATALOG.length} companheiros e todos os ${COMPANION_ACCESSORIES_CATALOG.length} acessórios com um único apoio simbólico (ideal para pagamentos internacionais sem taxas repetidas).`,
+        `Desbloqueia os ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} companheiros clássicos e todos os ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} acessórios de commits de uma vez (não inclui exclusivos Pix).`,
       supporterCta: 'Desbloquear Tudo por',
       supporterDone: 'Pacote Apoiador já desbloqueado nesta árvore!',
-      directTitle: 'Apoio Voluntário Direto para a Formatura',
-      directPixFreeBadge: 'Valor livre · Banco Inter',
+      directTitle: 'Apoio Voluntário',
+      directPixFreeBadge: 'Qualquer valor · Pix',
       directPixDesc:
-        'Apoie meus estudos enviando qualquer valor pelo app do seu banco via QR Code ou Pix Copia e Cola (apoio voluntário, sem vínculo com desbloqueios automáticos).',
+        'Contribuição voluntária de qualquer valor via QR Code ou Pix Copia e Cola (sem vínculo com desbloqueios da loja).',
       directPixPhase7Note:
-        'Para desbloquear o Pacote Apoiador (R$ 15,00) ou itens/presentes automaticamente na árvore, use o botão dourado acima ou a loja (checkout automático via Pix).',
-      pixQrAlt: 'QR Code Pix do Banco Inter para apoio voluntário aos estudos',
+        'Para desbloquear automaticamente o Pacote Apoiador ou itens da árvore, use o botão dourado acima ou a loja.',
+      pixQrAlt: 'QR Code Pix para apoio voluntário aos estudos',
       pixRecipientLabel: 'Recebedor',
       pixBrCodeLabel: 'Pix Copia e Cola (BR Code)',
       copyPixBrCodeBtn: 'Copiar Pix Copia e Cola',
       pixRandomKeyLabel: 'Chave Aleatória',
       copyRandomKeyBtn: 'Copiar Chave Aleatória',
       directUsdDesc:
-        'Apoie de qualquer lugar do mundo via Cartão / Checkout Internacional em USD.',
+        'Contribuição voluntária internacional via Cartão / Checkout em USD.',
       close: 'Fechar',
     },
   },
@@ -933,9 +1020,18 @@ export const UI_TRANSLATIONS = {
       giftBtn: 'gift tree',
       giftMyTreeBtn: 'gift my tree',
       companionShopBtn: 'companion & shop',
+      removeCompanionBtn: 'Remove from tree',
       supportBtn: 'support project',
       copyLink: 'copy tree link',
       linkCopied: 'link copied!',
+      shareSocial: 'share on social',
+      instagramCopied: 'Copied text for Instagram!',
+      exportBtn: 'export',
+      exportPng: 'Export PNG',
+      exportGif: 'Export GIF (360°)',
+      exportCapturing: 'Capturing...',
+      exportGeneratingGif: 'Generating GIF...',
+      exportError: 'Unable to export right now.',
     },
     howItWorks: {
       title: 'How Christmas Commit City Works',
@@ -968,6 +1064,8 @@ export const UI_TRANSLATIONS = {
       subtitleOwn: 'Preview 3D holiday gifts on your own tree before adding them!',
       special: 'Special',
       free: 'Free',
+      pixOnlyBadge: 'Pix Exclusive',
+      unlockedBadge: 'Unlocked',
       rarity: 'Rarity',
       placeGiftBtn: 'Place on tree',
       addToMyTreeBtn: 'Add to my tree',
@@ -1012,6 +1110,7 @@ export const UI_TRANSLATIONS = {
       copyLink: 'Copy tree link',
       linkCopied: 'Link copied!',
       shareSocial: 'Share on social',
+      instagramCopied: 'Copied text for Instagram!',
       noPet: 'No companion yet',
       equipped: 'Equipped',
       balance: 'Balance',
@@ -1023,6 +1122,7 @@ export const UI_TRANSLATIONS = {
       sentBy: 'Sent by',
       actionsLabel: 'Customize & Gift',
       companionActiveLabel: 'Active companion on tree',
+      removeCompanionBtn: 'Remove from tree',
       supportCampaignBtn: 'Support Project',
     },
     calendar: {
@@ -1046,13 +1146,21 @@ export const UI_TRANSLATIONS = {
       spentInShop: 'Spent in Shop',
       ruleBanner: "Spending balance never reduces your tree's level or commits.",
       livePreview: 'LIVE_PREVIEW',
+      previewBadge: 'Preview',
+      clearPreviewBtn: 'Clear preview',
       noPetHint: 'Adopt a companion on the right to place beside your tree!',
       headLabel: 'HEAD',
       bodyLabel: 'BODY',
       handLabel: 'ITEM',
-      removePet: 'Store companion away',
+      removePet: 'Remove companion from tree',
+      removePetShort: 'Remove from tree',
+      companionRemovedMsg: 'Companion removed from tree!',
       tabSpecies: 'Choose Companion',
       tabCustomize: 'Customize',
+      tabSceneProps: '3D Scene Props',
+      pixOnlyBadge: 'Pix Exclusive · Money Only',
+      pixOnlyNotice: 'Money-only supporter exclusive (Pix / Card) — not purchasable with commits.',
+      supporterExclusiveNote: 'Supporter Exclusive',
       activeOnTree: 'Active on tree',
       unlockedClickEquip: 'Unlocked · Click to equip',
       equippedClickRemove: 'Equipped (click to unequip)',
@@ -1065,9 +1173,9 @@ export const UI_TRANSLATIONS = {
       unlockPix: 'Unlock via Pix',
       unlockCard: 'Unlock with Card',
       unlockGlobal: 'Unlock Global',
-      supporterTitle: 'Full Supporter Pack (All-Access Bundle)',
+      supporterTitle: 'Full Supporter Pack (Classic Bundle)',
       supporterDesc:
-        `Unlock all ${COMPANION_SPECIES_CATALOG.length} pets + all ${COMPANION_ACCESSORIES_CATALOG.length} accessories at once.`,
+        `Unlock all ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} classic pets + ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} commit accessories at once.`,
       supporterUnlocked: 'Supporter Pack Active — Everything Unlocked!',
       supporterBtn: 'Unlock All',
       petNameLabel: "Your companion's name",
@@ -1111,26 +1219,26 @@ export const UI_TRANSLATIONS = {
       selectHint: 'Select a companion or accessory on the right to adopt or equip.',
     },
     supportModal: {
-      title: "Creator's Campaign: Road to Graduation at UFC",
+      title: 'Support Christmas Commit City',
       goal: 'Campaign goal',
-      supporterTitle: 'Supporter Bundle (Best for Global Support)',
+      supporterTitle: 'Supporter Bundle (Classic Pack)',
       supporterDesc:
-        `Unlocks all ${COMPANION_SPECIES_CATALOG.length} companions and all ${COMPANION_ACCESSORIES_CATALOG.length} accessories with a single contribution (avoids repeated international micro-transaction fees).`,
+        `Unlocks all ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} classic companions and all ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} commit accessories at once (excludes Pix-only exclusives).`,
       supporterCta: 'Unlock Everything for',
       supporterDone: 'Supporter Bundle already unlocked on this tree!',
-      directTitle: 'Direct Voluntary Support for Graduation',
-      directPixFreeBadge: 'Any amount · Banco Inter',
+      directTitle: 'Voluntary Support',
+      directPixFreeBadge: 'Any amount · Pix',
       directPixDesc:
-        'Support her studies by sending any amount through your Brazilian bank app via QR Code or Pix Copy & Paste (voluntary gift without automatic unlock).',
+        'Voluntary contribution of any amount via QR Code or Pix Copy & Paste (not tied to automatic shop unlocks).',
       directPixPhase7Note:
-        'To automatically unlock the Supporter Bundle or shop items/gifts on your tree, use the gold checkout button above (automatic Pix / Card checkout).',
-      pixQrAlt: 'Banco Inter Pix QR Code for voluntary graduation support',
+        'To automatically unlock the Supporter Bundle or shop items on your tree, use the gold checkout button above or the shop.',
+      pixQrAlt: 'Pix QR Code for voluntary study support',
       pixRecipientLabel: 'Recipient',
       pixBrCodeLabel: 'Pix Copy & Paste (BR Code)',
       copyPixBrCodeBtn: 'Copy Pix BR Code',
       pixRandomKeyLabel: 'Random Pix Key',
       copyRandomKeyBtn: 'Copy Random Key',
-      directUsdDesc: 'Contribute from anywhere worldwide using International Card / USD Checkout.',
+      directUsdDesc: 'Voluntary international contribution via Card / USD Checkout.',
       close: 'Close',
     },
   },

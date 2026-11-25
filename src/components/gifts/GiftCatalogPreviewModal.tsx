@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, CreditCard, Eye, Gift, Loader2, QrCode, Sparkles, X } from 'lucide-react'
+import { isCreatorGithubUsername } from '../../config/companions'
 import { normalizeGiftSlug, resolveGiftUsdPrice } from '../../config/gifts'
 import { formatCurrencyPrice } from '../../config/supportCampaign'
 import { useCity } from '../../context/cityContextStore'
@@ -32,6 +33,7 @@ export function GiftCatalogPreviewModal({
     currentUserTree,
     session,
     isSupabaseReady,
+    getCompanionLoadout,
     connectWithGitHub,
     sendGiftToTree,
     refreshCityState,
@@ -73,6 +75,17 @@ export function GiftCatalogPreviewModal({
     currency,
   )
   const selectedExistingCount = countsBySlug[selectedGift.slug] ?? 0
+  const viewerUsername = currentUserTree
+    ? currentUserTree.profile.github_username
+    : !isSupabaseReady && isOwnTree
+      ? recipientUsername
+      : null
+  const viewerLoadout = viewerUsername ? getCompanionLoadout(viewerUsername) : null
+  const isGiftUnlocked = (gift: GiftItem): boolean =>
+    gift.category === 'free' ||
+    Boolean(viewerLoadout?.unlockedGifts?.includes(gift.id)) ||
+    (isSupabaseReady ? isCreatorGithubUsername(viewerUsername) : !isSupabaseReady && isOwnTree && isCreatorGithubUsername(recipientUsername))
+  const selectedGiftUnlocked = isGiftUnlocked(selectedGift)
 
   // Inject the selected item temporarily into a derived tree object without mutating CityProvider state
   const previewTree = useMemo<CityTree | null>(() => {
@@ -101,7 +114,7 @@ export function GiftCatalogPreviewModal({
     setRecentGiftName(null)
     setIsSending(true)
     try {
-      if (isSupabaseReady && selectedGift.category === 'special') {
+      if (isSupabaseReady && !selectedGiftUnlocked) {
         if (!session) {
           await connectWithGitHub()
           return
@@ -163,7 +176,7 @@ export function GiftCatalogPreviewModal({
     : `${t.giftModal.title} @${recipientUsername}`
 
   const confirmLabel =
-    selectedGift.category === 'special'
+    selectedGift.category === 'special' && !selectedGiftUnlocked
       ? `${t.giftModal.giftSpecialBtn} (${selectedFormattedPrice})`
       : isOwnTree
         ? t.giftModal.addToMyTreeBtn
@@ -297,17 +310,27 @@ export function GiftCatalogPreviewModal({
                   <Sparkles className="h-3.5 w-3.5 shrink-0" />
                   <span>{selectedName}</span>
                 </p>
-                <span
-                  className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                    selectedGift.category === 'special'
-                      ? 'bg-amber-500/20 text-amber-300'
-                      : 'bg-emerald-500/20 text-emerald-300'
-                  }`}
-                >
-                  {selectedGift.category === 'special'
-                    ? selectedFormattedPrice
-                    : t.giftModal.free}
-                </span>
+                  {selectedGift.category === 'special' && selectedGiftUnlocked ? (
+                    <span className="shrink-0 rounded-sm bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-300">
+                      {t.giftModal.unlockedBadge}
+                    </span>
+                  ) : selectedGift.pixOnly ? (
+                    <span className="shrink-0 rounded-sm border border-emerald-400/50 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-300">
+                      {t.giftModal.pixOnlyBadge} · {selectedFormattedPrice}
+                    </span>
+                  ) : (
+                    <span
+                      className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                        selectedGift.category === 'special'
+                          ? 'bg-amber-500/20 text-amber-300'
+                          : 'bg-emerald-500/20 text-emerald-300'
+                      }`}
+                    >
+                      {selectedGift.category === 'special'
+                        ? selectedFormattedPrice
+                        : t.giftModal.free}
+                    </span>
+                  )}
               </div>
 
               <p className="mt-1.5 text-[11px] leading-snug text-slate-300">
@@ -337,9 +360,9 @@ export function GiftCatalogPreviewModal({
               {isSupabaseReady && !session ? (
                 <div className="mt-3 space-y-2">
                   <p className="rounded-sm border border-sky-400/35 bg-[#0d1833]/80 p-2 text-[11px] leading-snug text-sky-100">
-                    {selectedGift.category === 'special'
-                      ? t.giftModal.loginRequiredPaid
-                      : t.giftModal.loginRequiredFree}
+                    {selectedGiftUnlocked
+                      ? t.giftModal.loginRequiredFree
+                      : t.giftModal.loginRequiredPaid}
                   </p>
                   <button
                     type="button"
@@ -350,7 +373,7 @@ export function GiftCatalogPreviewModal({
                     <span>{t.connectModal.authorize}</span>
                   </button>
                 </div>
-              ) : isSupabaseReady && selectedGift.category === 'special' && pixOrder ? (
+              ) : isSupabaseReady && !selectedGiftUnlocked && pixOrder ? (
                 <PixCheckoutBox
                   order={pixOrder}
                   itemLabel={selectedName}
@@ -363,21 +386,23 @@ export function GiftCatalogPreviewModal({
                   disabled={isSending}
                   onClick={() => void handleConfirmGift()}
                   className={`pixel-btn mt-3 w-full rounded-sm px-3 py-2 text-xs font-bold disabled:opacity-60 ${
-                    selectedGift.category === 'special' ? 'pixel-btn-gold' : 'pixel-btn-pine'
+                    selectedGift.category === 'special' && !selectedGiftUnlocked
+                      ? 'pixel-btn-gold'
+                      : 'pixel-btn-pine'
                   }`}
                 >
                   {isSending ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : isSupabaseReady && selectedGift.category === 'special' && currency === 'BRL' ? (
+                  ) : isSupabaseReady && !selectedGiftUnlocked && currency === 'BRL' ? (
                     <QrCode className="h-3.5 w-3.5" />
-                  ) : isSupabaseReady && selectedGift.category === 'special' ? (
+                  ) : isSupabaseReady && !selectedGiftUnlocked ? (
                     <CreditCard className="h-3.5 w-3.5" />
                   ) : (
                     <Gift className="h-3.5 w-3.5" />
                   )}
                   <span>
                     {isSending
-                      ? selectedGift.category === 'special' && isSupabaseReady
+                      ? !selectedGiftUnlocked && isSupabaseReady
                         ? t.shop.generatingCheckout
                         : t.giftModal.sendingBtn
                       : confirmLabel}
@@ -426,20 +451,34 @@ export function GiftCatalogPreviewModal({
                           <Sparkles className="h-3.5 w-3.5 shrink-0" />
                           {displayName}
                         </span>
-                        <span
-                          className={`rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                            gift.category === 'special'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-emerald-500/20 text-emerald-300'
-                          }`}
-                        >
-                          {gift.category === 'special'
-                            ? `${t.giftModal.special} · ${formatCurrencyPrice(
-                                currency === 'BRL' ? gift.price : usdApprox,
-                                currency,
-                              )}`
-                            : t.giftModal.free}
-                        </span>
+                        {gift.category === 'special' && isGiftUnlocked(gift) ? (
+                          <span className="rounded-sm bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-300">
+                            {t.giftModal.unlockedBadge}
+                          </span>
+                        ) : gift.pixOnly ? (
+                          <span className="rounded-sm border border-emerald-400/50 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-300">
+                            {t.giftModal.pixOnlyBadge} ·{' '}
+                            {formatCurrencyPrice(
+                              currency === 'BRL' ? gift.price : usdApprox,
+                              currency,
+                            )}
+                          </span>
+                        ) : (
+                          <span
+                            className={`rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                              gift.category === 'special'
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-emerald-500/20 text-emerald-300'
+                            }`}
+                          >
+                            {gift.category === 'special'
+                              ? `${t.giftModal.special} · ${formatCurrencyPrice(
+                                  currency === 'BRL' ? gift.price : usdApprox,
+                                  currency,
+                                )}`
+                              : t.giftModal.free}
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1.5 text-[11px] leading-snug text-slate-300">
                         {displayDesc}

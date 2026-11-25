@@ -8,7 +8,12 @@ import {
   type BuiltCompanion,
 } from '../../game/voxel/voxelCompanionBuilder'
 import { createVoxelMesh } from '../../game/voxel/voxelMaterials'
-import { buildVoxelChristmasTree, updateCommitLightsTwinkle } from '../../game/voxel/voxelTreeBuilder'
+import {
+  buildVoxelChristmasTree,
+  type FloatingScenePropHandle,
+  updateCommitLightsTwinkle,
+  updateFloatingGiftProps,
+} from '../../game/voxel/voxelTreeBuilder'
 import type { CityTree } from '../../types/city'
 
 interface TreePixelCanvasProps {
@@ -56,6 +61,7 @@ export function TreePixelCanvas({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const activeTreeGroupRef = useRef<THREE.Group | null>(null)
   const activeCompanionRef = useRef<BuiltCompanion | null>(null)
+  const activeFloatingPropsRef = useRef<FloatingScenePropHandle[]>([])
   const yawRef = useRef<number>(INITIAL_YAW)
   const isDraggingRef = useRef<boolean>(false)
 
@@ -137,6 +143,7 @@ export function TreePixelCanvas({
         activeTreeGroupRef.current.rotation.y = yawRef.current
       }
       updateCommitLightsTwinkle(t)
+      updateFloatingGiftProps(activeFloatingPropsRef.current, t, true)
       if (activeCompanionRef.current) {
         updateCompanionAnimation(activeCompanionRef.current, t, 0.5)
       }
@@ -157,6 +164,7 @@ export function TreePixelCanvas({
       disposeActiveSceneTree(scene, activeTreeGroupRef.current, activeCompanionRef.current)
       activeCompanionRef.current = null
       activeTreeGroupRef.current = null
+      activeFloatingPropsRef.current = []
       sceneRef.current = null
       cameraRef.current = null
       renderer.dispose()
@@ -175,6 +183,7 @@ export function TreePixelCanvas({
     disposeActiveSceneTree(scene, activeTreeGroupRef.current, activeCompanionRef.current)
     activeCompanionRef.current = null
     activeTreeGroupRef.current = null
+    activeFloatingPropsRef.current = []
 
     const seed = hashUsername(tree.profile.github_username)
     const built = buildVoxelChristmasTree({
@@ -212,6 +221,7 @@ export function TreePixelCanvas({
     scene.add(built.group)
     activeTreeGroupRef.current = built.group
     activeCompanionRef.current = companion
+    activeFloatingPropsRef.current = built.floatingProps
 
     const camDistance = Math.max(14.0, built.height * 1.96, (compRadius + 1.45) / 0.215)
     camera.position.set(0, built.height * 0.52, camDistance)

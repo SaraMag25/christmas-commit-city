@@ -4,21 +4,15 @@ import type { SupportCurrency, SupporterBundleConfig } from '../types/companion'
 export { STANDARD_CONTRIBUTION_YEAR } from './githubPeriod'
 
 const PT_CAMPAIGN_PARAGRAPHS = [
-  'Oii! Meu nome é Sara e atualmente eu curso Engenharia da Computação na UFC. Às vezes eu até penso se não foi um erro (talvez seja mesmo), mas o que mais me faz pensar nisso é lembrar de quando precisei sair de onde eu moro para estudar, ir para uma cidade desconhecida e recomeçar a vida do zero. É paia, eu sei kkkk.',
-  'Eu sinto muita falta da minha casa e, principalmente, de não ter que arcar com toda a vida adulta. Hoje eu vivo de bolsas da UFC, então, se você quiser ajudar essa pobre coitada, nem que seja com 1 real, eu aceito!',
-  'Mas, se não puder contribuir agora, tudo bem também, meu mano! Você já ajuda muito de outras formas, tipo compartilhando o projeto.',
-  'Enfim, muito obrigada mesmo por estar lendo isso e mais ainda por estar usando o meu site. Xero no coração e que você seja muito feliz! ❤️',
+  'Apoie a criadora nos seus estudos. Qualquer valor é bem recebido!',
 ] as const
 
 const EN_CAMPAIGN_PARAGRAPHS = [
-  "Hii! My name is Sara and I'm currently studying Computer Engineering at UFC (Brazil). Sometimes I wonder if it wasn't a mistake (maybe it really was), and what makes me think about it most is remembering how I had to leave my hometown to study in an unfamiliar city and rebuild a life from scratch. Rough, I know haha.",
-  "I really miss home and, above all, not having to deal with full adulting expenses. Right now I live off university scholarships at UFC, so if you'd like to help this poor soul out, even $1 is happily accepted!",
-  "And if you can't chip in right now, that's totally fine too, my friend! You can still help a ton in other ways, like sharing the project.",
-  'Anyway, thank you so much for reading this and even more for actually using my website. Lots of love and I truly wish you happiness! ❤️',
+  'Support the creator in her studies. Any amount is welcome!',
 ] as const
 
 export const CREATOR_CAMPAIGN: PixCampaignConfig = {
-  title: 'Campanha da Criadora: Rumo à Formatura na UFC',
+  title: 'Apoie a Criadora · UFC',
   university: 'Universidade Federal do Ceará (UFC)',
   course: 'Engenharia da Computação',
   paragraphs: PT_CAMPAIGN_PARAGRAPHS,
@@ -37,7 +31,7 @@ export const CREATOR_CAMPAIGN: PixCampaignConfig = {
 }
 
 export const CREATOR_CAMPAIGN_EN = {
-  title: "Creator's Campaign: Road to Graduation at UFC",
+  title: 'Support the Creator · UFC',
   university: 'Federal University of Ceará (UFC), Brazil',
   course: 'Computer Engineering',
   paragraphs: EN_CAMPAIGN_PARAGRAPHS,

@@ -177,12 +177,10 @@ export function SupportCampaignModal({
           </div>
         </div>
 
-        {/* Authentic Story */}
-        <blockquote className="mt-3 space-y-2.5 rounded-sm border border-amber-400/35 bg-[#040811]/90 p-4 text-xs leading-relaxed text-slate-200">
-          {campaignCopy.paragraphs.map((paragraph, idx) => (
-            <p key={idx}>{paragraph}</p>
-          ))}
-        </blockquote>
+        {/* Intro message */}
+        <p className="mt-3 rounded-sm border border-amber-400/35 bg-[#040811]/90 px-4 py-3 text-xs leading-relaxed text-slate-200">
+          {campaignCopy.paragraphs[0]}
+        </p>
 
         {/* Supporter Bundle Box */}
         <div className="mt-4 rounded-sm border border-amber-400/45 bg-gradient-to-r from-[#1a1333]/90 to-[#0f2438]/90 p-3.5">
@@ -248,25 +246,20 @@ export function SupportCampaignModal({
           )}
         </div>
 
-        {/* Direct Contribution Details (Pix BRL or International USD) */}
+        {/* Voluntary Support Details (Pix BRL or International USD) */}
         <div className="mt-4 rounded-sm border border-slate-800 bg-[#040811]/85 p-3.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-bold text-slate-100">{t.supportModal.directTitle}</p>
-            <span className="text-[11px] text-emerald-300">
-              {t.supportModal.goal}: {formatCurrencyPrice(currency === 'BRL' ? CREATOR_CAMPAIGN.goalAmount : 1000, currency)}
+            <span className="inline-flex items-center rounded-sm border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+              {t.supportModal.directPixFreeBadge}
             </span>
           </div>
 
           {currency === 'BRL' ? (
             <div className="mt-2.5 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] leading-relaxed text-slate-300">
-                  {t.supportModal.directPixDesc}
-                </p>
-                <span className="inline-flex items-center rounded-sm border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                  {t.supportModal.directPixFreeBadge}
-                </span>
-              </div>
+              <p className="text-[11px] leading-relaxed text-slate-300">
+                {t.supportModal.directPixDesc}
+              </p>
 
               <div className="flex flex-col items-center gap-3.5 rounded-sm border border-slate-800 bg-[#070d1f] p-3 sm:flex-row sm:items-start">
                 <div className="aspect-square w-44 shrink-0 overflow-hidden rounded-md bg-white shadow-sm sm:w-44">

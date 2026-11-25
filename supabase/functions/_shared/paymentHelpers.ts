@@ -145,6 +145,7 @@ export async function authenticateCaller(
 export interface ShopCatalogRow {
   id: string
   item_type: 'companion' | 'accessory' | 'gift' | 'bundle'
+  price_commits: number | null
   price_brl_cents: number
   price_usd_cents: number
   is_free: boolean
@@ -174,7 +175,7 @@ export async function validateOrderCreationInput(params: {
 
   const { data: shopItem, error: catalogErr } = await adminClient
     .from('shop_catalog')
-    .select('id, item_type, price_brl_cents, price_usd_cents, is_free, active')
+    .select('id, item_type, price_commits, price_brl_cents, price_usd_cents, is_free, active')
     .eq('id', cleanItemId)
     .eq('active', true)
     .maybeSingle<ShopCatalogRow>()
@@ -242,11 +243,15 @@ export async function validateOrderCreationInput(params: {
 
     resolvedTargetTreeId = targetTree.id
   } else {
+    // Classic items (price_commits != null) are included in supporter-bundle;
+    // Pix-only exclusives (price_commits == null) must still be purchasable by bundle owners.
+    const unlockLookupIds =
+      shopItem.price_commits !== null ? [shopItem.id, 'supporter-bundle'] : [shopItem.id]
     const { data: existingUnlocks, error: unlockErr } = await adminClient
       .from('user_unlocks')
       .select('item_id')
       .eq('user_id', user.id)
-      .in('item_id', [shopItem.id, 'supporter-bundle'])
+      .in('item_id', unlockLookupIds)
 
     if (unlockErr) {
       console.error('[payments] Failed checking existing unlocks:', unlockErr.code, unlockErr.message)

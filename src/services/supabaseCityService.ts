@@ -5,6 +5,7 @@ import {
   getAccessoryById,
   getSpeciesById,
   sanitizeCompanionName,
+  withCreatorFullUnlock,
 } from '../config/companions'
 import { MIN_TREE_SPACING_GRID } from '../config/cityMapConfig'
 import { GIFTS_CATALOG } from '../config/gifts'
@@ -495,7 +496,7 @@ export async function fetchOwnerPrivateState(userId: string): Promise<OwnerPriva
     supabase
       .from('trees')
       .select(
-        'id, user_id, spent_commits, contribution_calendar, active_companion_id, companion_custom_name, equipped_head_id, equipped_body_id, equipped_hand_id',
+        'id, user_id, github_username, spent_commits, contribution_calendar, active_companion_id, companion_custom_name, equipped_head_id, equipped_body_id, equipped_hand_id',
       )
       .eq('user_id', userId)
       .maybeSingle(),
@@ -518,9 +519,11 @@ export async function fetchOwnerPrivateState(userId: string): Promise<OwnerPriva
 
   const speciesSet = new Set(COMPANION_SPECIES_CATALOG.map((s) => s.id))
   const accessorySet = new Set(COMPANION_ACCESSORIES_CATALOG.map((a) => a.id))
+  const giftIdSet = new Set(GIFTS_CATALOG.map((g) => g.id))
 
   const unlockedSpecies: CompanionSpeciesId[] = []
   const unlockedAccessories: CompanionAccessoryId[] = []
+  const unlockedGifts: string[] = []
   const unlockedViaPixIds: string[] = []
   let supporterBundleUnlocked = false
 
@@ -540,27 +543,43 @@ export async function fetchOwnerPrivateState(userId: string): Promise<OwnerPriva
       if (row.unlock_source !== 'commits') {
         unlockedViaPixIds.push(`accessory:${accId}`)
       }
+    } else if (giftIdSet.has(row.item_id)) {
+      unlockedGifts.push(row.item_id)
     }
   }
 
   const companionState = treeRow ? toCompanionStateFromRow(treeRow) : undefined
-  const loadout: UserCompanionLoadout | null = treeRow
+  const baseLoadout: UserCompanionLoadout | null = treeRow
     ? {
         species: companionState?.species ?? null,
         customName: companionState?.customName,
         equipped: companionState?.equipped ?? { ...EMPTY_EQUIPPED_ACCESSORIES },
         unlockedSpecies: supporterBundleUnlocked
-          ? COMPANION_SPECIES_CATALOG.map((s) => s.id)
+          ? Array.from(
+              new Set([
+                ...unlockedSpecies,
+                ...COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).map((s) => s.id),
+              ]),
+            )
           : unlockedSpecies,
         unlockedAccessories: supporterBundleUnlocked
-          ? COMPANION_ACCESSORIES_CATALOG.map((a) => a.id)
+          ? Array.from(
+              new Set([
+                ...unlockedAccessories,
+                ...COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).map((a) => a.id),
+              ]),
+            )
           : unlockedAccessories,
+        unlockedGifts,
         spentCommits: Math.max(0, Number(treeRow.spent_commits) || 0),
         supporterBundleUnlocked,
         unlockedViaPixIds,
         transactions: [],
         updatedAt: new Date().toISOString(),
       }
+    : null
+  const loadout: UserCompanionLoadout | null = baseLoadout
+    ? withCreatorFullUnlock(treeRow?.github_username, baseLoadout)
     : null
 
   const giftById = new Map(GIFTS_CATALOG.map((g) => [g.id, g]))
@@ -644,6 +663,23 @@ export async function rpcSendFreeGift(
   return data as SendFreeGiftRpcResult
 }
 
+export async function rpcSendUnlockedGift(
+  recipientTreeId: string,
+  giftId: string,
+): Promise<SendFreeGiftRpcResult> {
+  if (!supabase || !isSupabaseConfigured) {
+    throw new Error('SUPABASE_NOT_CONFIGURED')
+  }
+  const { data, error } = await supabase.rpc('send_unlocked_gift', {
+    p_recipient_tree_id: recipientTreeId,
+    p_gift_id: giftId,
+  })
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data as SendFreeGiftRpcResult
+}
+
 /**
  * Generates purely decorative background pine trees for production launch when few real
  * users have joined yet so the North Pole forest stays lush without creating fake profiles.
@@ -706,6 +742,21 @@ export function formatBackendActionError(rawMessage: string, language: 'pt-BR' |
     return language === 'en'
       ? 'Sync your GitHub tree first before customizing companions.'
       : 'Sincronize sua árvore do GitHub primeiro antes de customizar companheiros.'
+  }
+  if (msg.includes('GIFT_NOT_UNLOCKED')) {
+    return language === 'en'
+      ? 'This special gift or scene prop is not unlocked on your account yet.'
+      : 'Este presente ou objeto de cenário ainda não está desbloqueado na sua conta.'
+  }
+  if (
+    msg.includes('COMPANION_NOT_UNLOCKED') ||
+    msg.includes('ACCESSORY_NOT_UNLOCKED') ||
+    msg.includes('INVALID_COMPANION') ||
+    msg.includes('INVALID_BODY_ACCESSORY')
+  ) {
+    return language === 'en'
+      ? 'Item not yet enabled on the Supabase database. Run the latest SQL migrations (`npx supabase db push`).'
+      : 'Item ainda não liberado no banco Supabase — aplique as migrations SQL pendentes (`npx supabase db push`).'
   }
   if (msg.includes('GIFT_NOT_FREE_OR_INVALID')) {
     return language === 'en'

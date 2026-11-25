@@ -1,4 +1,12 @@
-export type CompanionSpeciesId = 'frog' | 'snake' | 'mouse' | 'otter' | 'capybara' | 'cat'
+export type CompanionSpeciesId =
+  | 'frog'
+  | 'snake'
+  | 'mouse'
+  | 'otter'
+  | 'capybara'
+  | 'cat'
+  | 'clawd_cafe'
+  | 'leaf_kitty'
 
 export type AccessorySlot = 'head' | 'body' | 'hand'
 
@@ -19,6 +27,7 @@ export type BodyAccessoryId =
   | 'dev_hoodie'
   | 'code_visor'
   | 'binary_sweater'
+  | 'programmer_tshirt'
 
 export type HandAccessoryId =
   | 'glow-lantern'
@@ -45,9 +54,10 @@ export interface CompanionSpeciesItem {
   subtitle: string
   description: string
   story: string
-  priceCommits: number
+  priceCommits: number | null
   priceBrl: number
   priceUsd: number
+  pixOnly?: boolean
   primaryColor: string
   accentColor: string
 }
@@ -57,9 +67,10 @@ export interface CompanionAccessoryItem {
   slot: AccessorySlot
   name: string
   description: string
-  priceCommits: number
+  priceCommits: number | null
   priceBrl: number
   priceUsd: number
+  pixOnly?: boolean
   accentColor: string
 }
 
@@ -99,6 +110,7 @@ export interface UserCompanionLoadout {
   equipped: EquippedAccessories
   unlockedSpecies: CompanionSpeciesId[]
   unlockedAccessories: CompanionAccessoryId[]
+  unlockedGifts?: string[]
   /** Commits allocated to companion/accessory unlocks; NEVER alters real GitHub commit stats */
   spentCommits: number
   /** Whether the user unlocked the Supporter Pack (all species & accessories) */
@@ -166,6 +178,7 @@ export interface SupabasePublicTreeRow {
 export interface SupabasePrivateTreeRow {
   id: string
   user_id: string
+  github_username?: string
   spent_commits: number
   contribution_calendar?: unknown
   active_companion_id: string | null

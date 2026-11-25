@@ -8,6 +8,7 @@ import {
   PawPrint,
   Share2,
   Sparkles,
+  X,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { AvatarBadge } from '../components/common/AvatarBadge'
@@ -25,6 +26,7 @@ import { resolveTreeStage, TREE_STAGES } from '../config/treeLevels'
 import { useCity } from '../context/cityContextStore'
 import { useLocale } from '../context/localeContextStore'
 import { normalizeGitHubUsernameInput } from '../services/githubSyncService'
+import { buildTreeShareUrl, buildTreeSocialShareLinks } from '../utils/socialShare'
 import {
   SPECIES_COPY,
   TREE_STAGE_COPY,
@@ -38,6 +40,7 @@ export function TreeProfilePage() {
     isLoadingTrees,
     discoverGitHubTree,
     ensureTreeCalendarLoaded,
+    equipSpecies,
   } = useCity()
   const { language, t } = useLocale()
   const { username = '' } = useParams<{ username: string }>()
@@ -45,6 +48,7 @@ export function TreeProfilePage() {
   const [showCompanionModal, setShowCompanionModal] = useState(false)
   const [showSupportModal, setShowSupportModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [instagramCopied, setInstagramCopied] = useState(false)
   const [resolvedAttemptKey, setResolvedAttemptKey] = useState<string | null>(null)
 
   const tree = useMemo(() => {
@@ -86,7 +90,10 @@ export function TreeProfilePage() {
     discoverGitHubTree,
   ])
 
-  const shareUrl = `${window.location.origin}/tree/${encodeURIComponent(tree?.profile.github_username ?? username)}`
+  const socialLinks = tree
+    ? buildTreeSocialShareLinks(tree.profile.github_username, tree.contribution_count, language)
+    : null
+  const shareUrl = socialLinks?.shareUrl ?? buildTreeShareUrl(username)
 
   const handleCopyLink = async () => {
     try {
@@ -96,6 +103,25 @@ export function TreeProfilePage() {
     } catch {
       // Ignore clipboard failures in restricted environments.
     }
+  }
+
+  const handleShareInstagram = () => {
+    if (socialLinks && navigator.clipboard?.writeText) {
+      void navigator.clipboard
+        .writeText(socialLinks.instagramCopyText)
+        .then(() => {
+          setInstagramCopied(true)
+          window.setTimeout(() => setInstagramCopied(false), 2600)
+        })
+        .catch(() => {
+          // Ignore clipboard failures in restricted environments.
+        })
+    }
+    window.open(
+      socialLinks?.instagramHref ?? 'https://www.instagram.com/',
+      '_blank',
+      'noopener,noreferrer',
+    )
   }
 
   const nextStage = tree
@@ -192,10 +218,24 @@ export function TreeProfilePage() {
               <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
                 {t.profile.companionActiveLabel}
               </p>
-              <span className="flex items-center gap-1.5 font-semibold text-slate-200">
-                <PawPrint className="h-3.5 w-3.5 text-amber-300" />
-                <span>{companionName ?? t.profile.noPet}</span>
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-semibold text-slate-200">
+                  <PawPrint className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                  <span className="truncate">{companionName ?? t.profile.noPet}</span>
+                </span>
+                {canCustomizeCompanion && companionName && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void equipSpecies(tree.profile.github_username, null)
+                    }}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-rose-500/45 bg-rose-950/45 px-2 py-0.5 text-[10px] font-semibold text-rose-200 hover:border-rose-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                    <span>{t.profile.removeCompanionBtn}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="mt-4 flex w-full flex-col gap-2 border-t border-slate-800/80 pt-3">
@@ -241,29 +281,22 @@ export function TreeProfilePage() {
               </p>
               <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                    `Check out @${tree.profile.github_username}'s tree in Christmas Commit City!`,
-                  )}&url=${encodeURIComponent(shareUrl)}`}
+                  href={socialLinks?.xHref ?? '#'}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-sm border border-slate-700 bg-[#0d1833] py-1.5 text-sky-300 hover:border-sky-400"
                 >
                   X / Twitter
                 </a>
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `Christmas Commit City: ${shareUrl}`,
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-sm border border-slate-700 bg-[#0d1833] py-1.5 text-emerald-300 hover:border-emerald-400"
+                <button
+                  type="button"
+                  onClick={handleShareInstagram}
+                  className="rounded-sm border border-slate-700 bg-[#0d1833] py-1.5 text-pink-300 hover:border-pink-400 cursor-pointer"
                 >
-                  WhatsApp
-                </a>
+                  Instagram
+                </button>
                 <a
-                  href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-                    shareUrl,
-                  )}`}
+                  href={socialLinks?.linkedinHref ?? '#'}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-sm border border-slate-700 bg-[#0d1833] py-1.5 text-amber-200 hover:border-amber-400"
@@ -271,6 +304,11 @@ export function TreeProfilePage() {
                   LinkedIn
                 </a>
               </div>
+              {instagramCopied && (
+                <p className="mt-1.5 text-center text-[10px] font-medium text-pink-300">
+                  {t.profile.instagramCopied}
+                </p>
+              )}
             </div>
           </section>
 
@@ -379,6 +417,7 @@ export function TreeProfilePage() {
       )}
       {showCompanionModal && tree && (
         <CompanionShopModal
+          key={tree.id}
           tree={tree}
           onClose={() => setShowCompanionModal(false)}
         />

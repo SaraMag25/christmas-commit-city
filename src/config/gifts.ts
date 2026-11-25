@@ -2,8 +2,13 @@ import type { GiftItem, TreeGiftSummary } from '../types/city'
 
 export const RETRO_PC_GIFT_ID = 'gift-retro-pc'
 export const RETRO_PC_GIFT_SLUG = 'retro-pc'
+export const RETRO_ROCKET_GIFT_ID = 'gift-retro-rocket'
+export const RETRO_ROCKET_GIFT_SLUG = 'retro-rocket'
+export const LILAC_UFO_GIFT_ID = 'gift-lilac-ufo'
+export const LILAC_UFO_GIFT_SLUG = 'lilac-ufo'
 export const LEGACY_SPECIAL_GIFT_ID = 'gift-crown'
 export const LEGACY_SPECIAL_GIFT_SLUG = 'ufc-ornament'
+export const SCENE_EXCLUSIVE_GIFT_IDS = [RETRO_ROCKET_GIFT_ID, LILAC_UFO_GIFT_ID] as const
 
 export const GIFTS_CATALOG: readonly GiftItem[] = [
   {
@@ -89,6 +94,32 @@ export const GIFTS_CATALOG: readonly GiftItem[] = [
     description:
       'Um computador clássico de tubo com teclado e mouse deixado debaixo da árvore para maratonas de código.',
     accentColor: '#4ade80',
+  },
+  {
+    id: RETRO_ROCKET_GIFT_ID,
+    slug: RETRO_ROCKET_GIFT_SLUG,
+    name: 'Foguete Retrô Voxel',
+    category: 'special',
+    price: 6,
+    priceUsd: 3,
+    pixOnly: true,
+    rarity: 'epic',
+    description:
+      'Foguete espacial retrô em voxel com corpo metálico/branco, bico e aletas vermelhas, vigia azul e chama pulsante suave na base.',
+    accentColor: '#ef4444',
+  },
+  {
+    id: LILAC_UFO_GIFT_ID,
+    slug: LILAC_UFO_GIFT_SLUG,
+    name: 'OVNI Lilás',
+    category: 'special',
+    price: 7,
+    priceUsd: 3.5,
+    pixOnly: true,
+    rarity: 'legendary',
+    description:
+      'Disco voador pastel lavanda e creme com estrelinhas brilhantes e feixe suave flutuando graciosamente ao lado da árvore.',
+    accentColor: '#c4b5fd',
   },
 ]
 

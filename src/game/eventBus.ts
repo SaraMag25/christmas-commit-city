@@ -1,9 +1,24 @@
+import type { AppLanguage } from '../i18n/translations'
 import type { CityTree, VillagePropDialogue } from '../types/city'
 import type { AmbientTreePoint } from './voxel/proceduralTreesLayer'
 
 type Listener<T> = (payload: T) => void
 
 export type GraphicsQualityMode = 'high' | 'low'
+export type TreeExportFormat = 'png' | 'gif'
+
+export interface TreeExportRequest {
+  treeId: string
+  username: string
+  displayCommits: number
+  periodYear: number
+  level: number
+  stageName: string
+  language: AppLanguage
+  format: TreeExportFormat
+  onProgress?: (percent: number) => void
+  onComplete?: (success: boolean) => void
+}
 
 export interface CameraTelemetry {
   targetX: number
@@ -39,6 +54,7 @@ export interface GameEventMap {
   'city:orbit-right': undefined
   'city:graphics-quality': GraphicsQualityMode
   'city:graphics-auto-downgraded': undefined
+  'city:export-tree': TreeExportRequest
 }
 
 class TypedEventBus {

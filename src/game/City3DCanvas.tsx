@@ -4,7 +4,7 @@ import { CITY_MAP_CONFIG, CITY_PALETTE } from '../config/cityMapConfig'
 import { useLocale } from '../context/localeContextStore'
 import type { CityTree } from '../types/city'
 import { toSafeHttpUrl } from '../utils/urlSafety'
-import { gameEventBus, type GraphicsQualityMode } from './eventBus'
+import { gameEventBus, type GraphicsQualityMode, type TreeExportRequest } from './eventBus'
 import {
   clampCameraTargetToContinent,
   getContinentRegionAtWorld,
@@ -18,8 +18,13 @@ import {
 } from './voxel/proceduralTreesLayer'
 import { updateCompanionAnimation } from './voxel/voxelCompanionBuilder'
 import { createVoxelMesh, getUnitBoxGeometry } from './voxel/voxelMaterials'
-import { updateCommitLightsTwinkle } from './voxel/voxelTreeBuilder'
+import { updateCommitLightsTwinkle, updateFloatingGiftProps } from './voxel/voxelTreeBuilder'
 import { buildVoxelWorld, gridToWorld, type InteractivePropHandle } from './voxel/voxelWorldBuilder'
+import {
+  createTreeExportCardCompositor,
+  downloadExportBlob,
+  sanitizeExportSlug,
+} from '../utils/treeExport'
 
 interface City3DCanvasProps {
   trees: readonly CityTree[]
@@ -612,6 +617,171 @@ export function City3DCanvas({
       }
     }
 
+    let activeExportCancelled = false
+    let isExportRunning = false
+    const captureCam = new THREE.PerspectiveCamera(34, 1, 0.5, 1200)
+    const prevRendererSize = new THREE.Vector2()
+
+    const waitNextFrame = () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+
+    const runTreeExport = async (req: TreeExportRequest) => {
+      if (isExportRunning || activeExportCancelled) {
+        req.onComplete?.(false)
+        return
+      }
+      const target =
+        cityTreesLayer.getTreeVisualInfo(req.treeId) ??
+        cityTreesLayer.getTreeVisualInfo(req.username)
+      if (!target) {
+        req.onComplete?.(false)
+        return
+      }
+
+      isExportRunning = true
+      const savedCam = { ...camState }
+      const exportSize = req.format === 'gif' ? 540 : 1080
+      let compositor: ReturnType<typeof createTreeExportCardCompositor> | null = null
+
+      try {
+        req.onProgress?.(5)
+        compositor = createTreeExportCardCompositor({
+          size: exportSize,
+          username: req.username,
+          commits: req.displayCommits,
+          periodYear: req.periodYear,
+          level: req.level,
+          stageName: req.stageName,
+          language: req.language,
+        })
+
+        const focusY = Math.max(2.0, target.height * 0.45)
+        const showcaseDist = Math.max(11.5, target.height * 1.9 + 4.4)
+        const showcasePolar = 0.32
+        const startAzimuth = camState.azimuth
+
+        // Smoothly frame the selected tree before capturing so snow & lighting settle naturally
+        camState.desiredX = target.worldPos.x
+        camState.desiredZ = target.worldPos.z
+        camState.desiredDistance = showcaseDist
+        camState.desiredPolar = showcasePolar
+        for (let f = 0; f < 16; f += 1) {
+          if (activeExportCancelled) return
+          await waitNextFrame()
+        }
+
+        const renderW = req.format === 'gif' ? 270 : 540
+        const renderH = Math.max(
+          160,
+          Math.round(renderW * (compositor.sceneHeight / compositor.sceneWidth)),
+        )
+        const activeCompositor = compositor
+
+        const captureSnapshotSynchronously = (azimuthAngle: number): Uint8ClampedArray => {
+          const prevHoverVisible = hoverRing.visible
+          const prevSelectionVisible = selectionGroup.visible
+          const prevCreatorVisible = creatorAuraGroup.visible
+          const prevPixelRatio = renderer.getPixelRatio()
+          const prevFogNear = fog.near
+          const prevFogFar = fog.far
+          renderer.getSize(prevRendererSize)
+
+          hoverRing.visible = false
+          selectionGroup.visible = false
+          creatorAuraGroup.visible = false
+
+          captureCam.aspect = activeCompositor.sceneWidth / activeCompositor.sceneHeight
+          const cosP = Math.cos(showcasePolar)
+          const sinP = Math.sin(showcasePolar)
+          captureCam.position.set(
+            target.worldPos.x + showcaseDist * cosP * Math.sin(azimuthAngle),
+            focusY + showcaseDist * sinP,
+            target.worldPos.z + showcaseDist * cosP * Math.cos(azimuthAngle),
+          )
+          captureCam.lookAt(target.worldPos.x, focusY, target.worldPos.z)
+          captureCam.updateProjectionMatrix()
+
+          fog.near = 68
+          fog.far = 165
+          renderer.setPixelRatio(1)
+          renderer.setSize(renderW, renderH, false)
+          renderer.render(scene, captureCam)
+
+          const frameBytes = activeCompositor.composeFrameData(renderer.domElement)
+
+          // Restore viewport renderer immediately inside the same synchronous frame to avoid flicker
+          fog.near = prevFogNear
+          fog.far = prevFogFar
+          hoverRing.visible = prevHoverVisible
+          selectionGroup.visible = prevSelectionVisible
+          creatorAuraGroup.visible = prevCreatorVisible
+          renderer.setPixelRatio(prevPixelRatio)
+          renderer.setSize(prevRendererSize.x, prevRendererSize.y, false)
+          renderer.render(scene, camera)
+
+          return frameBytes
+        }
+
+        const slug = sanitizeExportSlug(req.username)
+
+        if (req.format === 'png') {
+          req.onProgress?.(60)
+          captureSnapshotSynchronously(startAzimuth)
+          const pngBlob = await compositor.exportPngBlob()
+          if (!pngBlob || activeExportCancelled) {
+            req.onComplete?.(false)
+            return
+          }
+          downloadExportBlob(pngBlob, `christmas-tree-${slug}.png`)
+          req.onProgress?.(100)
+          req.onComplete?.(true)
+          return
+        }
+
+        const { GIFEncoder, quantize, applyPalette } = await import('gifenc')
+        const gif = GIFEncoder()
+        const totalFrames = 28
+        const frameDelayMs = 75
+
+        for (let frameIdx = 0; frameIdx < totalFrames; frameIdx += 1) {
+          if (activeExportCancelled) return
+          const angle = startAzimuth + (frameIdx / totalFrames) * Math.PI * 2
+          camState.desiredAzimuth = angle
+          await waitNextFrame()
+          if (activeExportCancelled) return
+
+          const rgba = captureSnapshotSynchronously(angle)
+          const palette = quantize(rgba, 256, { format: 'rgb565' })
+          const indexed = applyPalette(rgba, palette, 'rgb565')
+          gif.writeFrame(indexed, exportSize, exportSize, {
+            palette,
+            delay: frameDelayMs,
+            repeat: 0,
+          })
+
+          req.onProgress?.(Math.min(98, Math.round(12 + ((frameIdx + 1) / totalFrames) * 85)))
+        }
+
+        gif.finish()
+        const gifBlob = new Blob([new Uint8Array(gif.bytes())], { type: 'image/gif' })
+        downloadExportBlob(gifBlob, `christmas-tree-${slug}.gif`)
+        req.onProgress?.(100)
+        req.onComplete?.(true)
+      } catch {
+        req.onComplete?.(false)
+      } finally {
+        compositor?.dispose()
+        camState.desiredX = savedCam.desiredX
+        camState.desiredZ = savedCam.desiredZ
+        camState.desiredAzimuth = savedCam.desiredAzimuth
+        camState.desiredPolar = savedCam.desiredPolar
+        camState.desiredDistance = savedCam.desiredDistance
+        isExportRunning = false
+      }
+    }
+
     const unsubs = [
       gameEventBus.on('city:trees-updated', (nextTrees) => {
         latestTreesRef.current = nextTrees
@@ -705,6 +875,9 @@ export function City3DCanvas({
           azimuth: camState.azimuth,
           polar: camState.polar,
         })
+      }),
+      gameEventBus.on('city:export-tree', (req) => {
+        void runTreeExport(req)
       }),
     ]
 
@@ -818,12 +991,13 @@ export function City3DCanvas({
       // Twinkle GitHub green commit baubles across all real & ambient trees (paused in low mode)
       updateCommitLightsTwinkle(t, !isLow)
 
-      // Animate adopted developer companions beside trees
+      // Animate adopted developer companions & floating scenic UFO props beside trees
       const compList = cityTreesLayer.animatedCompanions
       for (let i = 0; i < compList.length; i += 1) {
         const entry = compList[i]
         updateCompanionAnimation(entry.companion, t, entry.phase)
       }
+      updateFloatingGiftProps(cityTreesLayer.animatedFloatingProps, t, !isLow)
 
       // Falling 3D voxel snow wrapped smoothly around camera target across entire metropolis
       const activeSnowCount = world.snowParticles.count
@@ -942,6 +1116,7 @@ export function City3DCanvas({
     animId = requestAnimationFrame(animate)
 
     return () => {
+      activeExportCancelled = true
       cancelAnimationFrame(animId)
       applyTreesUpdateRef.current = null
       applyGraphicsModeRef.current = null

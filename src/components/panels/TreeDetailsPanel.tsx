@@ -1,10 +1,23 @@
-import { useEffect, useState } from 'react'
-import { Check, ExternalLink, Gift, Heart, PawPrint, Share2, Trees, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Camera,
+  ChevronDown,
+  Download,
+  ExternalLink,
+  Film,
+  Gift,
+  Heart,
+  PawPrint,
+  Trees,
+  X,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getSpeciesById, resolveCompanionDisplayName } from '../../config/companions'
+import { STANDARD_CONTRIBUTION_YEAR } from '../../config/githubPeriod'
 import { resolveTreeStage } from '../../config/treeLevels'
 import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
+import { gameEventBus, type TreeExportFormat } from '../../game/eventBus'
 import { hashUsername } from '../../game/layout/treePlacement'
 import { resolveTreeTheme } from '../../game/voxel/voxelTreeBuilder'
 import {
@@ -19,6 +32,7 @@ import {
   getGitHubCalendarCellColor,
   selectRecentCalendarWeeks,
 } from '../../utils/calendarStats'
+import { buildTreeSocialShareLinks } from '../../utils/socialShare'
 import { isViewerTreeOwner } from '../../utils/treeOwnership'
 import { AvatarBadge } from '../common/AvatarBadge'
 import { TreeGiftsSection } from '../gifts/TreeGiftsSection'
@@ -38,9 +52,43 @@ export function TreeDetailsPanel({
   onOpenCompanionShop,
   onOpenSupportModal,
 }: TreeDetailsPanelProps) {
-  const { currentUserTree, isSupabaseReady, ensureTreeCalendarLoaded } = useCity()
+  const { currentUserTree, isSupabaseReady, ensureTreeCalendarLoaded, equipSpecies } = useCity()
   const { language, t } = useLocale()
-  const [copied, setCopied] = useState(false)
+  const [instagramCopied, setInstagramCopied] = useState(false)
+  const [isRemovingCompanion, setIsRemovingCompanion] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [exportStatus, setExportStatus] = useState<{
+    format: TreeExportFormat
+    progress: number
+  } | null>(null)
+  const [exportError, setExportError] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false)
+      }
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExportMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [exportMenuOpen])
 
   const hasCalendarWeeks = (tree.stats?.calendarWeeks?.length ?? 0) > 0
   useEffect(() => {
@@ -97,15 +145,61 @@ export function TreeDetailsPanel({
     .map(([slot, id]) => (id ? { slot: slotLabels[slot], name: accessoryCopy[id].name } : null))
     .filter((entry): entry is { slot: string; name: string } => entry !== null)
 
-  const handleCopyShareLink = async () => {
-    const shareUrl = `${window.location.origin}/tree/${encodeURIComponent(tree.profile.github_username)}`
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      // Clipboard may be blocked in restricted browsers; fallback silently.
+  const socialLinks = buildTreeSocialShareLinks(
+    tree.profile.github_username,
+    tree.contribution_count,
+    language,
+  )
+
+  const handleShareInstagram = () => {
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard
+        .writeText(socialLinks.instagramCopyText)
+        .then(() => {
+          if (!mountedRef.current) return
+          setInstagramCopied(true)
+          window.setTimeout(() => {
+            if (mountedRef.current) setInstagramCopied(false)
+          }, 2600)
+        })
+        .catch(() => {
+          // Clipboard may be blocked in restricted browsers; still open Instagram cleanly.
+        })
     }
+    window.open(socialLinks.instagramHref, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleExportTree = (format: TreeExportFormat) => {
+    if (exportStatus) return
+    setExportMenuOpen(false)
+    setExportError(false)
+    setExportStatus({ format, progress: 5 })
+
+    gameEventBus.emit('city:export-tree', {
+      treeId: tree.id,
+      username: tree.profile.github_username,
+      displayCommits: tree.contribution_count,
+      periodYear: tree.stats?.periodYear ?? STANDARD_CONTRIBUTION_YEAR,
+      level: stage.level,
+      stageName: stageCopy.name,
+      language,
+      format,
+      onProgress: (percent) => {
+        if (mountedRef.current) {
+          setExportStatus({ format, progress: percent })
+        }
+      },
+      onComplete: (success) => {
+        if (!mountedRef.current) return
+        setExportStatus(null)
+        if (!success) {
+          setExportError(true)
+          window.setTimeout(() => {
+            if (mountedRef.current) setExportError(false)
+          }, 2600)
+        }
+      },
+    })
   }
 
   return (
@@ -252,10 +346,29 @@ export function TreeDetailsPanel({
 
       {/* Companion Summary & Equipped Items */}
       <div className="mt-3.5 rounded-sm border border-slate-800 bg-[#040811]/85 p-2.5 text-[11px]">
-        <span className="flex items-center gap-1.5 font-semibold text-slate-200">
-          <PawPrint className="h-3.5 w-3.5 text-amber-300" />
-          <span>{companionName ?? t.treePanel.companionNone}</span>
-        </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 font-semibold text-slate-200">
+            <PawPrint className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+            <span className="truncate">{companionName ?? t.treePanel.companionNone}</span>
+          </span>
+          {canCustomizeCompanion && companionName && (
+            <button
+              type="button"
+              disabled={isRemovingCompanion}
+              onClick={() => {
+                if (isRemovingCompanion) return
+                setIsRemovingCompanion(true)
+                void equipSpecies(tree.profile.github_username, null).finally(() => {
+                  if (mountedRef.current) setIsRemovingCompanion(false)
+                })
+              }}
+              className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-rose-500/45 bg-rose-950/45 px-2 py-0.5 text-[10px] font-semibold text-rose-200 hover:border-rose-400 hover:text-white disabled:opacity-60 cursor-pointer"
+            >
+              <X className="h-3 w-3" />
+              <span>{t.treePanel.removeCompanionBtn}</span>
+            </button>
+          )}
+        </div>
         {equippedAccessoryEntries.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1 border-t border-slate-800/80 pt-2">
             {equippedAccessoryEntries.map((item) => (
@@ -312,14 +425,107 @@ export function TreeDetailsPanel({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={handleCopyShareLink}
-          className="pixel-btn pixel-btn-wood col-span-2 rounded-sm px-3 py-1.5 text-[11px]"
-        >
-          {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Share2 className="h-3.5 w-3.5" />}
-          <span>{copied ? t.treePanel.linkCopied : t.treePanel.copyLink}</span>
-        </button>
+        <div ref={exportMenuRef} className="relative col-span-2">
+          <button
+            type="button"
+            disabled={Boolean(exportStatus)}
+            aria-expanded={exportMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setExportMenuOpen((prev) => !prev)}
+            className={`pixel-btn pixel-btn-pine w-full rounded-sm px-2.5 py-1.5 text-[11px] font-semibold ${
+              exportStatus ? 'cursor-wait opacity-90' : ''
+            }`}
+          >
+            <Download className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {exportStatus
+                ? exportStatus.format === 'gif'
+                  ? `${t.treePanel.exportGeneratingGif} ${exportStatus.progress}%`
+                  : t.treePanel.exportCapturing
+                : t.treePanel.exportBtn}
+            </span>
+            {!exportStatus && <ChevronDown className="h-3 w-3 shrink-0 opacity-80" />}
+          </button>
+
+          {exportMenuOpen && !exportStatus && (
+            <div
+              role="menu"
+              className="absolute bottom-full right-0 z-40 mb-1.5 w-48 rounded-sm border border-emerald-500/40 bg-[#060b16]/98 p-1 shadow-xl"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleExportTree('png')}
+                className="flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-left text-[11px] font-medium text-slate-100 hover:bg-emerald-500/15 hover:text-emerald-300 cursor-pointer"
+              >
+                <Camera className="h-3.5 w-3.5 text-emerald-400" />
+                <span>{t.treePanel.exportPng}</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleExportTree('gif')}
+                className="flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-left text-[11px] font-medium text-slate-100 hover:bg-emerald-500/15 hover:text-emerald-300 cursor-pointer"
+              >
+                <Film className="h-3.5 w-3.5 text-amber-300" />
+                <span>{t.treePanel.exportGif}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {exportStatus && (
+          <div className="col-span-2 mt-0.5 space-y-1">
+            <div className="h-1.5 w-full overflow-hidden rounded-sm bg-slate-900">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500 to-amber-300 transition-[width] duration-150"
+                style={{ width: `${Math.max(8, exportStatus.progress)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {exportError && (
+          <p className="col-span-2 text-center text-[10px] text-rose-300">
+            {t.treePanel.exportError}
+          </p>
+        )}
+
+        <div className="col-span-2 mt-1 border-t border-slate-800/70 pt-2">
+          <p className="mb-1.5 text-center text-[10px] uppercase tracking-wide text-slate-500">
+            {t.treePanel.shareSocial}
+          </p>
+          <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
+            <a
+              href={socialLinks.xHref}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-sm border border-slate-700 bg-[#0d1833] py-1 text-sky-300 hover:border-sky-400"
+            >
+              X / Twitter
+            </a>
+            <button
+              type="button"
+              onClick={handleShareInstagram}
+              className="rounded-sm border border-slate-700 bg-[#0d1833] py-1 text-pink-300 hover:border-pink-400 cursor-pointer"
+            >
+              Instagram
+            </button>
+            <a
+              href={socialLinks.linkedinHref}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-sm border border-slate-700 bg-[#0d1833] py-1 text-amber-200 hover:border-amber-400"
+            >
+              LinkedIn
+            </a>
+          </div>
+          {instagramCopied && (
+            <p className="mt-1.5 text-center text-[10px] font-medium text-pink-300">
+              {t.treePanel.instagramCopied}
+            </p>
+          )}
+        </div>
       </div>
     </aside>
   )

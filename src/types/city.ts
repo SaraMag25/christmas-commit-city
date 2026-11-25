@@ -35,6 +35,7 @@ export interface GiftItem {
   category: GiftCategory
   price: number
   priceUsd?: number
+  pixOnly?: boolean
   rarity: GiftRarity
   description: string
   accentColor: string

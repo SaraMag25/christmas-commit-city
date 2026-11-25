@@ -17,6 +17,7 @@ import {
   generateVoxelTreeGeometryData,
   sharedTreeInstancedMaterials,
   type ColoredBox,
+  type FloatingScenePropHandle,
   type TreeVisualSpec,
 } from './voxelTreeBuilder'
 import { gridToWorld } from './voxelWorldBuilder'
@@ -55,6 +56,7 @@ interface TreeOverlayHandle {
   signature: string
   tree: CityTree
   giftGroup: THREE.Group | null
+  floatingProps: FloatingScenePropHandle[]
   companion: BuiltCompanion | null
   companionPhase: number
   companionGroup: THREE.Group | null
@@ -64,6 +66,7 @@ interface TreeOverlayHandle {
 export interface InstancedCityTreesHandle {
   group: THREE.Group
   animatedCompanions: AnimatedCompanionEntry[]
+  animatedFloatingProps: FloatingScenePropHandle[]
   rebuild: (realTrees: readonly CityTree[]) => {
     maxAbsX: number
     maxAbsZ: number
@@ -237,6 +240,7 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
   let lastBaseSignature = ''
   let lowGraphics = false
   const animatedCompanions: AnimatedCompanionEntry[] = []
+  const animatedFloatingProps: FloatingScenePropHandle[] = []
 
   const tmpMatrix = new THREE.Matrix4()
   const tmpInvMatrix = new THREE.Matrix4()
@@ -490,6 +494,7 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
     }
 
     animatedCompanions.length = 0
+    animatedFloatingProps.length = 0
 
     for (let i = 0; i < realTrees.length; i += 1) {
       const tree = realTrees[i]
@@ -504,6 +509,9 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
             companion: existing.companion,
             phase: existing.companionPhase,
           })
+        }
+        if (existing.floatingProps.length > 0) {
+          animatedFloatingProps.push(...existing.floatingProps)
         }
         continue
       }
@@ -521,6 +529,7 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
       const outerRadius = record?.outerRadius ?? 2.2
 
       let giftGroup: THREE.Group | null = null
+      let floatingProps: FloatingScenePropHandle[] = []
       if (tree.gifts.length > 0) {
         const builtGifts = buildTreeGiftsAndStarOverlay({
           level: tree.tree_level,
@@ -536,6 +545,10 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
         builtGifts.group.userData = { treeId: tree.id }
         overlaysGroup.add(builtGifts.group)
         giftGroup = builtGifts.group
+        floatingProps = builtGifts.floatingProps
+        if (floatingProps.length > 0) {
+          animatedFloatingProps.push(...floatingProps)
+        }
       }
 
       let companion: BuiltCompanion | null = null
@@ -573,6 +586,7 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
         signature: sig,
         tree,
         giftGroup,
+        floatingProps,
         companion,
         companionPhase,
         companionGroup,
@@ -845,11 +859,13 @@ export function createInstancedCityTreesLayer(): InstancedCityTreesHandle {
     spatialBuckets.clear()
     records = []
     animatedCompanions.length = 0
+    animatedFloatingProps.length = 0
   }
 
   return {
     group,
     animatedCompanions,
+    animatedFloatingProps,
     rebuild,
     setLowGraphicsMode,
     pickTreeAtRay,

@@ -50,11 +50,22 @@ export interface VoxelTreeBuildOptions {
   separateBaubles?: boolean
 }
 
+export interface FloatingScenePropHandle {
+  group: THREE.Group
+  baseY: number
+  phase: number
+  spinSpeed: number
+  bobAmp?: number
+  tiltAmp?: number
+  thrusterMesh?: THREE.Mesh
+}
+
 export interface BuiltVoxelTree {
   group: THREE.Group
   phaseAMeshes: THREE.Mesh[]
   phaseBMeshes: THREE.Mesh[]
   starMeshes: THREE.Mesh[]
+  floatingProps: FloatingScenePropHandle[]
   baubleInstances: BaubleInstanceData[]
   auraMesh: THREE.Mesh | null
   height: number
@@ -254,6 +265,40 @@ const staticMat = new THREE.MeshToonMaterial({
 })
 const l4PhaseAMergedMat = new THREE.MeshBasicMaterial({ vertexColors: true })
 const l4PhaseBMergedMat = new THREE.MeshBasicMaterial({ vertexColors: true })
+const ufoBeamMat = new THREE.MeshBasicMaterial({
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.2,
+  depthWrite: false,
+})
+
+/** Gently bobs, rotates, and pulses thruster flames on floating space scene items (UFO & Rocket). */
+export function updateFloatingGiftProps(
+  handles: readonly FloatingScenePropHandle[],
+  timeSec: number,
+  animate = true,
+): void {
+  for (let i = 0; i < handles.length; i += 1) {
+    const item = handles[i]
+    if (!animate) {
+      item.group.position.y = item.baseY
+      item.group.rotation.z = 0
+      item.thrusterMesh?.scale.setScalar(1)
+      continue
+    }
+    const bobAmp = item.bobAmp ?? 0.16
+    item.group.position.y = item.baseY + Math.sin(timeSec * 2.15 + item.phase) * bobAmp
+    item.group.rotation.y = timeSec * item.spinSpeed + item.phase
+    if (item.tiltAmp) {
+      item.group.rotation.z = Math.sin(timeSec * 1.65 + item.phase) * item.tiltAmp
+    }
+    if (item.thrusterMesh) {
+      const pulseY = 0.86 + 0.28 * (0.5 + 0.5 * Math.sin(timeSec * 11.5 + item.phase))
+      const pulseXZ = 0.92 + 0.12 * (0.5 + 0.5 * Math.cos(timeSec * 9.0 + item.phase))
+      item.thrusterMesh.scale.set(pulseXZ, pulseY, pulseXZ)
+    }
+  }
+}
 
 export const instancedBaubleMaterials = {
   l12: sharedTreeInstancedMaterials.foliage,
@@ -1278,7 +1323,12 @@ export function buildTreeGiftsAndStarOverlay(opts: {
   contributionCount?: number
   frontYaw?: number
   preserveFrontOrientation?: boolean
-}): { group: THREE.Group; height: number; outerRadius: number } {
+}): {
+  group: THREE.Group
+  height: number
+  outerRadius: number
+  floatingProps: FloatingScenePropHandle[]
+} {
   const {
     level,
     seed,
@@ -1305,6 +1355,7 @@ export function buildTreeGiftsAndStarOverlay(opts: {
   const l4bBoxes: ColoredBox[] = []
   const phaseAMeshes: THREE.Mesh[] = []
   const phaseBMeshes: THREE.Mesh[] = []
+  const floatingProps: FloatingScenePropHandle[] = []
   const usedGroundSlots = new Set<number>()
 
   if (activeGifts.length > 0) {
@@ -1323,6 +1374,7 @@ export function buildTreeGiftsAndStarOverlay(opts: {
       l4bBoxes,
       phaseAMeshes,
       phaseBMeshes,
+      floatingProps,
       usedGroundSlots,
     })
   }
@@ -1353,6 +1405,7 @@ export function buildTreeGiftsAndStarOverlay(opts: {
     group,
     height: spec.starY + 0.85 * spec.voxelSize * spec.starScale,
     outerRadius: spec.outerRadius,
+    floatingProps,
   }
 }
 
@@ -1465,6 +1518,7 @@ export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxel
   const phaseAMeshes: THREE.Mesh[] = []
   const phaseBMeshes: THREE.Mesh[] = []
   const starMeshes: THREE.Mesh[] = []
+  const floatingProps: FloatingScenePropHandle[] = []
   const usedGroundSlots = new Set<number>()
 
   // Ground shadow pad under tree
@@ -1506,6 +1560,7 @@ export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxel
       l4bBoxes,
       phaseAMeshes,
       phaseBMeshes,
+      floatingProps,
       usedGroundSlots,
     })
   } else if (level >= 5 || giftCount > 0 || isScenicLandmark) {
@@ -1557,6 +1612,7 @@ export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxel
     phaseAMeshes,
     phaseBMeshes,
     starMeshes,
+    floatingProps,
     baubleInstances: [],
     auraMesh: null,
     height: data.height,
@@ -1708,6 +1764,157 @@ function addRetroPcGift(boxes: ColoredBox[], glowBoxes: ColoredBox[], x: number,
   boxes.push({ x: x + 0.28, y: 0.075, z: z + 0.26, sx: 0.15, sy: 0.025, sz: 0.028, color: '#334155' })
 }
 
+/**
+ * Retro voxel spacecraft rocket with metallic white hull, crimson nose/fins,
+ * sky-blue porthole & trim, launchpad snow base, and soft pulsing exhaust flame.
+ */
+function addRetroRocketObject(
+  parentGroup: THREE.Group,
+  staticGroundBoxes: ColoredBox[],
+  glowGroundBoxes: ColoredBox[],
+  x: number,
+  z: number,
+  phase: number,
+  outFloatingProps: FloatingScenePropHandle[],
+): void {
+  // Compact snowy cosmic launchpad + dark deflector grate directly beneath nozzle exhaust
+  staticGroundBoxes.push({ x, y: 0.03, z, sx: 0.94, sy: 0.055, sz: 0.94, color: '#cbd5e1' })
+  staticGroundBoxes.push({ x, y: 0.075, z, sx: 0.68, sy: 0.04, sz: 0.68, color: '#334155' })
+  glowGroundBoxes.push({ x, y: 0.105, z, sx: 0.34, sy: 0.025, sz: 0.34, color: '#fed7aa' })
+
+  const rocketGroup = new THREE.Group()
+  const baseY = 0.72
+  rocketGroup.position.set(x, baseY, z)
+
+  const hullBoxes: ColoredBox[] = [
+    // Stepped white & brushed metallic fuselage tiers
+    { x: 0, y: 0.18, z: 0, sx: 0.42, sy: 0.36, sz: 0.42, color: '#f8fafc' },
+    { x: 0, y: 0.48, z: 0, sx: 0.38, sy: 0.28, sz: 0.38, color: '#e2e8f0' },
+    { x: 0, y: 0.72, z: 0, sx: 0.32, sy: 0.2, sz: 0.32, color: '#f8fafc' },
+    // Royal blue structural collar band
+    { x: 0, y: 0.62, z: 0, sx: 0.37, sy: 0.08, sz: 0.37, color: '#2563eb' },
+    { x: 0, y: 0.03, z: 0, sx: 0.38, sy: 0.07, sz: 0.38, color: '#475569' },
+    // Sleek retro crimson nose cone + silver fairing spire
+    { x: 0, y: 0.89, z: 0, sx: 0.24, sy: 0.15, sz: 0.24, color: '#ef4444' },
+    { x: 0, y: 1.01, z: 0, sx: 0.15, sy: 0.12, sz: 0.15, color: '#dc2626' },
+    { x: 0, y: 1.11, z: 0, sx: 0.075, sy: 0.1, sz: 0.075, color: '#b91c1c' },
+    // Porthole dark-blue frames front & back
+    { x: 0, y: 0.43, z: 0.205, sx: 0.2, sy: 0.2, sz: 0.04, color: '#1d4ed8' },
+    { x: 0, y: 0.43, z: -0.205, sx: 0.2, sy: 0.2, sz: 0.04, color: '#1d4ed8' },
+    // 4 swept retro red tail fins + blue aero winglets
+    { x: -0.29, y: 0.12, z: 0, sx: 0.16, sy: 0.28, sz: 0.08, color: '#ef4444' },
+    { x: -0.34, y: 0.02, z: 0, sx: 0.09, sy: 0.14, sz: 0.085, color: '#3b82f6' },
+    { x: 0.29, y: 0.12, z: 0, sx: 0.16, sy: 0.28, sz: 0.08, color: '#ef4444' },
+    { x: 0.34, y: 0.02, z: 0, sx: 0.09, sy: 0.14, sz: 0.085, color: '#3b82f6' },
+    { x: 0, y: 0.12, z: -0.29, sx: 0.08, sy: 0.28, sz: 0.16, color: '#dc2626' },
+    { x: 0, y: 0.02, z: -0.34, sx: 0.085, sy: 0.14, sz: 0.09, color: '#3b82f6' },
+    { x: 0, y: 0.12, z: 0.29, sx: 0.08, sy: 0.28, sz: 0.16, color: '#dc2626' },
+    { x: 0, y: 0.02, z: 0.34, sx: 0.085, sy: 0.14, sz: 0.09, color: '#3b82f6' },
+    // Charcoal thruster exhaust bell
+    { x: 0, y: -0.05, z: 0, sx: 0.26, sy: 0.1, sz: 0.26, color: '#1e293b' },
+  ]
+  const glassBoxes: ColoredBox[] = [
+    // Sky-blue circular porthole windows + subtle white cockpit catchlight
+    { x: 0, y: 0.43, z: 0.228, sx: 0.12, sy: 0.12, sz: 0.025, color: '#38bdf8' },
+    { x: -0.03, y: 0.46, z: 0.242, sx: 0.04, sy: 0.04, sz: 0.015, color: '#e0f2fe' },
+    { x: 0, y: 0.43, z: -0.228, sx: 0.12, sy: 0.12, sz: 0.025, color: '#38bdf8' },
+  ]
+  // Exhaust propulsion flame anchored neatly beneath the thruster bell
+  const flamePivot = new THREE.Group()
+  flamePivot.position.set(0, -0.1, 0)
+  const thrusterMesh = mergeColoredBoxes(
+    [
+      { x: 0, y: -0.09, z: 0, sx: 0.22, sy: 0.18, sz: 0.22, color: '#fb923c' },
+      { x: 0, y: -0.22, z: 0, sx: 0.14, sy: 0.18, sz: 0.14, color: '#fef08a' },
+      { x: 0, y: -0.34, z: 0, sx: 0.07, sy: 0.14, sz: 0.07, color: '#e0f2fe' },
+    ],
+    l4PhaseAMergedMat,
+  )
+  flamePivot.add(thrusterMesh)
+
+  rocketGroup.add(mergeColoredBoxes(hullBoxes, staticMat))
+  rocketGroup.add(mergeColoredBoxes(glassBoxes, l4PhaseAMergedMat))
+  rocketGroup.add(flamePivot)
+  parentGroup.add(rocketGroup)
+
+  outFloatingProps.push({
+    group: rocketGroup,
+    baseY,
+    phase,
+    spinSpeed: 0.35,
+    bobAmp: 0.09,
+    tiltAmp: 0.045,
+    thrusterMesh,
+  })
+}
+
+/**
+ * Floating pastel lavender voxel saucer hovering gracefully beside the tree with surrounding
+ * luminous cream stars and a translucent downward light beam.
+ */
+function addLilacUfoObject(
+  parentGroup: THREE.Group,
+  staticGroundBoxes: ColoredBox[],
+  x: number,
+  z: number,
+  phase: number,
+  outFloatingProps: FloatingScenePropHandle[],
+): void {
+  // Subtle cream-lavender snow reflection pad directly under the tractor beam
+  staticGroundBoxes.push({ x, y: 0.028, z, sx: 0.88, sy: 0.045, sz: 0.88, color: '#ddd6fe' })
+
+  const ufoGroup = new THREE.Group()
+  const baseY = 2.05
+  ufoGroup.position.set(x, baseY, z)
+
+  const bodyBoxes: ColoredBox[] = [
+    // Wide pastel lavender rim & cross disc plates
+    { x: 0, y: 0, z: 0, sx: 1.06, sy: 0.14, sz: 0.72, color: '#c4b5fd' },
+    { x: 0, y: 0, z: 0, sx: 0.72, sy: 0.14, sz: 1.06, color: '#c4b5fd' },
+    { x: 0, y: 0.09, z: 0, sx: 0.78, sy: 0.1, sz: 0.78, color: '#ddd6fe' },
+    // Deep pastel violet lower hull & thruster collar
+    { x: 0, y: -0.1, z: 0, sx: 0.66, sy: 0.1, sz: 0.66, color: '#a78bfa' },
+    { x: 0, y: -0.17, z: 0, sx: 0.36, sy: 0.06, sz: 0.36, color: '#7c3aed' },
+    // Rounded pastel violet canopy rim around bright cupola
+    { x: 0, y: 0.19, z: 0, sx: 0.5, sy: 0.12, sz: 0.5, color: '#a78bfa' },
+  ]
+  const glowBoxes: ColoredBox[] = [
+    // Luminous pastel cream-yellow glass dome on top
+    { x: 0, y: 0.28, z: 0, sx: 0.42, sy: 0.16, sz: 0.42, color: '#fef9c3' },
+    { x: 0, y: 0.38, z: 0, sx: 0.26, sy: 0.07, sz: 0.26, color: '#fef08a' },
+    // 4 glowing rim navigation bulbs
+    { x: -0.48, y: 0.01, z: 0, sx: 0.09, sy: 0.09, sz: 0.09, color: '#fef9c3' },
+    { x: 0.48, y: 0.01, z: 0, sx: 0.09, sy: 0.09, sz: 0.09, color: '#fef9c3' },
+    { x: 0, y: 0.01, z: -0.48, sx: 0.09, sy: 0.09, sz: 0.09, color: '#e9d5ff' },
+    { x: 0, y: 0.01, z: 0.48, sx: 0.09, sy: 0.09, sz: 0.09, color: '#e9d5ff' },
+    // Surrounding twinkling pastel stars around the UFO
+    { x: -0.74, y: 0.22, z: 0.24, sx: 0.09, sy: 0.09, sz: 0.09, color: '#fef9c3' },
+    { x: 0.72, y: 0.28, z: -0.26, sx: 0.09, sy: 0.09, sz: 0.09, color: '#fde68a' },
+    { x: 0.36, y: 0.48, z: 0.56, sx: 0.08, sy: 0.08, sz: 0.08, color: '#fef9c3' },
+    { x: -0.44, y: 0.44, z: -0.52, sx: 0.08, sy: 0.08, sz: 0.08, color: '#e9d5ff' },
+    { x: 0.64, y: -0.14, z: 0.52, sx: 0.075, sy: 0.075, sz: 0.075, color: '#fef9c3' },
+    { x: -0.62, y: -0.18, z: -0.48, sx: 0.075, sy: 0.075, sz: 0.075, color: '#e9d5ff' },
+  ]
+  const beamBoxes: ColoredBox[] = [
+    // Stepped soft pastel tractor beam descending cleanly toward the snow ground
+    { x: 0, y: -0.44, z: 0, sx: 0.34, sy: 0.48, sz: 0.34, color: '#fef9c3' },
+    { x: 0, y: -0.94, z: 0, sx: 0.54, sy: 0.54, sz: 0.54, color: '#fef9c3' },
+    { x: 0, y: -1.46, z: 0, sx: 0.74, sy: 0.56, sz: 0.74, color: '#f3e8ff' },
+  ]
+
+  ufoGroup.add(mergeColoredBoxes(bodyBoxes, staticMat))
+  ufoGroup.add(mergeColoredBoxes(glowBoxes, l4PhaseAMergedMat))
+  ufoGroup.add(mergeColoredBoxes(beamBoxes, ufoBeamMat))
+  parentGroup.add(ufoGroup)
+
+  outFloatingProps.push({
+    group: ufoGroup,
+    baseY,
+    phase,
+    spinSpeed: 0.75,
+  })
+}
+
 function sampleRingPoint(
   ring: TierPlacementRing,
   angle: number,
@@ -1793,6 +2000,7 @@ function buildCommunityGiftsShowcase(opts: {
   l4bBoxes: ColoredBox[]
   phaseAMeshes: THREE.Mesh[]
   phaseBMeshes: THREE.Mesh[]
+  floatingProps: FloatingScenePropHandle[]
   usedGroundSlots: Set<number>
 }): void {
   const {
@@ -1810,6 +2018,7 @@ function buildCommunityGiftsShowcase(opts: {
     l4bBoxes,
     phaseAMeshes,
     phaseBMeshes,
+    floatingProps,
     usedGroundSlots,
   } = opts
 
@@ -1821,18 +2030,18 @@ function buildCommunityGiftsShowcase(opts: {
   const frontGlowB: ColoredBox[] = []
 
   // Dedicated non-overlapping ground base slots clear of the companion corner (+X, +Z)
-  const groundDist = Math.min(2.42, Math.max(1.58, outerRadius * 0.92))
+  const groundDist = Math.min(2.48, Math.max(1.62, outerRadius * 0.94))
   const groundSlots: Array<{ x: number; z: number }> = [
     { x: -0.92 * groundDist, z: 0.39 * groundDist }, // Slot 0: primary cozy-teddy (front-left)
     { x: -0.36 * groundDist, z: 0.93 * groundDist }, // Slot 1: primary gift-box (front-center-left)
     { x: 0.98 * groundDist, z: -0.1 * groundDist }, // Slot 2: primary retro-pc (right showcase, behind companion arc)
-    { x: -0.76 * groundDist, z: -0.65 * groundDist }, // Slot 3: overflow rear-left
-    { x: 0.58 * groundDist, z: -0.81 * groundDist }, // Slot 4: overflow rear-right
+    { x: -0.76 * groundDist, z: -0.65 * groundDist }, // Slot 3: primary retro-rocket launchpad
+    { x: 0.58 * groundDist, z: -0.81 * groundDist }, // Slot 4: primary lilac-ufo hovering perch
     { x: -0.12 * groundDist, z: -0.99 * groundDist }, // Slot 5: overflow rear-center
   ]
 
-  // Reserve Slots 0..2 exclusively for primary ground gifts regardless of gift arrival order
-  const RESERVED_PRIMARY_SLOTS = 3
+  // Reserve Slots 0..4 exclusively for primary ground/scenic gifts regardless of gift arrival order
+  const RESERVED_PRIMARY_SLOTS = 5
 
   const allocPrimaryGroundSlot = (primarySlotIdx: number): { x: number; z: number } => {
     if (!usedGroundSlots.has(primarySlotIdx)) {
@@ -1875,6 +2084,8 @@ function buildCommunityGiftsShowcase(opts: {
   let teddyCount = 0
   let boxCount = 0
   let retroPcCount = 0
+  let retroRocketCount = 0
+  let lilacUfoCount = 0
   const branchPassCount: Record<string, number> = {}
 
   for (let i = 0; i < gifts.length; i += 1) {
@@ -1902,6 +2113,37 @@ function buildCommunityGiftsShowcase(opts: {
       const slot = retroPcCount === 0 ? allocPrimaryGroundSlot(2) : allocOverflowGroundSlot()
       addRetroPcGift(frontBoxes, frontGlowA, slot.x, slot.z)
       retroPcCount += 1
+      continue
+    }
+
+    if (slug === 'retro-rocket') {
+      if (retroRocketCount >= 1) continue
+      const slot = allocPrimaryGroundSlot(3)
+      addRetroRocketObject(
+        giftFrontGroup,
+        frontBoxes,
+        frontGlowA,
+        slot.x,
+        slot.z,
+        ((seed % 100) * 0.11) + 0.65,
+        floatingProps,
+      )
+      retroRocketCount += 1
+      continue
+    }
+
+    if (slug === 'lilac-ufo') {
+      if (lilacUfoCount >= 1) continue
+      const slot = allocPrimaryGroundSlot(4)
+      addLilacUfoObject(
+        giftFrontGroup,
+        frontBoxes,
+        slot.x,
+        slot.z,
+        ((seed % 100) * 0.13) + lilacUfoCount,
+        floatingProps,
+      )
+      lilacUfoCount += 1
       continue
     }
 

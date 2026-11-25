@@ -587,6 +587,7 @@ export function HomePage() {
       )}
       {companionTargetTree && (
         <CompanionShopModal
+          key={companionTargetTree.id}
           tree={companionTargetTree}
           onClose={() => setCompanionTargetTreeId(null)}
         />

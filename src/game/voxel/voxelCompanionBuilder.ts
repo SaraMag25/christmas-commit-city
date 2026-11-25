@@ -25,17 +25,187 @@ interface AnchorPoint {
   scale: number
 }
 
-interface FaceAnchorPoint extends AnchorPoint {
-  eyeSpan: number
+interface HeadAnchorPoint extends AnchorPoint {
+  width: number
+  depth: number
 }
 
-interface CompanionRig {
-  headAnchor: AnchorPoint
-  faceAnchor: FaceAnchorPoint
-  neckAnchor: AnchorPoint
-  backAnchor: AnchorPoint
-  handAnchor: AnchorPoint
-  height: number
+interface FaceAnchorPoint extends AnchorPoint {
+  eyeSpan: number
+  headHalfW: number
+}
+
+export interface DynamicCompanionAnchors {
+  anchorHeadTop: HeadAnchorPoint
+  anchorFaceFront: FaceAnchorPoint
+  anchorTorsoCenter: { x: number; y: number; z: number; sx: number; sy: number; sz: number }
+  anchorTorsoWidth: number
+  anchorSideHand: AnchorPoint
+  modelBounds: THREE.Box3
+}
+
+interface SpeciesRigProfile {
+  headMinY: number
+  headMaxY: number
+  headHalfSpanX?: number
+  faceCenterY: number
+  eyeSpan: number
+  crownClearance?: number
+  torsoMinY: number
+  torsoMaxY: number
+  torsoHalfSpanX?: number
+  torsoMarginXZ?: number
+  torsoMarginY?: number
+  hoodYRatio?: number
+  hoodZOffset?: number
+  handHeightRatio?: number
+  handClearanceX?: number
+  handZOffset?: number
+  handScale?: number
+  backAnchorZMargin?: number
+  modelHeight: number
+}
+
+const SPECIES_RIG_PROFILES: Record<CompanionSpeciesId, SpeciesRigProfile> = {
+  frog: {
+    headMinY: 0.44,
+    headMaxY: 0.74,
+    faceCenterY: 0.65,
+    eyeSpan: 0.42,
+    crownClearance: 0.025,
+    torsoMinY: 0.14,
+    torsoMaxY: 0.46,
+    torsoMarginXZ: 0.045,
+    torsoMarginY: 0.02,
+    handHeightRatio: 0.56,
+    handClearanceX: 0.14,
+    handZOffset: 0.2,
+    handScale: 0.94,
+    modelHeight: 1.05,
+  },
+  otter: {
+    headMinY: 0.66,
+    headMaxY: 1.06,
+    faceCenterY: 0.87,
+    eyeSpan: 0.28,
+    crownClearance: 0.01,
+    torsoMinY: 0.14,
+    torsoMaxY: 0.64,
+    torsoMarginXZ: 0.05,
+    torsoMarginY: 0.02,
+    handHeightRatio: 0.56,
+    handClearanceX: 0.15,
+    handZOffset: 0.22,
+    handScale: 0.92,
+    modelHeight: 1.25,
+  },
+  snake: {
+    headMinY: 0.65,
+    headMaxY: 0.96,
+    headHalfSpanX: 0.26,
+    faceCenterY: 0.81,
+    eyeSpan: 0.28,
+    crownClearance: 0.015,
+    torsoMinY: 0.37,
+    torsoMaxY: 0.64,
+    torsoHalfSpanX: 0.2,
+    torsoMarginXZ: 0.06,
+    torsoMarginY: 0.015,
+    handHeightRatio: 0.48,
+    handClearanceX: 0.13,
+    handZOffset: 0.18,
+    handScale: 0.88,
+    modelHeight: 1.18,
+  },
+  capybara: {
+    headMinY: 0.58,
+    headMaxY: 0.94,
+    faceCenterY: 0.78,
+    eyeSpan: 0.32,
+    crownClearance: 0.025,
+    torsoMinY: 0.2,
+    torsoMaxY: 0.64,
+    torsoMarginXZ: 0.045,
+    torsoMarginY: 0.02,
+    hoodYRatio: 0.52,
+    hoodZOffset: 0.14,
+    handHeightRatio: 0.45,
+    handClearanceX: 0.16,
+    handZOffset: 0.28,
+    handScale: 0.96,
+    modelHeight: 1.15,
+  },
+  mouse: {
+    headMinY: 0.55,
+    headMaxY: 0.9,
+    headHalfSpanX: 0.24,
+    faceCenterY: 0.72,
+    eyeSpan: 0.26,
+    crownClearance: 0.065,
+    torsoMinY: 0.15,
+    torsoMaxY: 0.54,
+    torsoMarginXZ: 0.045,
+    torsoMarginY: 0.02,
+    handHeightRatio: 0.52,
+    handClearanceX: 0.13,
+    handZOffset: 0.2,
+    handScale: 0.88,
+    modelHeight: 1.12,
+  },
+  cat: {
+    headMinY: 0.6,
+    headMaxY: 0.96,
+    headHalfSpanX: 0.25,
+    faceCenterY: 0.79,
+    eyeSpan: 0.28,
+    crownClearance: 0.045,
+    torsoMinY: 0.14,
+    torsoMaxY: 0.56,
+    torsoHalfSpanX: 0.27,
+    torsoMarginXZ: 0.05,
+    torsoMarginY: 0.02,
+    handHeightRatio: 0.52,
+    handClearanceX: 0.15,
+    handZOffset: 0.2,
+    handScale: 0.9,
+    modelHeight: 1.2,
+  },
+  clawd_cafe: {
+    headMinY: 0.24,
+    headMaxY: 0.75,
+    headHalfSpanX: 0.44,
+    faceCenterY: 0.5,
+    eyeSpan: 0.42,
+    crownClearance: 0.008,
+    torsoMinY: 0.18,
+    torsoMaxY: 0.355,
+    torsoHalfSpanX: 0.44,
+    torsoMarginXZ: 0.036,
+    torsoMarginY: 0.01,
+    handHeightRatio: 0.55,
+    handClearanceX: 0.17,
+    handZOffset: 0.14,
+    handScale: 0.8,
+    modelHeight: 0.98,
+  },
+  leaf_kitty: {
+    headMinY: 0.6,
+    headMaxY: 0.96,
+    headHalfSpanX: 0.25,
+    faceCenterY: 0.78,
+    eyeSpan: 0.28,
+    crownClearance: 0.055,
+    torsoMinY: 0.14,
+    torsoMaxY: 0.56,
+    torsoHalfSpanX: 0.27,
+    torsoMarginXZ: 0.05,
+    torsoMarginY: 0.02,
+    handHeightRatio: 0.52,
+    handClearanceX: 0.15,
+    handZOffset: 0.2,
+    handScale: 0.9,
+    modelHeight: 1.28,
+  },
 }
 
 export interface SteamPuffHandle {
@@ -71,58 +241,182 @@ export interface BuiltCompanion {
   butterfly: ButterflyHandle | null
   snowFlakes: SnowFlakeHandle[]
   steamPuffs: SteamPuffHandle[]
+  antennaeGroup?: THREE.Group | null
+  tailGroup?: THREE.Group | null
+  armGroups?: { left: THREE.Group; right: THREE.Group } | null
+  anchors: DynamicCompanionAnchors
   height: number
 }
 
-const SPECIES_RIGS: Record<CompanionSpeciesId, CompanionRig> = {
-  frog: {
-    headAnchor: { x: 0, y: 0.72, z: 0.04, scale: 1.0 },
-    faceAnchor: { x: 0, y: 0.62, z: 0.36, scale: 1.0, eyeSpan: 0.42 },
-    neckAnchor: { x: 0, y: 0.41, z: 0.02, scale: 1.24 },
-    backAnchor: { x: 0, y: 0.36, z: -0.34, scale: 1.0 },
-    handAnchor: { x: 0.46, y: 0.36, z: 0.22, scale: 1.0 },
-    height: 1.05,
-  },
-  otter: {
-    headAnchor: { x: 0, y: 1.06, z: 0.04, scale: 0.92 },
-    faceAnchor: { x: 0, y: 0.86, z: 0.32, scale: 0.92, eyeSpan: 0.28 },
-    neckAnchor: { x: 0, y: 0.62, z: 0.06, scale: 0.92 },
-    backAnchor: { x: 0, y: 0.5, z: -0.26, scale: 0.95 },
-    handAnchor: { x: 0.38, y: 0.48, z: 0.24, scale: 0.95 },
-    height: 1.25,
-  },
-  snake: {
-    headAnchor: { x: 0, y: 0.96, z: 0.08, scale: 0.88 },
-    faceAnchor: { x: 0, y: 0.81, z: 0.34, scale: 0.88, eyeSpan: 0.28 },
-    neckAnchor: { x: 0, y: 0.56, z: 0.06, scale: 0.84 },
-    backAnchor: { x: 0, y: 0.42, z: -0.2, scale: 0.86 },
-    handAnchor: { x: 0.42, y: 0.44, z: 0.2, scale: 0.92 },
-    height: 1.18,
-  },
-  capybara: {
-    headAnchor: { x: 0, y: 0.94, z: 0.2, scale: 0.98 },
-    faceAnchor: { x: 0, y: 0.76, z: 0.54, scale: 0.96, eyeSpan: 0.32 },
-    neckAnchor: { x: 0, y: 0.54, z: 0.14, scale: 1.16 },
-    backAnchor: { x: 0, y: 0.56, z: -0.2, scale: 1.06 },
-    handAnchor: { x: 0.42, y: 0.38, z: 0.34, scale: 1.0 },
-    height: 1.15,
-  },
-  mouse: {
-    headAnchor: { x: 0, y: 0.92, z: 0.06, scale: 0.86 },
-    faceAnchor: { x: 0, y: 0.7, z: 0.34, scale: 0.88, eyeSpan: 0.26 },
-    neckAnchor: { x: 0, y: 0.48, z: 0.06, scale: 0.88 },
-    backAnchor: { x: 0, y: 0.4, z: -0.22, scale: 0.88 },
-    handAnchor: { x: 0.36, y: 0.38, z: 0.22, scale: 0.9 },
-    height: 1.12,
-  },
-  cat: {
-    headAnchor: { x: 0, y: 0.98, z: 0.06, scale: 0.88 },
-    faceAnchor: { x: 0, y: 0.78, z: 0.31, scale: 0.88, eyeSpan: 0.28 },
-    neckAnchor: { x: 0, y: 0.56, z: 0.06, scale: 0.88 },
-    backAnchor: { x: 0, y: 0.44, z: -0.22, scale: 0.9 },
-    handAnchor: { x: 0.36, y: 0.4, z: 0.22, scale: 0.9 },
-    height: 1.2,
-  },
+const tempBoxMin = new THREE.Vector3()
+const tempBoxMax = new THREE.Vector3()
+const tempObjBox = new THREE.Box3()
+
+function expandBox3FromVoxelBox(target: THREE.Box3, box: ColoredBox): void {
+  tempBoxMin.set(box.x - box.sx * 0.5, box.y - box.sy * 0.5, box.z - box.sz * 0.5)
+  tempBoxMax.set(box.x + box.sx * 0.5, box.y + box.sy * 0.5, box.z + box.sz * 0.5)
+  target.expandByPoint(tempBoxMin)
+  target.expandByPoint(tempBoxMax)
+}
+
+function computeDynamicCompanionAnchors(
+  species: CompanionSpeciesId,
+  boxes: readonly ColoredBox[],
+  extras: SpeciesBuildExtras,
+): { anchors: DynamicCompanionAnchors; torsoFit: TorsoFitSpec } {
+  const profile = SPECIES_RIG_PROFILES[species]
+
+  const modelBounds = new THREE.Box3()
+  const headSkullBox = new THREE.Box3()
+  const eyeBoundsBox = new THREE.Box3()
+  const torsoBox = new THREE.Box3()
+  let minEyeX = Infinity
+  let maxEyeX = -Infinity
+
+  for (let i = 0; i < boxes.length; i += 1) {
+    const b = boxes[i]
+    const bottomY = b.y - b.sy * 0.5
+    if (bottomY >= 0.045) {
+      expandBox3FromVoxelBox(modelBounds, b)
+    }
+
+    // Use structural skull blocks (sx >= 0.30, sz >= 0.26) so protruding eyeballs/ears/tongues never distort crown/width
+    const halfSpanOkHead =
+      profile.headHalfSpanX === undefined || Math.abs(b.x) <= profile.headHalfSpanX
+    if (
+      halfSpanOkHead &&
+      b.sx >= 0.3 &&
+      b.sz >= 0.26 &&
+      b.y >= profile.headMinY &&
+      b.y <= profile.headMaxY
+    ) {
+      expandBox3FromVoxelBox(headSkullBox, b)
+    }
+
+    // Measure true eye Box3 bounds & span so glasses and visors sit flush over both eyes without floating over noses/snouts
+    if (
+      (b.color === '#0f172a' || b.color === '#090d16') &&
+      b.sx <= 0.15 &&
+      b.y >= profile.faceCenterY - 0.15 &&
+      b.y <= profile.faceCenterY + 0.15
+    ) {
+      expandBox3FromVoxelBox(eyeBoundsBox, b)
+      if (b.x < minEyeX) minEyeX = b.x
+      if (b.x > maxEyeX) maxEyeX = b.x
+    }
+
+    const halfSpanOkTorso =
+      profile.torsoHalfSpanX === undefined || Math.abs(b.x) <= profile.torsoHalfSpanX
+    if (halfSpanOkTorso && b.y >= profile.torsoMinY && b.y <= profile.torsoMaxY) {
+      expandBox3FromVoxelBox(torsoBox, b)
+    }
+  }
+
+  for (const subGroup of [extras.armGroups?.left, extras.armGroups?.right, extras.tailGroup, extras.antennaeGroup]) {
+    if (!subGroup) continue
+    subGroup.updateMatrixWorld(true)
+    tempObjBox.setFromObject(subGroup)
+    if (!tempObjBox.isEmpty()) {
+      modelBounds.union(tempObjBox)
+    }
+  }
+
+  const headSize = new THREE.Vector3()
+  const headCenter = new THREE.Vector3()
+  if (headSkullBox.isEmpty()) {
+    headSkullBox.copy(modelBounds)
+  }
+  headSkullBox.getSize(headSize)
+  headSkullBox.getCenter(headCenter)
+
+  const torsoSize = new THREE.Vector3()
+  const torsoCenter = new THREE.Vector3()
+  if (torsoBox.isEmpty()) {
+    torsoBox.copy(modelBounds)
+  }
+  torsoBox.getSize(torsoSize)
+  torsoBox.getCenter(torsoCenter)
+
+  const headWidth = Math.max(0.42, headSize.x)
+  const headDepth = Math.max(0.38, headSize.z)
+  const headScale = THREE.MathUtils.clamp(headWidth / 0.54, 0.85, 1.24)
+  const anchorHeadTop: HeadAnchorPoint = {
+    x: headCenter.x,
+    y: headSkullBox.max.y + (profile.crownClearance ?? 0.015),
+    z: headCenter.z,
+    width: headWidth,
+    depth: headDepth,
+    scale: headScale,
+  }
+
+  const eyeCenterY = eyeBoundsBox.isEmpty()
+    ? profile.faceCenterY
+    : (eyeBoundsBox.min.y + eyeBoundsBox.max.y) * 0.5
+  const eyeFrontZ = eyeBoundsBox.isEmpty() ? headSkullBox.max.z : eyeBoundsBox.max.z
+  const computedEyeSpan =
+    Number.isFinite(minEyeX) && Number.isFinite(maxEyeX) && maxEyeX - minEyeX >= 0.16
+      ? maxEyeX - minEyeX
+      : profile.eyeSpan
+  const faceScale = THREE.MathUtils.clamp(headWidth / 0.54, 0.85, 1.06)
+  const anchorFaceFront: FaceAnchorPoint = {
+    x: headCenter.x,
+    y: eyeCenterY,
+    z: eyeFrontZ + 0.022,
+    eyeSpan: computedEyeSpan,
+    headHalfW: headWidth * 0.5,
+    scale: faceScale,
+  }
+
+  const marginXZ = profile.torsoMarginXZ ?? 0.045
+  const marginY = profile.torsoMarginY ?? 0.02
+  const fittedTorso = {
+    x: torsoCenter.x,
+    y: torsoCenter.y,
+    z: torsoCenter.z,
+    sx: torsoSize.x + marginXZ,
+    sy: Math.max(0.17, torsoSize.y + marginY),
+    sz: torsoSize.z + marginXZ,
+  }
+  const hoodW = Math.min(headWidth * 0.96, fittedTorso.sx * 0.84)
+  const hoodZ =
+    fittedTorso.z -
+    fittedTorso.sz * 0.5 -
+    0.045 +
+    (profile.hoodZOffset ?? 0)
+  const torsoFit: TorsoFitSpec = {
+    body: fittedTorso,
+    hood: {
+      x: fittedTorso.x,
+      y: fittedTorso.y + fittedTorso.sy * (profile.hoodYRatio ?? 0.44),
+      z: hoodZ,
+      sx: hoodW,
+      sy: 0.13,
+      sz: 0.14,
+    },
+    allowSideSleeves: species !== 'clawd_cafe',
+  }
+
+  const sideRightEdge = Math.max(modelBounds.max.x, torsoCenter.x + fittedTorso.sx * 0.5)
+  const modelSize = new THREE.Vector3()
+  modelBounds.getSize(modelSize)
+  const anchorSideHand: AnchorPoint = {
+    x: sideRightEdge + (profile.handClearanceX ?? 0.15),
+    y: modelBounds.min.y + modelSize.y * (profile.handHeightRatio ?? 0.5),
+    z: torsoCenter.z + (profile.handZOffset ?? 0.2),
+    scale: profile.handScale ?? 0.9,
+  }
+
+  return {
+    anchors: {
+      anchorHeadTop,
+      anchorFaceFront,
+      anchorTorsoCenter: fittedTorso,
+      anchorTorsoWidth: fittedTorso.sx,
+      anchorSideHand,
+      modelBounds,
+    },
+    torsoFit,
+  }
 }
 
 const baseBox = new THREE.BoxGeometry(1, 1, 1)
@@ -217,7 +511,34 @@ function mergeColoredBoxes(boxes: ColoredBox[], material: THREE.Material): THREE
   return new THREE.Mesh(geom, material)
 }
 
-function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): void {
+interface SpeciesBuildExtras {
+  steamAnchors: Array<{ x: number; y: number; z: number }>
+  groundedStaticBoxes: ColoredBox[]
+  groundedEmissiveBoxes: ColoredBox[]
+  antennaeGroup: THREE.Group | null
+  tailGroup: THREE.Group | null
+  armGroups: { left: THREE.Group; right: THREE.Group } | null
+}
+
+function buildSpeciesBoxes(
+  species: CompanionSpeciesId,
+  boxes: ColoredBox[],
+): SpeciesBuildExtras {
+  const steamAnchors: Array<{ x: number; y: number; z: number }> = []
+  const groundedStaticBoxes: ColoredBox[] = []
+  const groundedEmissiveBoxes: ColoredBox[] = []
+  let antennaeGroup: THREE.Group | null = null
+  let tailGroup: THREE.Group | null = null
+  let armGroups: { left: THREE.Group; right: THREE.Group } | null = null
+
+  const extras = (): SpeciesBuildExtras => ({
+    steamAnchors,
+    groundedStaticBoxes,
+    groundedEmissiveBoxes,
+    antennaeGroup,
+    tailGroup,
+    armGroups,
+  })
   if (species === 'frog') {
     boxes.push({ x: 0, y: 0.03, z: 0, sx: 0.88, sy: 0.05, sz: 0.88, color: '#9eb3db' })
     boxes.push({ x: -0.28, y: 0.09, z: 0.16, sx: 0.24, sy: 0.14, sz: 0.34, color: '#15803d' })
@@ -232,7 +553,7 @@ function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): vo
     boxes.push({ x: -0.25, y: 0.54, z: 0.33, sx: 0.11, sy: 0.08, sz: 0.05, color: '#fb7185' })
     boxes.push({ x: 0.25, y: 0.54, z: 0.33, sx: 0.11, sy: 0.08, sz: 0.05, color: '#fb7185' })
     boxes.push({ x: 0, y: 0.5, z: 0.34, sx: 0.28, sy: 0.05, sz: 0.04, color: '#064e3b' })
-    return
+    return extras()
   }
 
   if (species === 'otter') {
@@ -251,7 +572,7 @@ function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): vo
     boxes.push({ x: 0, y: 0.83, z: 0.35, sx: 0.12, sy: 0.08, sz: 0.06, color: '#1e293b' })
     boxes.push({ x: -0.14, y: 0.88, z: 0.28, sx: 0.08, sy: 0.09, sz: 0.05, color: '#0f172a' })
     boxes.push({ x: 0.14, y: 0.88, z: 0.28, sx: 0.08, sy: 0.09, sz: 0.05, color: '#0f172a' })
-    return
+    return extras()
   }
 
   if (species === 'snake') {
@@ -283,7 +604,7 @@ function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): vo
     boxes.push({ x: 0, y: 0.68, z: 0.39, sx: 0.05, sy: 0.03, sz: 0.1, color: '#f43f5e' })
     boxes.push({ x: -0.035, y: 0.67, z: 0.44, sx: 0.035, sy: 0.028, sz: 0.05, color: '#fb7185' })
     boxes.push({ x: 0.035, y: 0.67, z: 0.44, sx: 0.035, sy: 0.028, sz: 0.05, color: '#fb7185' })
-    return
+    return extras()
   }
 
   if (species === 'capybara') {
@@ -300,7 +621,7 @@ function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): vo
     boxes.push({ x: 0.22, y: 0.94, z: 0.06, sx: 0.14, sy: 0.14, sz: 0.12, color: '#5c371d' })
     boxes.push({ x: -0.16, y: 0.78, z: 0.51, sx: 0.11, sy: 0.05, sz: 0.05, color: '#0f172a' })
     boxes.push({ x: 0.16, y: 0.78, z: 0.51, sx: 0.11, sy: 0.05, sz: 0.05, color: '#0f172a' })
-    return
+    return extras()
   }
 
   if (species === 'mouse') {
@@ -320,7 +641,121 @@ function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): vo
     boxes.push({ x: 0.26, y: 0.92, z: 0.07, sx: 0.16, sy: 0.16, sz: 0.04, color: '#fda4af' })
     boxes.push({ x: -0.13, y: 0.74, z: 0.28, sx: 0.08, sy: 0.09, sz: 0.05, color: '#0f172a' })
     boxes.push({ x: 0.13, y: 0.74, z: 0.28, sx: 0.08, sy: 0.09, sz: 0.05, color: '#0f172a' })
-    return
+    return extras()
+  }
+
+  if (species === 'clawd_cafe') {
+    // Original Claude / Clawd mascot: classic coral-orange pixel-art rectangular block with
+    // two square black eyes, short side arms, and four stubby legs along the bottom.
+    groundedStaticBoxes.push({ x: 0, y: 0.03, z: 0.02, sx: 0.98, sy: 0.05, sz: 0.72, color: '#9eb3db' })
+
+    // 4 short stubby bottom legs cleanly visible under the rectangular coral block
+    boxes.push({ x: -0.31, y: 0.1, z: 0.02, sx: 0.12, sy: 0.18, sz: 0.22, color: '#cc6144' })
+    boxes.push({ x: -0.11, y: 0.1, z: 0.02, sx: 0.12, sy: 0.18, sz: 0.22, color: '#c4583b' })
+    boxes.push({ x: 0.11, y: 0.1, z: 0.02, sx: 0.12, sy: 0.18, sz: 0.22, color: '#c4583b' })
+    boxes.push({ x: 0.31, y: 0.1, z: 0.02, sx: 0.12, sy: 0.18, sz: 0.22, color: '#cc6144' })
+
+    // Iconic horizontal rectangular coral-orange body block (single classic silhouette, flat top, no hat)
+    boxes.push({ x: 0, y: 0.45, z: 0, sx: 0.86, sy: 0.54, sz: 0.42, color: '#de7356' })
+    boxes.push({ x: 0, y: 0.725, z: 0, sx: 0.82, sy: 0.03, sz: 0.38, color: '#eb866a' })
+    boxes.push({ x: 0, y: 0.21, z: 0, sx: 0.84, sy: 0.06, sz: 0.4, color: '#c96245' })
+
+    // Two solid black square pixel eyes on upper-center front face
+    boxes.push({ x: -0.21, y: 0.5, z: 0.22, sx: 0.12, sy: 0.14, sz: 0.045, color: '#090d16' })
+    boxes.push({ x: 0.21, y: 0.5, z: 0.22, sx: 0.12, sy: 0.14, sz: 0.045, color: '#090d16' })
+
+    // Two short side arms sticking out from left & right sides (animated cheerfully)
+    const leftArmGroup = new THREE.Group()
+    leftArmGroup.position.set(-0.44, 0.44, 0)
+    leftArmGroup.add(
+      mergeColoredBoxes(
+        [{ x: -0.06, y: 0, z: 0, sx: 0.14, sy: 0.16, sz: 0.22, color: '#de7356' }],
+        companionStaticMat,
+      ),
+    )
+    const rightArmGroup = new THREE.Group()
+    rightArmGroup.position.set(0.44, 0.44, 0)
+    rightArmGroup.add(
+      mergeColoredBoxes(
+        [{ x: 0.06, y: 0, z: 0, sx: 0.14, sy: 0.16, sz: 0.22, color: '#de7356' }],
+        companionStaticMat,
+      ),
+    )
+    armGroups = { left: leftArmGroup, right: rightArmGroup }
+    return extras()
+  }
+
+  if (species === 'leaf_kitty') {
+    // Gato Alien: green alien kitty companion with animated antennae, wagging tail, pointed ears, whiskers & freckles
+    groundedStaticBoxes.push({ x: 0, y: 0.03, z: -0.02, sx: 0.8, sy: 0.05, sz: 0.9, color: '#9eb3db' })
+    // Seated dark-green paws
+    boxes.push({ x: -0.15, y: 0.1, z: 0.18, sx: 0.14, sy: 0.16, sz: 0.2, color: '#15803d' })
+    boxes.push({ x: 0.15, y: 0.1, z: 0.18, sx: 0.14, sy: 0.16, sz: 0.2, color: '#15803d' })
+    // Vibrant green body + soft mint belly + animated tail
+    boxes.push({ x: 0, y: 0.34, z: 0, sx: 0.5, sy: 0.48, sz: 0.44, color: '#22c55e' })
+    boxes.push({ x: 0, y: 0.35, z: 0.19, sx: 0.3, sy: 0.34, sz: 0.1, color: '#bbf7d0' })
+    boxes.push({ x: -0.15, y: 0.34, z: -0.02, sx: 0.18, sy: 0.12, sz: 0.34, color: '#16a34a' })
+    boxes.push({ x: 0.15, y: 0.38, z: -0.02, sx: 0.18, sy: 0.12, sz: 0.34, color: '#4ade80' })
+    const alienTailGroup = new THREE.Group()
+    alienTailGroup.position.set(0, 0.22, -0.22)
+    alienTailGroup.add(
+      mergeColoredBoxes(
+        [
+          { x: 0, y: 0, z: -0.08, sx: 0.12, sy: 0.12, sz: 0.22, color: '#16a34a' },
+          { x: 0.04, y: 0.24, z: -0.14, sx: 0.12, sy: 0.42, sz: 0.12, color: '#22c55e' },
+          { x: 0.08, y: 0.48, z: -0.1, sx: 0.11, sy: 0.11, sz: 0.12, color: '#4ade80' },
+        ],
+        companionStaticMat,
+      ),
+    )
+    tailGroup = alienTailGroup
+
+    // Green alien feline head & soft muzzle
+    boxes.push({ x: 0, y: 0.76, z: 0.06, sx: 0.48, sy: 0.4, sz: 0.44, color: '#22c55e' })
+    boxes.push({ x: 0, y: 0.67, z: 0.25, sx: 0.28, sy: 0.15, sz: 0.1, color: '#dcfce7' })
+    // Pointed cat ears with pastel pink interior
+    boxes.push({ x: -0.19, y: 1.01, z: 0.06, sx: 0.13, sy: 0.17, sz: 0.1, color: '#16a34a' })
+    boxes.push({ x: 0.19, y: 1.01, z: 0.06, sx: 0.13, sy: 0.17, sz: 0.1, color: '#16a34a' })
+    boxes.push({ x: -0.19, y: 0.99, z: 0.1, sx: 0.07, sy: 0.1, sz: 0.04, color: '#fda4af' })
+    boxes.push({ x: 0.19, y: 0.99, z: 0.1, sx: 0.07, sy: 0.1, sz: 0.04, color: '#fda4af' })
+    // Animated twin green antennae atop head crowned with glowing yellow tips
+    const kittyAntennaeGroup = new THREE.Group()
+    kittyAntennaeGroup.position.set(0, 0.95, 0.07)
+    kittyAntennaeGroup.add(
+      mergeColoredBoxes(
+        [
+          { x: -0.09, y: 0.11, z: 0, sx: 0.045, sy: 0.2, sz: 0.045, color: '#15803d' },
+          { x: 0.09, y: 0.11, z: 0, sx: 0.045, sy: 0.2, sz: 0.045, color: '#15803d' },
+        ],
+        companionStaticMat,
+      ),
+    )
+    kittyAntennaeGroup.add(
+      mergeColoredBoxes(
+        [
+          { x: -0.1, y: 0.23, z: 0.01, sx: 0.095, sy: 0.095, sz: 0.095, color: '#fef08a' },
+          { x: 0.1, y: 0.23, z: 0.01, sx: 0.095, sy: 0.095, sz: 0.095, color: '#fef08a' },
+        ],
+        companionEmissiveMat,
+      ),
+    )
+    antennaeGroup = kittyAntennaeGroup
+
+    // Expressive eyes + catchlights + pink nose + freckles + white whiskers
+    boxes.push({ x: -0.13, y: 0.79, z: 0.29, sx: 0.095, sy: 0.11, sz: 0.05, color: '#0f172a' })
+    boxes.push({ x: 0.13, y: 0.79, z: 0.29, sx: 0.095, sy: 0.11, sz: 0.05, color: '#0f172a' })
+    boxes.push({ x: -0.115, y: 0.815, z: 0.315, sx: 0.036, sy: 0.042, sz: 0.02, color: '#ffffff' })
+    boxes.push({ x: 0.145, y: 0.815, z: 0.315, sx: 0.036, sy: 0.042, sz: 0.02, color: '#ffffff' })
+    boxes.push({ x: 0, y: 0.7, z: 0.3, sx: 0.08, sy: 0.055, sz: 0.045, color: '#fb7185' })
+    boxes.push({ x: -0.2, y: 0.71, z: 0.295, sx: 0.032, sy: 0.032, sz: 0.025, color: '#fde68a' })
+    boxes.push({ x: -0.16, y: 0.68, z: 0.295, sx: 0.032, sy: 0.032, sz: 0.025, color: '#fde68a' })
+    boxes.push({ x: 0.2, y: 0.71, z: 0.295, sx: 0.032, sy: 0.032, sz: 0.025, color: '#fde68a' })
+    boxes.push({ x: 0.16, y: 0.68, z: 0.295, sx: 0.032, sy: 0.032, sz: 0.025, color: '#fde68a' })
+    boxes.push({ x: -0.23, y: 0.69, z: 0.3, sx: 0.17, sy: 0.024, sz: 0.024, color: '#f8fafc' })
+    boxes.push({ x: 0.23, y: 0.69, z: 0.3, sx: 0.17, sy: 0.024, sz: 0.024, color: '#f8fafc' })
+    boxes.push({ x: -0.22, y: 0.64, z: 0.3, sx: 0.15, sy: 0.024, sz: 0.024, color: '#dcfce7' })
+    boxes.push({ x: 0.22, y: 0.64, z: 0.3, sx: 0.15, sy: 0.024, sz: 0.024, color: '#dcfce7' })
+    return extras()
   }
 
   // 'cat' (Maria): Multi-tone mottled grey tabby (silver, dove grey, pewter & charcoal stripes) with white whiskers
@@ -371,6 +806,7 @@ function buildSpeciesBoxes(species: CompanionSpeciesId, boxes: ColoredBox[]): vo
   boxes.push({ x: 0.22, y: 0.69, z: 0.3, sx: 0.18, sy: 0.025, sz: 0.025, color: '#f8fafc' })
   boxes.push({ x: -0.21, y: 0.64, z: 0.3, sx: 0.16, sy: 0.025, sz: 0.025, color: '#e2e8f0' })
   boxes.push({ x: 0.21, y: 0.64, z: 0.3, sx: 0.16, sy: 0.025, sz: 0.025, color: '#e2e8f0' })
+  return extras()
 }
 
 interface HeadAccessoryResult {
@@ -397,75 +833,81 @@ function addGlassBox(
 
 function buildHeadAccessory(
   id: HeadAccessoryId,
-  anchor: AnchorPoint,
+  anchor: HeadAnchorPoint,
+  faceAnchor: FaceAnchorPoint,
   boxes: ColoredBox[],
   staticEmissiveBoxes: ColoredBox[],
 ): HeadAccessoryResult {
-  const { x, y, z, scale } = anchor
+  const { x, y, z, width, depth, scale } = anchor
   const emptyResult: HeadAccessoryResult = { butterfly: null, snowDomeGroup: null, snowFlakes: [] }
 
   if (id === 'dev_headset') {
-    // Sleek dark over-ear arch + padded cups on left/right sides + neon LED rings + boom mic
-    const spanX = 0.31 * scale
-    const cupY = y - 0.16 * scale
-    const cupZ = z + 0.05 * scale
+    // Over-ear band dynamically scaled to actual head Box3 width & cheek height
+    const earHalfW = Math.max(width * 0.5, faceAnchor.headHalfW) + 0.048
+    const bandWidth = earHalfW * 2 + 0.05
+    const bandTopY = Math.max(y + 0.045, faceAnchor.y + 0.22 * scale)
+    const cupY = Math.max(faceAnchor.y + 0.01, bandTopY - 0.21 * scale)
+    const cupZ = z + Math.min(0.06, depth * 0.14)
+    const strutHeight = Math.max(0.14, bandTopY - cupY + 0.02)
+    const strutY = (bandTopY + cupY) * 0.5
 
-    // Top padded headband arch
-    boxes.push({ x, y: y + 0.075 * scale, z, sx: 0.62 * scale, sy: 0.065 * scale, sz: 0.11 * scale, color: '#1e293b' })
-    boxes.push({ x, y: y + 0.095 * scale, z, sx: 0.34 * scale, sy: 0.04 * scale, sz: 0.09 * scale, color: '#334155' })
+    // Top padded headband arch clear above skull crown & ears
+    boxes.push({ x, y: bandTopY, z, sx: bandWidth, sy: 0.058 * scale, sz: 0.11 * scale, color: '#1e293b' })
+    boxes.push({ x, y: bandTopY + 0.024 * scale, z, sx: bandWidth * 0.55, sy: 0.036 * scale, sz: 0.09 * scale, color: '#334155' })
     // Side vertical arch struts connecting down to earcups
-    boxes.push({ x: x - spanX, y: y - 0.03 * scale, z: cupZ, sx: 0.055 * scale, sy: 0.24 * scale, sz: 0.08 * scale, color: '#1e293b' })
-    boxes.push({ x: x + spanX, y: y - 0.03 * scale, z: cupZ, sx: 0.055 * scale, sy: 0.24 * scale, sz: 0.08 * scale, color: '#1e293b' })
-    // Left & right over-ear cushions + outer shells
-    boxes.push({ x: x - spanX, y: cupY, z: cupZ, sx: 0.095 * scale, sy: 0.2 * scale, sz: 0.2 * scale, color: '#0f172a' })
-    boxes.push({ x: x + spanX, y: cupY, z: cupZ, sx: 0.095 * scale, sy: 0.2 * scale, sz: 0.2 * scale, color: '#0f172a' })
-    boxes.push({ x: x - (spanX + 0.025 * scale), y: cupY, z: cupZ, sx: 0.055 * scale, sy: 0.15 * scale, sz: 0.15 * scale, color: '#1e293b' })
-    boxes.push({ x: x + (spanX + 0.025 * scale), y: cupY, z: cupZ, sx: 0.055 * scale, sy: 0.15 * scale, sz: 0.15 * scale, color: '#1e293b' })
+    boxes.push({ x: x - earHalfW, y: strutY, z: cupZ, sx: 0.052 * scale, sy: strutHeight, sz: 0.075 * scale, color: '#1e293b' })
+    boxes.push({ x: x + earHalfW, y: strutY, z: cupZ, sx: 0.052 * scale, sy: strutHeight, sz: 0.075 * scale, color: '#1e293b' })
+    // Left & right over-ear cushions + outer shells outside the head walls
+    boxes.push({ x: x - earHalfW, y: cupY, z: cupZ, sx: 0.09 * scale, sy: 0.18 * scale, sz: 0.18 * scale, color: '#0f172a' })
+    boxes.push({ x: x + earHalfW, y: cupY, z: cupZ, sx: 0.09 * scale, sy: 0.18 * scale, sz: 0.18 * scale, color: '#0f172a' })
+    boxes.push({ x: x - (earHalfW + 0.024 * scale), y: cupY, z: cupZ, sx: 0.05 * scale, sy: 0.135 * scale, sz: 0.135 * scale, color: '#1e293b' })
+    boxes.push({ x: x + (earHalfW + 0.024 * scale), y: cupY, z: cupZ, sx: 0.05 * scale, sy: 0.135 * scale, sz: 0.135 * scale, color: '#1e293b' })
     // Glowing neon RGB LED rings (cyan left, neon-green right)
     staticEmissiveBoxes.push({
-      x: x - (spanX + 0.05 * scale),
+      x: x - (earHalfW + 0.048 * scale),
       y: cupY,
       z: cupZ,
-      sx: 0.025 * scale,
-      sy: 0.1 * scale,
-      sz: 0.1 * scale,
+      sx: 0.024 * scale,
+      sy: 0.09 * scale,
+      sz: 0.09 * scale,
       color: '#38bdf8',
     })
     staticEmissiveBoxes.push({
-      x: x + (spanX + 0.05 * scale),
+      x: x + (earHalfW + 0.048 * scale),
       y: cupY,
       z: cupZ,
-      sx: 0.025 * scale,
-      sy: 0.1 * scale,
-      sz: 0.1 * scale,
+      sx: 0.024 * scale,
+      sy: 0.09 * scale,
+      sz: 0.09 * scale,
       color: '#39d353',
     })
-    // Adjustable boom mic arm extending forward toward cheek/mouth + subtle neon mic tip
+    // Adjustable boom mic arm extending cleanly toward mouth/front Z
+    const micExtendZ = Math.max(0.16 * scale, faceAnchor.z - cupZ - 0.02)
     boxes.push({
-      x: x + spanX,
-      y: cupY - 0.05 * scale,
-      z: cupZ + 0.14 * scale,
-      sx: 0.03 * scale,
-      sy: 0.03 * scale,
-      sz: 0.18 * scale,
+      x: x + earHalfW,
+      y: cupY - 0.045 * scale,
+      z: cupZ + micExtendZ * 0.5,
+      sx: 0.028 * scale,
+      sy: 0.028 * scale,
+      sz: micExtendZ,
       color: '#334155',
     })
     boxes.push({
-      x: x + spanX - 0.06 * scale,
-      y: cupY - 0.06 * scale,
-      z: cupZ + 0.24 * scale,
+      x: x + earHalfW - 0.065 * scale,
+      y: cupY - 0.055 * scale,
+      z: cupZ + micExtendZ,
       sx: 0.13 * scale,
-      sy: 0.03 * scale,
-      sz: 0.03 * scale,
+      sy: 0.028 * scale,
+      sz: 0.028 * scale,
       color: '#1e293b',
     })
     staticEmissiveBoxes.push({
-      x: x + spanX - 0.125 * scale,
-      y: cupY - 0.06 * scale,
-      z: cupZ + 0.24 * scale,
-      sx: 0.042 * scale,
-      sy: 0.042 * scale,
-      sz: 0.042 * scale,
+      x: x + earHalfW - 0.13 * scale,
+      y: cupY - 0.055 * scale,
+      z: cupZ + micExtendZ,
+      sx: 0.04 * scale,
+      sy: 0.04 * scale,
+      sz: 0.04 * scale,
       color: '#38bdf8',
     })
     return emptyResult
@@ -679,8 +1121,8 @@ function buildHeadAccessory(
 
   if (id === 'golden-butterfly') {
     const butterflyGroup = new THREE.Group()
-    const bx = x + 0.38 * scale
-    const by = y + 0.28 * scale
+    const bx = x + Math.max(width * 0.5 + 0.12, 0.34 * scale)
+    const by = y + 0.18 * scale
     const bz = z + 0.08 * scale
     butterflyGroup.position.set(bx, by, bz)
 
@@ -705,117 +1147,106 @@ function buildHeadAccessory(
     }
   }
 
+  const brimD = Math.min(depth * 1.15, 0.68 * scale)
+
   if (id === 'wizard-hat') {
-    boxes.push({ x, y: y + 0.04 * scale, z, sx: 0.76 * scale, sy: 0.09 * scale, sz: 0.76 * scale, color: '#6d28d9' })
-    boxes.push({ x, y: y + 0.14 * scale, z, sx: 0.48 * scale, sy: 0.11 * scale, sz: 0.48 * scale, color: '#fbbf24' })
-    boxes.push({ x, y: y + 0.14 * scale, z: z + 0.25 * scale, sx: 0.16 * scale, sy: 0.12 * scale, sz: 0.05 * scale, color: '#fde047' })
-    boxes.push({ x, y: y + 0.29 * scale, z: z - 0.02 * scale, sx: 0.42 * scale, sy: 0.2 * scale, sz: 0.42 * scale, color: '#7c3aed' })
-    boxes.push({ x: x + 0.04 * scale, y: y + 0.46 * scale, z: z - 0.06 * scale, sx: 0.26 * scale, sy: 0.18 * scale, sz: 0.26 * scale, color: '#6d28d9' })
-    boxes.push({ x: x + 0.1 * scale, y: y + 0.6 * scale, z: z - 0.12 * scale, sx: 0.14 * scale, sy: 0.14 * scale, sz: 0.14 * scale, color: '#8b5cf6' })
+    const brimW = Math.max(width * 0.94, 0.68 * scale)
+    boxes.push({ x, y: y + 0.045 * scale, z, sx: brimW, sy: 0.085 * scale, sz: brimD, color: '#6d28d9' })
+    boxes.push({ x, y: y + 0.14 * scale, z, sx: brimW * 0.65, sy: 0.11 * scale, sz: brimD * 0.66, color: '#fbbf24' })
+    boxes.push({ x, y: y + 0.14 * scale, z: z + brimD * 0.35, sx: 0.15 * scale, sy: 0.11 * scale, sz: 0.05 * scale, color: '#fde047' })
+    boxes.push({ x, y: y + 0.28 * scale, z: z - 0.02 * scale, sx: brimW * 0.56, sy: 0.19 * scale, sz: brimD * 0.58, color: '#7c3aed' })
+    boxes.push({ x: x + 0.04 * scale, y: y + 0.45 * scale, z: z - 0.06 * scale, sx: 0.26 * scale, sy: 0.18 * scale, sz: 0.26 * scale, color: '#6d28d9' })
+    boxes.push({ x: x + 0.1 * scale, y: y + 0.58 * scale, z: z - 0.11 * scale, sx: 0.14 * scale, sy: 0.14 * scale, sz: 0.14 * scale, color: '#8b5cf6' })
     return emptyResult
   }
 
   if (id === 'strawberry-hat') {
-    boxes.push({ x, y: y + 0.05 * scale, z, sx: 0.56 * scale, sy: 0.16 * scale, sz: 0.56 * scale, color: '#ef4444' })
-    boxes.push({ x, y: y + 0.19 * scale, z, sx: 0.44 * scale, sy: 0.14 * scale, sz: 0.44 * scale, color: '#dc2626' })
-    boxes.push({ x: x - 0.16 * scale, y: y + 0.08 * scale, z: z + 0.28 * scale, sx: 0.07 * scale, sy: 0.07 * scale, sz: 0.04 * scale, color: '#fef3c7' })
-    boxes.push({ x: x + 0.14 * scale, y: y + 0.12 * scale, z: z + 0.28 * scale, sx: 0.07 * scale, sy: 0.07 * scale, sz: 0.04 * scale, color: '#fef3c7' })
-    boxes.push({ x, y: y + 0.28 * scale, z, sx: 0.34 * scale, sy: 0.08 * scale, sz: 0.34 * scale, color: '#22c55e' })
-    boxes.push({ x, y: y + 0.36 * scale, z, sx: 0.1 * scale, sy: 0.12 * scale, sz: 0.1 * scale, color: '#15803d' })
+    const capW = Math.max(width * 0.84, 0.52 * scale)
+    const capD = Math.min(depth * 1.02, capW)
+    boxes.push({ x, y: y + 0.075 * scale, z, sx: capW, sy: 0.15 * scale, sz: capD, color: '#ef4444' })
+    boxes.push({ x, y: y + 0.21 * scale, z, sx: capW * 0.78, sy: 0.13 * scale, sz: capD * 0.78, color: '#dc2626' })
+    boxes.push({ x: x - capW * 0.28, y: y + 0.08 * scale, z: z + capD * 0.5 + 0.01, sx: 0.07 * scale, sy: 0.07 * scale, sz: 0.04 * scale, color: '#fef3c7' })
+    boxes.push({ x: x + capW * 0.25, y: y + 0.12 * scale, z: z + capD * 0.5 + 0.01, sx: 0.07 * scale, sy: 0.07 * scale, sz: 0.04 * scale, color: '#fef3c7' })
+    boxes.push({ x, y: y + 0.3 * scale, z, sx: capW * 0.6, sy: 0.075 * scale, sz: capD * 0.6, color: '#22c55e' })
+    boxes.push({ x, y: y + 0.37 * scale, z, sx: 0.1 * scale, sy: 0.11 * scale, sz: 0.1 * scale, color: '#15803d' })
     return emptyResult
   }
 
   if (id === 'leaf-umbrella') {
-    boxes.push({ x: x + 0.12 * scale, y: y + 0.18 * scale, z: z - 0.04 * scale, sx: 0.08 * scale, sy: 0.38 * scale, sz: 0.08 * scale, color: '#7c4d2b' })
-    boxes.push({ x, y: y + 0.38 * scale, z, sx: 0.84 * scale, sy: 0.1 * scale, sz: 0.78 * scale, color: '#16a34a' })
-    boxes.push({ x, y: y + 0.44 * scale, z, sx: 0.62 * scale, sy: 0.06 * scale, sz: 0.58 * scale, color: '#22c55e' })
-    boxes.push({ x, y: y + 0.48 * scale, z, sx: 0.1 * scale, sy: 0.04 * scale, sz: 0.62 * scale, color: '#4ade80' })
+    boxes.push({ x: x + 0.12 * scale, y: y + 0.17 * scale, z: z - 0.04 * scale, sx: 0.08 * scale, sy: 0.34 * scale, sz: 0.08 * scale, color: '#7c4d2b' })
+    boxes.push({ x, y: y + 0.36 * scale, z, sx: Math.max(width * 1.05, 0.82 * scale), sy: 0.1 * scale, sz: Math.max(depth * 1.15, 0.72 * scale), color: '#16a34a' })
+    boxes.push({ x, y: y + 0.42 * scale, z, sx: Math.max(width * 0.82, 0.6 * scale), sy: 0.06 * scale, sz: Math.max(depth * 0.88, 0.54 * scale), color: '#22c55e' })
+    boxes.push({ x, y: y + 0.46 * scale, z, sx: 0.1 * scale, sy: 0.04 * scale, sz: Math.max(depth * 0.92, 0.58 * scale), color: '#4ade80' })
     return emptyResult
   }
 
   // 'santa-hat'
-  boxes.push({ x, y: y + 0.04 * scale, z, sx: 0.58 * scale, sy: 0.12 * scale, sz: 0.58 * scale, color: '#f4f8ff' })
-  boxes.push({ x, y: y + 0.18 * scale, z, sx: 0.46 * scale, sy: 0.16 * scale, sz: 0.46 * scale, color: '#dc2626' })
-  boxes.push({ x: x + 0.08 * scale, y: y + 0.32 * scale, z: z - 0.04 * scale, sx: 0.32 * scale, sy: 0.16 * scale, sz: 0.32 * scale, color: '#ef4444' })
-  boxes.push({ x: x + 0.22 * scale, y: y + 0.38 * scale, z: z - 0.1 * scale, sx: 0.16 * scale, sy: 0.16 * scale, sz: 0.16 * scale, color: '#ffffff' })
+  const hatBaseW = Math.max(width * 0.86, 0.56 * scale)
+  const hatBaseD = Math.min(depth * 1.04, 0.58 * scale)
+  boxes.push({ x, y: y + 0.055 * scale, z, sx: hatBaseW, sy: 0.11 * scale, sz: hatBaseD, color: '#f4f8ff' })
+  boxes.push({ x, y: y + 0.19 * scale, z, sx: hatBaseW * 0.78, sy: 0.16 * scale, sz: hatBaseD * 0.8, color: '#dc2626' })
+  boxes.push({ x: x + 0.08 * scale, y: y + 0.33 * scale, z: z - 0.04 * scale, sx: hatBaseW * 0.54, sy: 0.15 * scale, sz: hatBaseD * 0.58, color: '#ef4444' })
+  boxes.push({ x: x + 0.2 * scale, y: y + 0.39 * scale, z: z - 0.09 * scale, sx: 0.16 * scale, sy: 0.16 * scale, sz: 0.16 * scale, color: '#ffffff' })
   return emptyResult
 }
 
 interface TorsoFitSpec {
   body: { x: number; y: number; z: number; sx: number; sy: number; sz: number }
   hood: { x: number; y: number; z: number; sx: number; sy: number; sz: number }
-}
-
-const TORSO_APPAREL_FITS: Record<CompanionSpeciesId, TorsoFitSpec> = {
-  frog: {
-    body: { x: 0, y: 0.29, z: 0.01, sx: 0.72, sy: 0.29, sz: 0.7 },
-    hood: { x: 0, y: 0.44, z: -0.34, sx: 0.56, sy: 0.14, sz: 0.16 },
-  },
-  otter: {
-    body: { x: 0, y: 0.35, z: 0.01, sx: 0.61, sy: 0.44, sz: 0.58 },
-    hood: { x: 0, y: 0.56, z: -0.29, sx: 0.5, sy: 0.15, sz: 0.16 },
-  },
-  snake: {
-    body: { x: 0, y: 0.42, z: 0.05, sx: 0.44, sy: 0.3, sz: 0.46 },
-    hood: { x: 0, y: 0.56, z: -0.18, sx: 0.4, sy: 0.13, sz: 0.14 },
-  },
-  capybara: {
-    body: { x: 0, y: 0.36, z: 0.0, sx: 0.72, sy: 0.34, sz: 0.86 },
-    hood: { x: 0, y: 0.62, z: -0.1, sx: 0.56, sy: 0.15, sz: 0.18 },
-  },
-  mouse: {
-    body: { x: 0, y: 0.3, z: 0.01, sx: 0.56, sy: 0.36, sz: 0.53 },
-    hood: { x: 0, y: 0.48, z: -0.26, sx: 0.46, sy: 0.14, sz: 0.15 },
-  },
-  cat: {
-    body: { x: 0, y: 0.33, z: 0.01, sx: 0.55, sy: 0.39, sz: 0.52 },
-    hood: { x: 0, y: 0.52, z: -0.24, sx: 0.46, sy: 0.14, sz: 0.14 },
-  },
+  allowSideSleeves: boolean
 }
 
 function buildBodyAccessory(
   id: BodyAccessoryId,
-  species: CompanionSpeciesId,
-  rig: CompanionRig,
+  fit: TorsoFitSpec,
+  anchors: DynamicCompanionAnchors,
   boxes: ColoredBox[],
   staticEmissiveBoxes: ColoredBox[],
 ): THREE.Group | null {
-  if (id === 'code_visor') {
-    const { x, y, z, scale, eyeSpan } = rig.faceAnchor
-    const visorWidth = Math.max(0.46, eyeSpan + 0.22) * scale
-    const sideOffset = visorWidth * 0.5
+  const face = anchors.anchorFaceFront
 
-    // Sleek dark top frame & side temple straps gripping the head
+  if (id === 'code_visor') {
+    const { x, y, z, scale, eyeSpan, headHalfW } = face
+    const visorWidth = Math.max(eyeSpan + 0.22 * scale, 0.46 * scale)
+    const sideOffset = Math.max(visorWidth * 0.5, headHalfW + 0.028)
+    const templeBackZ = Math.max(0.24, z - 0.04)
+
+    // Sleek dark top frame & side temple straps clearing head walls cleanly
     boxes.push({
       x,
-      y: y + 0.095 * scale,
-      z: z + 0.035,
+      y: y + 0.092 * scale,
+      z: z + 0.025,
       sx: visorWidth + 0.04,
-      sy: 0.045 * scale,
-      sz: 0.075,
+      sy: 0.042 * scale,
+      sz: 0.065,
       color: '#0f172a',
     })
+    if (sideOffset > visorWidth * 0.5) {
+      const bridgeSpan = sideOffset - visorWidth * 0.5 + 0.02
+      boxes.push({ x: x - (visorWidth * 0.5 + bridgeSpan * 0.5), y: y + 0.02 * scale, z: z + 0.02, sx: bridgeSpan, sy: 0.05 * scale, sz: 0.04, color: '#1e293b' })
+      boxes.push({ x: x + (visorWidth * 0.5 + bridgeSpan * 0.5), y: y + 0.02 * scale, z: z + 0.02, sx: bridgeSpan, sy: 0.05 * scale, sz: 0.04, color: '#1e293b' })
+    }
     boxes.push({
       x: x - sideOffset,
       y: y + 0.02 * scale,
-      z: z - 0.12,
+      z: z - templeBackZ * 0.45,
       sx: 0.04 * scale,
-      sy: 0.06 * scale,
-      sz: 0.3,
+      sy: 0.055 * scale,
+      sz: templeBackZ,
       color: '#1e293b',
     })
     boxes.push({
       x: x + sideOffset,
       y: y + 0.02 * scale,
-      z: z - 0.12,
+      z: z - templeBackZ * 0.45,
       sx: 0.04 * scale,
-      sy: 0.06 * scale,
-      sz: 0.3,
+      sy: 0.055 * scale,
+      sz: templeBackZ,
       color: '#1e293b',
     })
 
     // Micro glowing neon-green simulated log/code lines projected onto visor
-    const lineZ = z + 0.072
+    const lineZ = z + 0.058
     staticEmissiveBoxes.push({ x: x - 0.11 * scale, y: y + 0.03 * scale, z: lineZ, sx: 0.12 * scale, sy: 0.024 * scale, sz: 0.015, color: '#39d353' })
     staticEmissiveBoxes.push({ x: x + 0.08 * scale, y: y + 0.03 * scale, z: lineZ, sx: 0.07 * scale, sy: 0.024 * scale, sz: 0.015, color: '#a7f3d0' })
     staticEmissiveBoxes.push({ x: x - 0.05 * scale, y: y - 0.015 * scale, z: lineZ, sx: 0.16 * scale, sy: 0.024 * scale, sz: 0.015, color: '#38bdf8' })
@@ -827,167 +1258,230 @@ function buildBodyAccessory(
       visorGlassGroup,
       x,
       y,
-      z + 0.04,
+      z + 0.03,
       visorWidth,
-      0.17 * scale,
-      0.055,
+      0.165 * scale,
+      0.052,
       codeVisorGlassMat,
     )
     return visorGlassGroup
   }
 
-  if (id === 'binary_sweater') {
-    const fit = TORSO_APPAREL_FITS[species]
-    const b = fit.body
-    const chestZ = b.z + b.sz * 0.5 + 0.014
+  const b = fit.body
+  const chestZ = b.z + b.sz * 0.5 + 0.014
+  const backZ = b.z - b.sz * 0.5 - 0.014
+  const chestScaleX = Math.min(1, b.sx / 0.56)
 
+  if (id === 'binary_sweater') {
     // Cozy deep-navy holiday knit sweater + festive crimson collar & ribbed hem trim
     boxes.push({ ...b, color: '#1e3a8a' })
     boxes.push({
       x: b.x,
-      y: b.y - b.sy * 0.43,
+      y: b.y - b.sy * 0.42,
       z: b.z,
       sx: b.sx + 0.025,
-      sy: 0.065,
+      sy: Math.min(0.065, b.sy * 0.24),
       sz: b.sz + 0.025,
       color: '#b91c1c',
     })
     boxes.push({
       x: b.x,
-      y: b.y + b.sy * 0.42,
+      y: b.y + b.sy * 0.41,
       z: b.z,
       sx: b.sx * 0.92,
-      sy: 0.06,
+      sy: Math.min(0.06, b.sy * 0.22),
       sz: b.sz * 0.94,
       color: '#dc2626',
     })
 
-    // Binary pixel `0` (left) and `1` (right) in glowing gold & emerald on belly
-    const cy = b.y + 0.02
+    // Binary pixel `0` (left) and `1` (right) in glowing gold & emerald centered inside front face
+    const cy = b.y + 0.01
     const bz = chestZ + 0.005
-    // `0` around x = -0.10
-    staticEmissiveBoxes.push({ x: -0.145, y: cy, z: bz, sx: 0.022, sy: 0.085, sz: 0.018, color: '#fbbf24' })
-    staticEmissiveBoxes.push({ x: -0.075, y: cy, z: bz, sx: 0.022, sy: 0.085, sz: 0.018, color: '#fbbf24' })
-    staticEmissiveBoxes.push({ x: -0.11, y: cy + 0.036, z: bz, sx: 0.065, sy: 0.022, sz: 0.018, color: '#fbbf24' })
-    staticEmissiveBoxes.push({ x: -0.11, y: cy - 0.036, z: bz, sx: 0.065, sy: 0.022, sz: 0.018, color: '#fbbf24' })
-    // `1` around x = +0.005
-    staticEmissiveBoxes.push({ x: 0.005, y: cy, z: bz, sx: 0.024, sy: 0.09, sz: 0.018, color: '#4ade80' })
-    staticEmissiveBoxes.push({ x: -0.012, y: cy + 0.03, z: bz, sx: 0.03, sy: 0.02, sz: 0.018, color: '#4ade80' })
+    const digitYScale = Math.min(1, b.sy / 0.28)
+    const zeroCx = b.x - 0.11 * chestScaleX
+    staticEmissiveBoxes.push({ x: zeroCx - 0.035 * chestScaleX, y: cy, z: bz, sx: 0.022 * chestScaleX, sy: 0.08 * digitYScale, sz: 0.018, color: '#fbbf24' })
+    staticEmissiveBoxes.push({ x: zeroCx + 0.035 * chestScaleX, y: cy, z: bz, sx: 0.022 * chestScaleX, sy: 0.08 * digitYScale, sz: 0.018, color: '#fbbf24' })
+    staticEmissiveBoxes.push({ x: zeroCx, y: cy + 0.034 * digitYScale, z: bz, sx: 0.065 * chestScaleX, sy: 0.02 * digitYScale, sz: 0.018, color: '#fbbf24' })
+    staticEmissiveBoxes.push({ x: zeroCx, y: cy - 0.034 * digitYScale, z: bz, sx: 0.065 * chestScaleX, sy: 0.02 * digitYScale, sz: 0.018, color: '#fbbf24' })
 
-    // Mini conference lanyard & white tech badge hanging on front chest
-    const bx = 0.125
-    const by = b.y - 0.01
-    boxes.push({ x: bx - 0.035, y: b.y + b.sy * 0.24, z: chestZ, sx: 0.02, sy: b.sy * 0.36, sz: 0.018, color: '#38bdf8' })
-    boxes.push({ x: bx + 0.035, y: b.y + b.sy * 0.24, z: chestZ, sx: 0.02, sy: b.sy * 0.36, sz: 0.018, color: '#38bdf8' })
-    boxes.push({ x: bx, y: by, z: chestZ + 0.012, sx: 0.115, sy: 0.13, sz: 0.024, color: '#f8fafc' })
-    boxes.push({ x: bx, y: by + 0.048, z: chestZ + 0.016, sx: 0.115, sy: 0.03, sz: 0.024, color: '#ef4444' })
-    boxes.push({ x: bx, y: by - 0.01, z: chestZ + 0.026, sx: 0.075, sy: 0.022, sz: 0.012, color: '#0f172a' })
+    const oneCx = b.x + 0.005
+    staticEmissiveBoxes.push({ x: oneCx, y: cy, z: bz, sx: 0.024 * chestScaleX, sy: 0.085 * digitYScale, sz: 0.018, color: '#4ade80' })
+    staticEmissiveBoxes.push({ x: oneCx - 0.016 * chestScaleX, y: cy + 0.028 * digitYScale, z: bz, sx: 0.03 * chestScaleX, sy: 0.02 * digitYScale, sz: 0.018, color: '#4ade80' })
+
+    // Mini conference lanyard & white tech badge fitted safely inside chest width
+    const bx = b.x + Math.min(0.145, b.sx * 0.24)
+    const by = b.y - 0.01 * digitYScale
+    boxes.push({ x: bx - 0.03 * chestScaleX, y: b.y + b.sy * 0.23, z: chestZ, sx: 0.018, sy: b.sy * 0.34, sz: 0.018, color: '#38bdf8' })
+    boxes.push({ x: bx + 0.03 * chestScaleX, y: b.y + b.sy * 0.23, z: chestZ, sx: 0.018, sy: b.sy * 0.34, sz: 0.018, color: '#38bdf8' })
+    boxes.push({ x: bx, y: by, z: chestZ + 0.012, sx: 0.105 * chestScaleX, sy: 0.115 * digitYScale, sz: 0.024, color: '#f8fafc' })
+    boxes.push({ x: bx, y: by + 0.042 * digitYScale, z: chestZ + 0.016, sx: 0.105 * chestScaleX, sy: 0.026 * digitYScale, sz: 0.024, color: '#ef4444' })
+    boxes.push({ x: bx, y: by - 0.01 * digitYScale, z: chestZ + 0.026, sx: 0.07 * chestScaleX, sy: 0.02 * digitYScale, sz: 0.012, color: '#0f172a' })
     return null
   }
 
   if (id === 'dev_hoodie') {
-    const fit = TORSO_APPAREL_FITS[species]
-    const b = fit.body
     const h = fit.hood
 
-    // GitHub Dark fleece torso, ribbed hem trim, kangaroo pocket & side shoulder accents
+    // GitHub Dark fleece torso, ribbed hem trim, kangaroo pocket & folded hood
     boxes.push({ ...b, color: '#161b22' })
     boxes.push({
       x: b.x,
-      y: b.y - b.sy * 0.44,
+      y: b.y - b.sy * 0.43,
       z: b.z,
       sx: b.sx + 0.02,
-      sy: 0.06,
+      sy: Math.min(0.06, b.sy * 0.22),
       sz: b.sz + 0.02,
       color: '#30363d',
     })
     boxes.push({
       x: b.x,
-      y: b.y - b.sy * 0.22,
-      z: b.z + b.sz * 0.5 + 0.012,
-      sx: b.sx * 0.58,
-      sy: b.sy * 0.3,
-      sz: 0.03,
+      y: b.y - b.sy * 0.2,
+      z: chestZ,
+      sx: b.sx * 0.56,
+      sy: b.sy * 0.28,
+      sz: 0.028,
       color: '#21262d',
     })
     // Subtle hoodie drawstring cords on front neckline
-    const chestZ = b.z + b.sz * 0.5 + 0.014
     boxes.push({
-      x: b.x - 0.08,
-      y: b.y + b.sy * 0.35,
-      z: chestZ,
-      sx: 0.025,
-      sy: 0.09,
+      x: b.x - 0.08 * chestScaleX,
+      y: b.y + b.sy * 0.34,
+      z: chestZ + 0.004,
+      sx: 0.024,
+      sy: Math.min(0.09, b.sy * 0.3),
       sz: 0.02,
       color: '#cbd5e1',
     })
     boxes.push({
-      x: b.x + 0.08,
-      y: b.y + b.sy * 0.35,
-      z: chestZ,
-      sx: 0.025,
-      sy: 0.09,
+      x: b.x + 0.08 * chestScaleX,
+      y: b.y + b.sy * 0.34,
+      z: chestZ + 0.004,
+      sx: 0.024,
+      sy: Math.min(0.09, b.sy * 0.3),
       sz: 0.02,
       color: '#cbd5e1',
     })
-    // Folded cozy hood collar tucked behind the neck/shoulders
+    // Folded cozy hood collar tucked cleanly behind torso
     boxes.push({ ...h, color: '#161b22' })
     boxes.push({
       x: h.x,
       y: h.y + h.sy * 0.35,
       z: h.z + 0.01,
       sx: h.sx * 0.86,
-      sy: 0.05,
+      sy: 0.048,
       sz: h.sz * 0.82,
       color: '#21262d',
     })
 
     // Glowing GitHub neon-green pixel terminal emblem `>_` on the front chest
-    const cy = b.y + b.sy * 0.16
-    const cz = b.z + b.sz * 0.5 + 0.018
-    staticEmissiveBoxes.push({ x: -0.075, y: cy + 0.026, z: cz, sx: 0.032, sy: 0.024, sz: 0.02, color: '#39d353' })
-    staticEmissiveBoxes.push({ x: -0.045, y: cy, z: cz, sx: 0.032, sy: 0.024, sz: 0.02, color: '#39d353' })
-    staticEmissiveBoxes.push({ x: -0.075, y: cy - 0.026, z: cz, sx: 0.032, sy: 0.024, sz: 0.02, color: '#39d353' })
-    staticEmissiveBoxes.push({ x: 0.048, y: cy - 0.03, z: cz, sx: 0.088, sy: 0.024, sz: 0.02, color: '#39d353' })
+    const cy = b.y + b.sy * 0.14
+    const cz = chestZ + 0.008
+    staticEmissiveBoxes.push({ x: -0.075 * chestScaleX, y: cy + 0.024, z: cz, sx: 0.03, sy: 0.022, sz: 0.02, color: '#39d353' })
+    staticEmissiveBoxes.push({ x: -0.045 * chestScaleX, y: cy, z: cz, sx: 0.03, sy: 0.022, sz: 0.02, color: '#39d353' })
+    staticEmissiveBoxes.push({ x: -0.075 * chestScaleX, y: cy - 0.024, z: cz, sx: 0.03, sy: 0.022, sz: 0.02, color: '#39d353' })
+    staticEmissiveBoxes.push({ x: 0.048 * chestScaleX, y: cy - 0.026, z: cz, sx: 0.084 * chestScaleX, sy: 0.022, sz: 0.02, color: '#39d353' })
+    return null
+  }
+
+  if (id === 'programmer_tshirt') {
+    const h = fit.hood
+
+    // Stylish Cyber-Neon Bomber Jacket in obsidian black, electric purple, emerald green & gold trim
+    boxes.push({ ...b, color: '#111827' })
+    if (fit.allowSideSleeves) {
+      boxes.push({ x: b.x - b.sx * 0.5 - 0.042, y: b.y + b.sy * 0.13, z: b.z, sx: 0.092, sy: b.sy * 0.48, sz: b.sz * 0.44, color: '#1f2937' })
+      boxes.push({ x: b.x + b.sx * 0.5 + 0.042, y: b.y + b.sy * 0.13, z: b.z, sx: 0.092, sy: b.sy * 0.48, sz: b.sz * 0.44, color: '#1f2937' })
+      boxes.push({ x: b.x - b.sx * 0.5 - 0.045, y: b.y + b.sy * 0.29, z: b.z, sx: 0.098, sy: 0.06, sz: b.sz * 0.45, color: '#9333ea' })
+      boxes.push({ x: b.x + b.sx * 0.5 + 0.045, y: b.y + b.sy * 0.29, z: b.z, sx: 0.098, sy: 0.06, sz: b.sz * 0.45, color: '#9333ea' })
+      boxes.push({ x: b.x - b.sx * 0.5 - 0.046, y: b.y - b.sy * 0.06, z: b.z, sx: 0.096, sy: 0.042, sz: b.sz * 0.45, color: '#10b981' })
+      boxes.push({ x: b.x + b.sx * 0.5 + 0.046, y: b.y - b.sy * 0.06, z: b.z, sx: 0.096, sy: 0.042, sz: b.sz * 0.45, color: '#10b981' })
+    } else {
+      // Sleeveless cyber vest accents along wide shoulders so Claude's articulated coral arms stay free
+      boxes.push({ x: b.x - b.sx * 0.44, y: b.y + b.sy * 0.34, z: b.z, sx: 0.12, sy: 0.05, sz: b.sz + 0.015, color: '#9333ea' })
+      boxes.push({ x: b.x + b.sx * 0.44, y: b.y + b.sy * 0.34, z: b.z, sx: 0.12, sy: 0.05, sz: b.sz + 0.015, color: '#9333ea' })
+    }
+
+    // Purple collar trim + folded cyber hood behind neck
+    boxes.push({ x: b.x, y: b.y + b.sy * 0.42, z: b.z, sx: b.sx * 0.88, sy: Math.min(0.056, b.sy * 0.22), sz: b.sz * 0.9, color: '#7e22ce' })
+    boxes.push({ ...h, color: '#18181b' })
+    boxes.push({
+      x: h.x,
+      y: h.y + h.sy * 0.35,
+      z: h.z + 0.01,
+      sx: h.sx * 0.88,
+      sy: 0.048,
+      sz: h.sz * 0.82,
+      color: '#a855f7',
+    })
+
+    // Metallic gold waistband trim & center zipper
+    boxes.push({ x: b.x, y: b.y - b.sy * 0.43, z: b.z, sx: b.sx + 0.025, sy: Math.min(0.052, b.sy * 0.22), sz: b.sz + 0.025, color: '#f59e0b' })
+    boxes.push({ x: b.x, y: b.y - 0.005, z: chestZ + 0.004, sx: 0.032, sy: b.sy * 0.82, sz: 0.016, color: '#fbbf24' })
+
+    // Glowing cyber emerald/purple `</>` crest on left chest & emerald badge on right chest
+    const cx = b.x - b.sx * 0.2
+    const cy = b.y + b.sy * 0.06
+    const badgeScaleY = Math.min(1, b.sy / 0.24)
+    boxes.push({ x: cx, y: cy, z: chestZ + 0.005, sx: 0.135 * chestScaleX, sy: 0.095 * badgeScaleY, sz: 0.016, color: '#1e1b4b' })
+    staticEmissiveBoxes.push({ x: cx - 0.036 * chestScaleX, y: cy + 0.008, z: chestZ + 0.016, sx: 0.024, sy: 0.04 * badgeScaleY, sz: 0.012, color: '#34d399' })
+    staticEmissiveBoxes.push({ x: cx + 0.036 * chestScaleX, y: cy + 0.008, z: chestZ + 0.016, sx: 0.024, sy: 0.04 * badgeScaleY, sz: 0.012, color: '#c084fc' })
+    staticEmissiveBoxes.push({ x: cx, y: cy + 0.008, z: chestZ + 0.016, sx: 0.018, sy: 0.05 * badgeScaleY, sz: 0.012, color: '#fde047' })
+
+    staticEmissiveBoxes.push({ x: b.x + b.sx * 0.2, y: cy + 0.008, z: chestZ + 0.012, sx: 0.072 * chestScaleX, sy: 0.024 * badgeScaleY, sz: 0.012, color: '#10b981' })
+    staticEmissiveBoxes.push({ x: b.x, y: b.y + 0.02, z: backZ, sx: Math.min(0.32, b.sx * 0.48), sy: 0.04, sz: 0.016, color: '#a855f7' })
+    staticEmissiveBoxes.push({ x: b.x, y: b.y - 0.032, z: backZ, sx: Math.min(0.22, b.sx * 0.34), sy: 0.026, sz: 0.016, color: '#34d399' })
     return null
   }
 
   if (id === 'round-glasses') {
-    const { x, y, z, scale, eyeSpan } = rig.faceAnchor
+    const { x, y, z, scale, eyeSpan, headHalfW } = face
     const halfSpan = eyeSpan * 0.5
     const rimSize = 0.2 * scale
     const lensSize = 0.13 * scale
+    const outerBridge = Math.max(halfSpan + rimSize * 0.5, headHalfW + 0.022)
+    const templeBackZ = Math.max(0.22, z - 0.04)
 
-    boxes.push({ x: x - halfSpan, y, z: z + 0.03, sx: rimSize, sy: rimSize, sz: 0.06, color: '#1e293b' })
-    boxes.push({ x: x + halfSpan, y, z: z + 0.03, sx: rimSize, sy: rimSize, sz: 0.06, color: '#1e293b' })
-    boxes.push({ x: x - halfSpan, y, z: z + 0.045, sx: lensSize, sy: lensSize, sz: 0.05, color: '#bae6fd' })
-    boxes.push({ x: x + halfSpan, y, z: z + 0.045, sx: lensSize, sy: lensSize, sz: 0.05, color: '#bae6fd' })
-    boxes.push({ x, y: y + 0.02, z: z + 0.035, sx: Math.max(0.08, eyeSpan - rimSize), sy: 0.05, sz: 0.05, color: '#fbbf24' })
+    boxes.push({ x: x - halfSpan, y, z: z + 0.015, sx: rimSize, sy: rimSize, sz: 0.055, color: '#1e293b' })
+    boxes.push({ x: x + halfSpan, y, z: z + 0.015, sx: rimSize, sy: rimSize, sz: 0.055, color: '#1e293b' })
+    boxes.push({ x: x - halfSpan, y, z: z + 0.03, sx: lensSize, sy: lensSize, sz: 0.048, color: '#bae6fd' })
+    boxes.push({ x: x + halfSpan, y, z: z + 0.03, sx: lensSize, sy: lensSize, sz: 0.048, color: '#bae6fd' })
+    boxes.push({ x, y: y + 0.02, z: z + 0.02, sx: Math.max(0.08, eyeSpan - rimSize), sy: 0.045, sz: 0.048, color: '#fbbf24' })
+    // Subtle temple ear arms wrapping cleanly around head sides without piercing skull
+    if (outerBridge > halfSpan + rimSize * 0.5) {
+      const armBridge = outerBridge - (halfSpan + rimSize * 0.5) + 0.02
+      boxes.push({ x: x - (halfSpan + rimSize * 0.5 + armBridge * 0.5), y: y + 0.015, z: z + 0.015, sx: armBridge, sy: 0.035, sz: 0.04, color: '#1e293b' })
+      boxes.push({ x: x + (halfSpan + rimSize * 0.5 + armBridge * 0.5), y: y + 0.015, z: z + 0.015, sx: armBridge, sy: 0.035, sz: 0.04, color: '#1e293b' })
+    }
+    boxes.push({ x: x - outerBridge, y: y + 0.015, z: z - templeBackZ * 0.42, sx: 0.035, sy: 0.038, sz: templeBackZ, color: '#1e293b' })
+    boxes.push({ x: x + outerBridge, y: y + 0.015, z: z - templeBackZ * 0.42, sx: 0.035, sy: 0.038, sz: templeBackZ, color: '#1e293b' })
     return null
   }
+
+  // Collar & Cape / Scarf dimensions driven dynamically by real Box3 torso dimensions
+  const collarW = b.sx + 0.045
+  const collarD = b.sz + 0.045
+  const collarY = b.y + b.sy * 0.4
+  const frontCollarZ = b.z + collarD * 0.5 + 0.018
+  const backCollarZ = b.z - collarD * 0.5 - 0.045
 
   if (id === 'wizard-cloak') {
-    const n = rig.neckAnchor
-    const b = rig.backAnchor
-    boxes.push({ x: n.x, y: n.y, z: n.z, sx: 0.62 * n.scale, sy: 0.12, sz: 0.54 * n.scale, color: '#7c3aed' })
-    boxes.push({ x: n.x, y: n.y - 0.02, z: n.z + 0.28 * n.scale, sx: 0.14, sy: 0.12, sz: 0.06, color: '#fde047' })
-    boxes.push({ x: b.x, y: b.y, z: b.z, sx: 0.64 * b.scale, sy: 0.48, sz: 0.14, color: '#6d28d9' })
-    boxes.push({ x: b.x, y: b.y - 0.18, z: b.z - 0.06, sx: 0.72 * b.scale, sy: 0.2, sz: 0.12, color: '#5b21b6' })
-    boxes.push({ x: b.x - 0.16, y: b.y - 0.06, z: b.z - 0.08, sx: 0.07, sy: 0.07, sz: 0.04, color: '#fde047' })
-    boxes.push({ x: b.x + 0.18, y: b.y + 0.08, z: b.z - 0.08, sx: 0.07, sy: 0.07, sz: 0.04, color: '#fde047' })
+    boxes.push({ x: b.x, y: collarY, z: b.z, sx: collarW, sy: 0.1, sz: collarD, color: '#7c3aed' })
+    boxes.push({ x: b.x, y: collarY - 0.02, z: frontCollarZ, sx: 0.14, sy: 0.11, sz: 0.055, color: '#fde047' })
+    boxes.push({ x: b.x, y: b.y, z: backCollarZ, sx: Math.min(0.76, b.sx + 0.06), sy: Math.max(0.22, b.sy + 0.08), sz: 0.1, color: '#6d28d9' })
+    boxes.push({ x: b.x, y: b.y - b.sy * 0.35, z: backCollarZ - 0.04, sx: Math.min(0.84, b.sx + 0.12), sy: Math.max(0.14, b.sy * 0.42), sz: 0.09, color: '#5b21b6' })
+    boxes.push({ x: b.x - 0.15, y: b.y - 0.02, z: backCollarZ - 0.055, sx: 0.065, sy: 0.065, sz: 0.035, color: '#fde047' })
+    boxes.push({ x: b.x + 0.16, y: b.y + 0.06, z: backCollarZ - 0.055, sx: 0.065, sy: 0.065, sz: 0.035, color: '#fde047' })
     return null
   }
 
-  const n = rig.neckAnchor
-  const frontZ = n.z + 0.28 * n.scale
-  // Deep spruce-evergreen collar band wrapping clearly outside torso + warm golden sprout clasp & hanging leaf tails
-  boxes.push({ x: n.x, y: n.y, z: n.z, sx: 0.64 * n.scale, sy: 0.14, sz: 0.56 * n.scale, color: '#064e3b' })
-  boxes.push({ x: n.x, y: n.y + 0.04, z: n.z, sx: 0.66 * n.scale, sy: 0.06, sz: 0.58 * n.scale, color: '#15803d' })
-  boxes.push({ x: n.x + 0.13 * n.scale, y: n.y - 0.13, z: frontZ + 0.02, sx: 0.17, sy: 0.24, sz: 0.09, color: '#064e3b' })
-  boxes.push({ x: n.x + 0.14 * n.scale, y: n.y - 0.18, z: frontZ + 0.035, sx: 0.12, sy: 0.14, sz: 0.08, color: '#4ade80' })
-  boxes.push({ x: n.x - 0.09 * n.scale, y: n.y - 0.08, z: frontZ + 0.02, sx: 0.14, sy: 0.16, sz: 0.08, color: '#15803d' })
-  boxes.push({ x: n.x + 0.04 * n.scale, y: n.y, z: frontZ + 0.04, sx: 0.11, sy: 0.1, sz: 0.06, color: '#fbbf24' })
-  boxes.push({ x: n.x + 0.04 * n.scale, y: n.y + 0.03, z: frontZ + 0.055, sx: 0.06, sy: 0.06, sz: 0.04, color: '#ef4444' })
+  // 'leaf-scarf': Deep spruce-evergreen collar band wrapping cleanly outside torso Box3
+  boxes.push({ x: b.x, y: collarY, z: b.z, sx: collarW, sy: 0.12, sz: collarD, color: '#064e3b' })
+  boxes.push({ x: b.x, y: collarY + 0.04, z: b.z, sx: collarW + 0.02, sy: 0.055, sz: collarD + 0.02, color: '#15803d' })
+  boxes.push({ x: b.x + Math.min(0.14, b.sx * 0.22), y: collarY - 0.12, z: frontCollarZ + 0.015, sx: 0.15, sy: Math.min(0.22, b.sy * 0.72), sz: 0.08, color: '#064e3b' })
+  boxes.push({ x: b.x + Math.min(0.15, b.sx * 0.24), y: collarY - 0.17, z: frontCollarZ + 0.03, sx: 0.11, sy: Math.min(0.13, b.sy * 0.45), sz: 0.07, color: '#4ade80' })
+  boxes.push({ x: b.x - Math.min(0.1, b.sx * 0.16), y: collarY - 0.07, z: frontCollarZ + 0.015, sx: 0.13, sy: Math.min(0.15, b.sy * 0.5), sz: 0.075, color: '#15803d' })
+  boxes.push({ x: b.x + 0.04, y: collarY, z: frontCollarZ + 0.035, sx: 0.1, sy: 0.095, sz: 0.055, color: '#fbbf24' })
+  boxes.push({ x: b.x + 0.04, y: collarY + 0.03, z: frontCollarZ + 0.05, sx: 0.055, sy: 0.055, sz: 0.035, color: '#ef4444' })
   return null
 }
 
@@ -1069,7 +1563,7 @@ export function buildVoxelCompanion(
   species: CompanionSpeciesId,
   equipped: EquippedAccessories,
 ): BuiltCompanion {
-  const rig = SPECIES_RIGS[species]
+  const profile = SPECIES_RIG_PROFILES[species]
   const group = new THREE.Group()
   const bodyGroup = new THREE.Group()
   group.add(bodyGroup)
@@ -1078,7 +1572,32 @@ export function buildVoxelCompanion(
   const staticEmissiveBoxes: ColoredBox[] = []
   const emissiveBoxes: ColoredBox[] = []
 
-  buildSpeciesBoxes(species, staticBoxes)
+  const speciesExtras = buildSpeciesBoxes(species, staticBoxes)
+
+  // Compute real Box3 bounds & dynamic accessory anchors from the companion's constructed voxels
+  const { anchors, torsoFit } = computeDynamicCompanionAnchors(species, staticBoxes, speciesExtras)
+
+  if (speciesExtras.groundedStaticBoxes.length > 0) {
+    group.add(mergeColoredBoxes(speciesExtras.groundedStaticBoxes, companionStaticMat))
+  }
+  if (speciesExtras.groundedEmissiveBoxes.length > 0) {
+    group.add(mergeColoredBoxes(speciesExtras.groundedEmissiveBoxes, companionEmissiveMat))
+  }
+  if (speciesExtras.antennaeGroup) {
+    // On Gato Alien, angle twin yellow antennae forward when wearing a hat/headset so they peek cleanly without clipping
+    if (species === 'leaf_kitty' && equipped.head && equipped.head !== 'golden-butterfly') {
+      speciesExtras.antennaeGroup.position.set(0, 0.94, equipped.head === 'dev_headset' ? 0.16 : 0.21)
+      speciesExtras.antennaeGroup.rotation.x = equipped.head === 'dev_headset' ? 0.18 : 0.34
+    }
+    bodyGroup.add(speciesExtras.antennaeGroup)
+  }
+  if (speciesExtras.tailGroup) {
+    bodyGroup.add(speciesExtras.tailGroup)
+  }
+  if (speciesExtras.armGroups) {
+    bodyGroup.add(speciesExtras.armGroups.left)
+    bodyGroup.add(speciesExtras.armGroups.right)
+  }
 
   let butterfly: ButterflyHandle | null = null
   let snowDomeGroup: THREE.Group | null = null
@@ -1086,7 +1605,8 @@ export function buildVoxelCompanion(
   if (equipped.head) {
     const headResult = buildHeadAccessory(
       equipped.head,
-      rig.headAnchor,
+      anchors.anchorHeadTop,
+      anchors.anchorFaceFront,
       staticBoxes,
       staticEmissiveBoxes,
     )
@@ -1102,8 +1622,8 @@ export function buildVoxelCompanion(
   if (equipped.body) {
     visorGlassGroup = buildBodyAccessory(
       equipped.body,
-      species,
-      rig,
+      torsoFit,
+      anchors,
       staticBoxes,
       staticEmissiveBoxes,
     )
@@ -1111,11 +1631,13 @@ export function buildVoxelCompanion(
 
   let lanternMesh: THREE.Mesh | null = null
   const steamPuffs: SteamPuffHandle[] = []
+  const steamEntries: Array<{ anchor: { x: number; y: number; z: number }; target: THREE.Group }> =
+    speciesExtras.steamAnchors.map((anchor) => ({ anchor, target: group }))
 
   if (equipped.hand) {
     const handMeta = buildHandAccessory(
       equipped.hand,
-      rig.handAnchor,
+      anchors.anchorSideHand,
       staticBoxes,
       emissiveBoxes,
       staticEmissiveBoxes,
@@ -1127,21 +1649,24 @@ export function buildVoxelCompanion(
     }
 
     if (handMeta.steamAnchor) {
-      const steamMat = getVoxelMaterial('#f4f8ff', 0.65)
+      steamEntries.push({ anchor: handMeta.steamAnchor, target: bodyGroup })
+    }
+  }
+
+  if (steamEntries.length > 0) {
+    const steamMat = getVoxelMaterial('#f4f8ff', 0.65)
+    for (let sIdx = 0; sIdx < steamEntries.length; sIdx += 1) {
+      const { anchor, target } = steamEntries[sIdx]
       for (let i = 0; i < 3; i += 1) {
         const puff = new THREE.Mesh(steamGeom, steamMat)
-        puff.position.set(
-          handMeta.steamAnchor.x,
-          handMeta.steamAnchor.y + i * 0.16,
-          handMeta.steamAnchor.z,
-        )
-        bodyGroup.add(puff)
+        puff.position.set(anchor.x, anchor.y + i * 0.14, anchor.z)
+        target.add(puff)
         steamPuffs.push({
           mesh: puff,
-          baseX: handMeta.steamAnchor.x,
-          baseY: handMeta.steamAnchor.y,
-          baseZ: handMeta.steamAnchor.z,
-          phase: i * 0.8,
+          baseX: anchor.x,
+          baseY: anchor.y,
+          baseZ: anchor.z,
+          phase: i * 0.8 + sIdx * 0.35,
         })
       }
     }
@@ -1168,7 +1693,11 @@ export function buildVoxelCompanion(
     butterfly,
     snowFlakes,
     steamPuffs,
-    height: rig.height,
+    antennaeGroup: speciesExtras.antennaeGroup,
+    tailGroup: speciesExtras.tailGroup,
+    armGroups: speciesExtras.armGroups,
+    anchors,
+    height: profile.modelHeight,
   }
 }
 
@@ -1181,6 +1710,20 @@ export function updateCompanionAnimation(
   const sway = Math.sin(timeSec * 1.7 + phaseOffset) * 0.038
   companion.bodyGroup.position.y = bob
   companion.bodyGroup.rotation.z = sway
+
+  if (companion.armGroups) {
+    companion.armGroups.left.rotation.x = Math.sin(timeSec * 5.4 + phaseOffset) * 0.22
+    companion.armGroups.right.rotation.x = Math.cos(timeSec * 5.4 + phaseOffset) * 0.22
+  }
+
+  if (companion.antennaeGroup) {
+    companion.antennaeGroup.rotation.z = Math.sin(timeSec * 3.6 + phaseOffset) * 0.12
+    companion.antennaeGroup.rotation.x = Math.cos(timeSec * 2.9 + phaseOffset) * 0.08
+  }
+
+  if (companion.tailGroup) {
+    companion.tailGroup.rotation.y = Math.sin(timeSec * 4.2 + phaseOffset) * 0.28
+  }
 
   if (companion.lanternMesh) {
     const pulse = 0.94 + 0.12 * (0.5 + 0.5 * Math.sin(timeSec * 4.2 + phaseOffset))
