@@ -180,7 +180,7 @@ export interface CalendarOrnamentEntry {
   level: GitHubContributionLevel
 }
 
-function classifyGitHubContributionLevel(
+export function classifyGitHubContributionLevel(
   count: number,
   maxDayCount: number,
 ): GitHubContributionLevel {

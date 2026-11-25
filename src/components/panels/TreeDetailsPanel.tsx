@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, ExternalLink, Gift, Heart, PawPrint, Share2, Trees, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getSpeciesById, resolveCompanionDisplayName } from '../../config/companions'
@@ -38,9 +38,16 @@ export function TreeDetailsPanel({
   onOpenCompanionShop,
   onOpenSupportModal,
 }: TreeDetailsPanelProps) {
-  const { currentUserTree, isSupabaseReady } = useCity()
+  const { currentUserTree, isSupabaseReady, ensureTreeCalendarLoaded } = useCity()
   const { language, t } = useLocale()
   const [copied, setCopied] = useState(false)
+
+  const hasCalendarWeeks = (tree.stats?.calendarWeeks?.length ?? 0) > 0
+  useEffect(() => {
+    if (isSupabaseReady && !tree.isDecorative && tree.contribution_count > 0 && !hasCalendarWeeks) {
+      void ensureTreeCalendarLoaded(tree.id)
+    }
+  }, [isSupabaseReady, tree.id, tree.isDecorative, tree.contribution_count, hasCalendarWeeks, ensureTreeCalendarLoaded])
 
   const stage = resolveTreeStage(tree.contribution_count)
   const stageCopy = TREE_STAGE_COPY[language][stage.level]
@@ -169,7 +176,9 @@ export function TreeDetailsPanel({
           </div>
           <div className="flex items-baseline justify-between gap-2">
             <dt className="text-[11px] text-slate-500">{t.treePanel.region}</dt>
-            <dd className="text-sky-300">{theme.regionName}</dd>
+            <dd className="text-sky-300">
+              {language === 'en' ? theme.regionNameEn : theme.regionName}
+            </dd>
           </div>
           <div className="flex items-baseline justify-between gap-2">
             <dt className="text-[11px] text-slate-500">{t.treePanel.status}</dt>

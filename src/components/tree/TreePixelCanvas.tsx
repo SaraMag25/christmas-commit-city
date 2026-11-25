@@ -186,6 +186,8 @@ export function TreePixelCanvas({
       giftCount: tree.gifts.length,
       isCreatorSpecial: tree.is_creator_special,
       contributionCount: tree.contribution_count,
+      activeDays: tree.activeDays,
+      commitLevelCounts: tree.commitLevelCounts,
       calendarWeeks: tree.stats?.calendarWeeks,
       frontYaw: 0,
       preserveFrontOrientation: false,

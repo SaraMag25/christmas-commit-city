@@ -149,8 +149,8 @@ export interface SupabasePublicTreeRow {
   display_name: string
   avatar_url: string
   total_commits: number
-  contribution_calendar: unknown
-  plot_index: number
+  contribution_calendar?: unknown
+  plot_index?: number | null
   active_companion_id: string | null
   companion_custom_name: string | null
   equipped_head_id: string | null
@@ -159,12 +159,15 @@ export interface SupabasePublicTreeRow {
   last_synced_at: string | null
   claimed?: boolean
   github_username_lower?: string
+  active_days?: number
+  commit_level_counts?: number[] | null
 }
 
 export interface SupabasePrivateTreeRow {
   id: string
   user_id: string
   spent_commits: number
+  contribution_calendar?: unknown
   active_companion_id: string | null
   companion_custom_name: string | null
   equipped_head_id: string | null

@@ -84,3 +84,22 @@ export function createVoxelMesh(
   mesh.scale.set(sx, sy, sz)
   return mesh
 }
+
+/**
+ * Synchronizes an InstancedMesh count, visibility, and GPU upload flags safely
+ * across graphics-quality transitions (High <-> Low).
+ */
+export function syncInstancedMeshState(
+  mesh: THREE.InstancedMesh | null,
+  count: number,
+  visible: boolean,
+): void {
+  if (!mesh) return
+  const safeCount = visible ? Math.max(0, count) : 0
+  mesh.visible = visible && safeCount > 0
+  mesh.count = safeCount
+  mesh.instanceMatrix.needsUpdate = true
+  if (mesh.instanceColor) {
+    mesh.instanceColor.needsUpdate = true
+  }
+}

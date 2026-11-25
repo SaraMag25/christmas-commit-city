@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { CompanionShopModal } from '../components/companions/CompanionShopModal'
@@ -7,6 +7,7 @@ import { isViewerTreeOwner } from '../utils/treeOwnership'
 import { CameraControls } from '../components/hud/CameraControls'
 import { CityExplorerBar } from '../components/hud/CityExplorerBar'
 import { CityHeader } from '../components/hud/CityHeader'
+import { CityMinimap } from '../components/hud/CityMinimap'
 import { GitHubConnectModal } from '../components/panels/GitHubConnectModal'
 import { HeroWelcomeOverlay } from '../components/panels/HeroWelcomeOverlay'
 import { HowItWorksModal } from '../components/panels/HowItWorksModal'
@@ -15,9 +16,22 @@ import { TreeDetailsPanel } from '../components/panels/TreeDetailsPanel'
 import { useCity } from '../context/cityContextStore'
 import { useLocale } from '../context/localeContextStore'
 import { City3DCanvas } from '../game/City3DCanvas'
-import { gameEventBus } from '../game/eventBus'
+import { gameEventBus, type GraphicsQualityMode } from '../game/eventBus'
+import type { AmbientTreePoint } from '../game/voxel/proceduralTreesLayer'
 import { fetchMyPaymentOrderStatus } from '../services/paymentService'
 import type { CityTree, VillagePropDialogue } from '../types/city'
+
+const GRAPHICS_QUALITY_STORAGE_KEY = 'ccc_graphics_quality_v1'
+
+function readInitialGraphicsQuality(): GraphicsQualityMode {
+  try {
+    const stored = window.localStorage.getItem(GRAPHICS_QUALITY_STORAGE_KEY)
+    if (stored === 'low' || stored === 'high') return stored
+  } catch {
+    // Ignore restricted storage environments.
+  }
+  return 'high'
+}
 
 export function HomePage() {
   const {
@@ -66,6 +80,28 @@ export function HomePage() {
   const [supportTargetUsername, setSupportTargetUsername] = useState<string | null>(null)
   const [hoveredTree, setHoveredTree] = useState<CityTree | null>(null)
   const [selectedTree, setSelectedTree] = useState<CityTree | null>(null)
+  const [ambientPoints, setAmbientPoints] = useState<readonly AmbientTreePoint[]>([])
+  const [graphicsQuality, setGraphicsQuality] = useState<GraphicsQualityMode>(() =>
+    readInitialGraphicsQuality(),
+  )
+  const [lowFpsSuggested, setLowFpsSuggested] = useState(false)
+
+  const handleToggleGraphicsQuality = useCallback(() => {
+    setLowFpsSuggested(false)
+    setGraphicsQuality((prev) => {
+      const next: GraphicsQualityMode = prev === 'high' ? 'low' : 'high'
+      try {
+        window.localStorage.setItem(GRAPHICS_QUALITY_STORAGE_KEY, next)
+      } catch {
+        // Ignore restricted storage environments.
+      }
+      return next
+    })
+  }, [])
+
+  const handleLowFpsSuggested = useCallback(() => {
+    setLowFpsSuggested(true)
+  }, [])
 
   const isWelcomeVisible =
     welcomeMode === 'manual' || (welcomeMode === 'auto' && !session)
@@ -208,7 +244,19 @@ export function HomePage() {
         (item) => !item.isDecorative && item.profile.github_username.toLowerCase() === cleanParam,
       )
       if (!alreadyLoaded && isSupabaseReady) {
-        await discoverGitHubTree(focusParam)
+        await discoverGitHubTree(focusParam, {
+          silentSwap: true,
+          pickOffCameraSlot: (excludedIds) => {
+            let picked: CityTree | null = null
+            gameEventBus.emit('city:request-swap-slot', {
+              excludedIds,
+              onResolve: (slot) => {
+                picked = slot
+              },
+            })
+            return picked
+          },
+        })
       }
       gameEventBus.emit('city:focus-tree', focusParam)
       setSearchParams({}, { replace: true })
@@ -266,7 +314,13 @@ export function HomePage() {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#0a1633]">
-      <City3DCanvas trees={trees} decorativeTrees={decorativeTrees} />
+      <City3DCanvas
+        trees={trees}
+        decorativeTrees={decorativeTrees}
+        graphicsQuality={graphicsQuality}
+        onLowFpsSuggested={handleLowFpsSuggested}
+        onAmbientPointsReady={setAmbientPoints}
+      />
 
       <CityHeader
         onOpenConnectModal={() => setShowConnectModal(true)}
@@ -409,6 +463,34 @@ export function HomePage() {
                 {language === 'en' ? (propDialogue.textEn ?? propDialogue.text) : propDialogue.text}
               </p>
 
+              {propDialogue.action === 'connect-github' && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {session ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPropDialogue(null)
+                        handleFocusMyTree()
+                      }}
+                      className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-bold"
+                    >
+                      {language === 'en' ? 'Go to My Tree' : 'Ir para Minha Árvore'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPropDialogue(null)
+                        setShowConnectModal(true)
+                      }}
+                      className="pixel-btn pixel-btn-pine rounded-sm px-2.5 py-1 text-[11px] font-bold"
+                    >
+                      {language === 'en' ? 'Connect GitHub' : 'Conectar GitHub'}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {propDialogue.action === 'open-shop' && (
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   <button
@@ -470,10 +552,21 @@ export function HomePage() {
         />
       )}
 
+      <CityMinimap
+        trees={trees}
+        ambientPoints={ambientPoints}
+        selectedTree={activeSelectedTree}
+        isHidden={isWelcomeVisible}
+      />
+
       <CameraControls
         hoveredTree={hoveredTree}
         totalTreesCount={realTreesCount}
         hasMyTree={Boolean(currentUserTree)}
+        graphicsQuality={graphicsQuality}
+        lowFpsSuggested={lowFpsSuggested}
+        onDismissLowFpsSuggestion={() => setLowFpsSuggested(false)}
+        onToggleGraphicsQuality={handleToggleGraphicsQuality}
         onZoomIn={() => gameEventBus.emit('city:zoom-in')}
         onZoomOut={() => gameEventBus.emit('city:zoom-out')}
         onOrbitLeft={() => gameEventBus.emit('city:orbit-left')}

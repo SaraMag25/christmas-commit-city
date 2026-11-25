@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { resolveTreeStage } from '../../config/treeLevels'
 import { useCity } from '../../context/cityContextStore'
 import { useLocale } from '../../context/localeContextStore'
+import { gameEventBus } from '../../game/eventBus'
 import { TREE_STAGE_COPY } from '../../i18n/translations'
 import { normalizeGitHubUsernameInput } from '../../services/githubSyncService'
 import type { CityTree } from '../../types/city'
@@ -96,10 +97,31 @@ export function CityExplorerBar({
     }
 
     setIsDiscovering(true)
+    gameEventBus.emit('city:search-flight-start', { username: clean })
+
+    const pickOffCameraSlot = (excludedIds: Set<string>): CityTree | null => {
+      let picked: CityTree | null = null
+      gameEventBus.emit('city:request-swap-slot', {
+        excludedIds,
+        onResolve: (slot) => {
+          picked = slot
+        },
+      })
+      return picked
+    }
+
     try {
-      const res = await discoverGitHubTree(clean)
+      const res = await discoverGitHubTree(clean, {
+        silentSwap: true,
+        pickOffCameraSlot,
+      })
       if (!res.ok || !res.tree) {
-        setLookupError(res.error ?? t.explorer.empty)
+        gameEventBus.emit('city:search-flight-abort')
+        const rawErr = res.error ?? ''
+        const isNotFound = /não encontrado|not found|404/i.test(rawErr)
+        setLookupError(
+          isNotFound ? `@${clean} ${t.explorer.notFoundGithub}` : rawErr || t.explorer.empty,
+        )
         return
       }
       onSelectTree(res.tree)
@@ -152,7 +174,7 @@ export function CityExplorerBar({
             <Search className="h-3.5 w-3.5" />
             <span>$ tree find --github</span>
             <span className="rounded-sm border border-emerald-500/30 bg-emerald-950/70 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
-              {realTrees.length.toLocaleString(language)}
+              {t.explorer.cityCountLabel} · {realTrees.length.toLocaleString(language)}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -245,7 +267,7 @@ export function CityExplorerBar({
                     )}
                     <span className="truncate font-semibold">
                       {isDiscovering
-                        ? t.explorer.searchingGithub
+                        ? `${t.explorer.locatingPrefix} @${validGithubUsername} ${t.explorer.locatingSuffix}`
                         : `${t.explorer.searchGithubCta}: @${validGithubUsername}`}
                     </span>
                   </span>

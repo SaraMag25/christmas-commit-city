@@ -1,6 +1,17 @@
 import type { CityTree, VillagePropDialogue } from '../types/city'
+import type { AmbientTreePoint } from './voxel/proceduralTreesLayer'
 
 type Listener<T> = (payload: T) => void
+
+export type GraphicsQualityMode = 'high' | 'low'
+
+export interface CameraTelemetry {
+  targetX: number
+  targetZ: number
+  distance: number
+  azimuth: number
+  polar: number
+}
 
 export interface GameEventMap {
   'city:ready': undefined
@@ -9,12 +20,25 @@ export interface GameEventMap {
   'city:tree-selected': CityTree
   'city:focus-tree': string
   'city:focus-creator': undefined
+  'city:pan-to-world': { x: number; z: number; distance?: number }
+  'city:camera-telemetry': CameraTelemetry
+  'city:request-telemetry': undefined
+  'city:ambient-points-updated': readonly AmbientTreePoint[]
+  'city:low-fps-suggested': undefined
+  'city:search-flight-start': { username: string }
+  'city:search-flight-abort': undefined
+  'city:request-swap-slot': {
+    excludedIds: Set<string>
+    onResolve: (slot: CityTree | null) => void
+  }
   'city:prop-interacted': VillagePropDialogue
   'city:zoom-in': undefined
   'city:zoom-out': undefined
   'city:reset-camera': undefined
   'city:orbit-left': undefined
   'city:orbit-right': undefined
+  'city:graphics-quality': GraphicsQualityMode
+  'city:graphics-auto-downgraded': undefined
 }
 
 class TypedEventBus {

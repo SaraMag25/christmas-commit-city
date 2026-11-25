@@ -21,6 +21,7 @@ import {
   cleanEmptyOAuthHashFromUrl,
   clearCachedGitHubProviderToken,
   extractSessionGitHubUser,
+  normalizeGitHubContributionStats,
   normalizeGitHubUsernameInput,
   resolvePublicGitHubTree,
   signInWithGitHubReadOnly,
@@ -29,9 +30,11 @@ import {
 } from '../services/githubSyncService'
 import { isSupabaseConfigured, supabase } from '../services/supabaseClient'
 import {
+  CITY_SECTOR_LIMIT,
   expandGiftCountsToSummaries,
+  fetchCitySectorTrees,
   fetchOwnerPrivateState,
-  fetchPublicCityTrees,
+  fetchPublicTreeCalendarById,
   findPublicTreeByUsername,
   formatBackendActionError,
   mapPublicTreeRowToCityTree,
@@ -54,6 +57,7 @@ import type {
 import {
   CityContext,
   type CompanionActionResult,
+  type DiscoverGitHubTreeOptions,
   type TreeDiscoveryResult,
   type TreeGiftActionResult,
 } from './cityContextStore'
@@ -356,6 +360,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
     treesRef.current = trees
   }, [trees])
 
+  const [sessionSeed] = useState<string>(() => crypto.randomUUID())
   const [isLoadingTrees, setIsLoadingTrees] = useState<boolean>(isSupabaseConfigured)
   const [session, setSession] = useState<Session | null>(null)
   const [authenticatedUsername, setAuthenticatedUsername] = useState<string | null>(null)
@@ -364,6 +369,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null)
   const syncedSessionUserRef = useRef<string | null>(null)
   const ownerGiftsRef = useRef<TreeGiftSummary[] | null>(null)
+  const loadedCalendarIdsRef = useRef<Set<string>>(new Set())
+  const inFlightCalendarIdsRef = useRef<Set<string>>(new Set())
+  const protectedSwapIdsRef = useRef<Set<string>>(new Set())
 
   // Horizon scenery pines now render via a 5-draw-call InstancedMesh layer inside City3DCanvas
   const decorativeTrees = useMemo<readonly CityTree[]>(() => [], [])
@@ -372,71 +380,169 @@ export function CityProvider({ children }: { children: ReactNode }) {
     treesRef.current = nextRealTrees
   }, [])
 
-  const discoverGitHubTree = useCallback(async (rawUsername: string): Promise<TreeDiscoveryResult> => {
-    const clean = normalizeGitHubUsernameInput(rawUsername)
-    if (!clean) {
-      return {
-        ok: false,
-        error: 'Nome de usuário do GitHub inválido.',
+  const discoverGitHubTree = useCallback(
+    async (
+      rawUsername: string,
+      options?: DiscoverGitHubTreeOptions,
+    ): Promise<TreeDiscoveryResult> => {
+      const clean = normalizeGitHubUsernameInput(rawUsername)
+      if (!clean) {
+        return {
+          ok: false,
+          error: 'Nome de usuário do GitHub inválido.',
+        }
       }
-    }
 
-    const lower = clean.toLowerCase()
-    const inMemory = treesRef.current.find(
-      (t) => !t.isDecorative && t.profile.github_username.toLowerCase() === lower,
-    )
-    if (inMemory) {
-      return { ok: true, tree: inMemory }
-    }
-
-    if (!isSupabaseConfigured) {
-      return {
-        ok: false,
-        error: 'A busca universal de perfis no GitHub requer conexão ativa com o Supabase.',
+      const lower = clean.toLowerCase()
+      const inMemory = treesRef.current.find(
+        (t) => !t.isDecorative && t.profile.github_username.toLowerCase() === lower,
+      )
+      if (inMemory) {
+        protectedSwapIdsRef.current.add(inMemory.id)
+        return { ok: true, tree: inMemory }
       }
-    }
 
-    try {
-      // 1. Check Supabase public_trees first before hitting Edge Function / GitHub API
-      const existingDbTree = await findPublicTreeByUsername(clean)
-      if (existingDbTree) {
+      if (!isSupabaseConfigured) {
+        return {
+          ok: false,
+          error: 'A busca universal de perfis no GitHub requer conexão ativa com o Supabase.',
+        }
+      }
+
+      const placeResolvedTreeIntoCity = (resolvedTree: CityTree): CityTree => {
+        protectedSwapIdsRef.current.add(resolvedTree.id)
+        const slotTree = options?.silentSwap
+          ? options.pickOffCameraSlot?.(protectedSwapIdsRef.current) ?? null
+          : null
+
+        if (slotTree) {
+          const swappedTree: CityTree = {
+            ...resolvedTree,
+            tree_position: slotTree.tree_position,
+            plotIndex: slotTree.plotIndex,
+          }
+          setTrees((prev) => {
+            const existsAlready = prev.some((t) => t.id === swappedTree.id)
+            const next = existsAlready
+              ? upsertUserTree(prev, swappedTree)
+              : prev.map((t) => (t.id === slotTree.id ? swappedTree : t))
+            treesRef.current = next
+            return next
+          })
+          return swappedTree
+        }
+
+        const nextFallbackPlot =
+          treesRef.current.length > 0 ? treesRef.current.length : resolvedTree.plotIndex ?? 0
+        const positionedTree: CityTree = {
+          ...resolvedTree,
+          plotIndex: nextFallbackPlot,
+          tree_position: resolveTreePositionFromPlotIndex(
+            nextFallbackPlot,
+            [],
+            resolvedTree.profile.github_username,
+          ),
+        }
         setTrees((prev) => {
-          const next = upsertUserTree(prev, existingDbTree)
+          const next = upsertUserTree(prev, positionedTree)
           treesRef.current = next
           return next
         })
-        return { ok: true, tree: existingDbTree }
+        return positionedTree
       }
 
-      // 2. Fetch from GitHub on demand via Edge Function & save unclaimed plot in Supabase
-      const resolved = await resolvePublicGitHubTree(clean)
-      const gifts = expandGiftCountsToSummaries(resolved.tree.id, resolved.giftCounts)
-      const createdTree = mapPublicTreeRowToCityTree(
-        resolved.tree,
-        gifts,
-        [],
-        resolved.periodYear,
-      )
+      try {
+        // 1. Check Supabase database first before resolving via GitHub API
+        const existingDbTree = await findPublicTreeByUsername(clean)
+        if (existingDbTree) {
+          if ((existingDbTree.stats?.calendarWeeks?.length ?? 0) > 0) {
+            loadedCalendarIdsRef.current.add(existingDbTree.id)
+          }
+          const finalTree = placeResolvedTreeIntoCity(existingDbTree)
+          return { ok: true, tree: finalTree }
+        }
+
+        // 2. Resolve from GitHub on demand cleanly behind the scenes
+        const resolved = await resolvePublicGitHubTree(clean)
+        const gifts = expandGiftCountsToSummaries(resolved.tree.id, resolved.giftCounts)
+        const createdTree = mapPublicTreeRowToCityTree(
+          resolved.tree,
+          gifts,
+          [],
+          resolved.periodYear,
+        )
+        if ((createdTree.stats?.calendarWeeks?.length ?? 0) > 0) {
+          loadedCalendarIdsRef.current.add(createdTree.id)
+        }
+
+        const finalTree = placeResolvedTreeIntoCity(createdTree)
+        return { ok: true, tree: finalTree }
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : `Não foi possível localizar "@${clean}".`,
+        }
+      }
+    },
+    [],
+  )
+
+  const ensureTreeCalendarLoaded = useCallback(async (treeId: string): Promise<void> => {
+    if (!isSupabaseConfigured || !treeId) return
+    if (loadedCalendarIdsRef.current.has(treeId) || inFlightCalendarIdsRef.current.has(treeId)) {
+      return
+    }
+    const target = treesRef.current.find((t) => t.id === treeId)
+    if (
+      !target ||
+      target.isDecorative ||
+      target.contribution_count <= 0 ||
+      (target.stats?.calendarWeeks?.length ?? 0) > 0
+    ) {
+      loadedCalendarIdsRef.current.add(treeId)
+      return
+    }
+
+    inFlightCalendarIdsRef.current.add(treeId)
+    try {
+      const weeks = await fetchPublicTreeCalendarById(treeId)
+      loadedCalendarIdsRef.current.add(treeId)
+      if (!weeks || weeks.length === 0) return
 
       setTrees((prev) => {
-        const next = upsertUserTree(prev, createdTree)
+        const next = prev.map((item) => {
+          if (item.id !== treeId) return item
+          return {
+            ...item,
+            stats: normalizeGitHubContributionStats(
+              {
+                ...item.stats,
+                totalContributions: item.contribution_count,
+                calendarWeeks: weeks,
+              },
+              item.contribution_count,
+            ),
+          }
+        })
         treesRef.current = next
         return next
       })
-
-      return { ok: true, tree: createdTree }
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : `Não foi possível buscar "@${clean}".`,
-      }
+    } finally {
+      inFlightCalendarIdsRef.current.delete(treeId)
     }
   }, [])
 
   const refreshSupabaseTreesAndOwner = useCallback(
     async (activeUserId?: string, focusUsername?: string) => {
       if (!isSupabaseConfigured) return
-      const publicTrees = await fetchPublicCityTrees()
+      const focusParam =
+        focusUsername ?? new URLSearchParams(window.location.search).get('focus') ?? undefined
+      const publicTrees = await fetchCitySectorTrees({
+        sessionSeed,
+        limit: CITY_SECTOR_LIMIT,
+        focusUsername: focusParam,
+        viewerUserId: activeUserId ?? null,
+      })
 
       let mergedTrees = publicTrees
       if (activeUserId) {
@@ -445,6 +551,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
 
         if (ownerState.treeRow) {
           const ownerTreeId = ownerState.treeRow.id
+          protectedSwapIdsRef.current.add(ownerTreeId)
           const matchedTree = publicTrees.find((t) => t.id === ownerTreeId)
           if (matchedTree && ownerState.loadout) {
             const key = matchedTree.profile.github_username.toLowerCase()
@@ -456,11 +563,27 @@ export function CityProvider({ children }: { children: ReactNode }) {
             setLoadoutsByUsername(nextLoadouts)
           }
 
+          if (ownerState.ownerCalendarWeeks && ownerState.ownerCalendarWeeks.length > 0) {
+            loadedCalendarIdsRef.current.add(ownerTreeId)
+          }
+
           mergedTrees = publicTrees.map((t) => {
             if (t.id !== ownerTreeId) return t
+            const nextStats =
+              ownerState.ownerCalendarWeeks && ownerState.ownerCalendarWeeks.length > 0
+                ? normalizeGitHubContributionStats(
+                    {
+                      ...t.stats,
+                      totalContributions: t.contribution_count,
+                      calendarWeeks: ownerState.ownerCalendarWeeks,
+                    },
+                    t.contribution_count,
+                  )
+                : t.stats
             return {
               ...t,
               gifts: ownerState.ownerGifts ?? t.gifts,
+              stats: nextStats,
             }
           })
         }
@@ -473,13 +596,18 @@ export function CityProvider({ children }: { children: ReactNode }) {
         gameEventBus.emit('city:focus-tree', focusUsername)
       }
     },
-    [emitForestUpdate],
+    [emitForestUpdate, sessionSeed],
   )
 
   useEffect(() => {
     if (!isSupabaseConfigured) return
     let active = true
-    fetchPublicCityTrees()
+    const urlFocus = new URLSearchParams(window.location.search).get('focus')
+    fetchCitySectorTrees({
+      sessionSeed,
+      limit: CITY_SECTOR_LIMIT,
+      focusUsername: urlFocus,
+    })
       .then((loaded) => {
         if (!active || syncedSessionUserRef.current) return
         setTrees(loaded)
@@ -498,7 +626,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [emitForestUpdate])
+  }, [emitForestUpdate, sessionSeed])
 
   const applyOfflineLoadoutUpdate = useCallback(
     (username: string, nextLoadout: UserCompanionLoadout) => {
@@ -1280,6 +1408,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         resyncMyTree,
         refreshCityState,
         discoverGitHubTree,
+        ensureTreeCalendarLoaded,
         signOut,
         clearAuthError: () => setAuthError(null),
         getCompanionLoadout,

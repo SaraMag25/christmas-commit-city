@@ -182,10 +182,6 @@ Deno.serve(async (req: Request) => {
       (typeof identityData.user_name === 'string' && identityData.user_name.trim()) ||
       (typeof identityData.preferred_username === 'string' &&
         identityData.preferred_username.trim()) ||
-      (typeof user.user_metadata?.user_name === 'string' &&
-        user.user_metadata.user_name.trim()) ||
-      (typeof user.user_metadata?.preferred_username === 'string' &&
-        user.user_metadata.preferred_username.trim()) ||
       ''
 
     if (!githubLogin) {
@@ -202,12 +198,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const currentUtcYear = new Date().getUTCFullYear()
+    const configuredYear = Number(Deno.env.get('CONTRIBUTION_YEAR')?.trim() || '')
     const year =
-      typeof payload.year === 'number' &&
-      Number.isInteger(payload.year) &&
-      payload.year >= 2020 &&
-      payload.year <= currentUtcYear + 1
-        ? payload.year
+      Number.isInteger(configuredYear) && configuredYear >= 2020 && configuredYear <= currentUtcYear + 1
+        ? configuredYear
         : currentUtcYear
 
     // Privileged service-role client used ONLY inside this verified Edge Function

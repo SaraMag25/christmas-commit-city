@@ -29,6 +29,11 @@ export interface TreeDiscoveryResult {
   error?: string
 }
 
+export interface DiscoverGitHubTreeOptions {
+  silentSwap?: boolean
+  pickOffCameraSlot?: (excludedIds: Set<string>) => CityTree | null
+}
+
 export interface CityContextValue {
   trees: readonly CityTree[]
   decorativeTrees: readonly CityTree[]
@@ -42,7 +47,11 @@ export interface CityContextValue {
   connectWithGitHub: () => Promise<boolean>
   resyncMyTree: () => Promise<void>
   refreshCityState: () => Promise<void>
-  discoverGitHubTree: (rawUsername: string) => Promise<TreeDiscoveryResult>
+  discoverGitHubTree: (
+    rawUsername: string,
+    options?: DiscoverGitHubTreeOptions,
+  ) => Promise<TreeDiscoveryResult>
+  ensureTreeCalendarLoaded: (treeId: string) => Promise<void>
   signOut: () => Promise<void>
   clearAuthError: () => void
   getCompanionLoadout: (username: string) => UserCompanionLoadout

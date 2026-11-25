@@ -95,12 +95,11 @@ async function hashClientIp(req: Request): Promise<string> {
     .join('')
 }
 
-function resolveContributionYear(rawYear: unknown): number {
+function resolveContributionYear(): number {
+  const configured = Number(Deno.env.get('CONTRIBUTION_YEAR')?.trim() || '')
   const currentYear = new Date().getUTCFullYear()
-  if (typeof rawYear === 'number' && Number.isInteger(rawYear)) {
-    if (rawYear >= 2020 && rawYear <= currentYear + 1) {
-      return rawYear
-    }
+  if (Number.isInteger(configured) && configured >= 2020 && configured <= currentYear + 1) {
+    return configured
   }
   return currentYear
 }
@@ -120,10 +119,12 @@ interface TreeRow {
   equipped_hand_id: string | null
   last_synced_at: string | null
   claimed: boolean
+  active_days: number
+  commit_level_counts: number[]
 }
 
 const PUBLIC_TREE_SELECT =
-  'id, github_username, display_name, avatar_url, total_commits, contribution_calendar, plot_index, active_companion_id, companion_custom_name, equipped_head_id, equipped_body_id, equipped_hand_id, last_synced_at, claimed'
+  'id, github_username, display_name, avatar_url, total_commits, contribution_calendar, plot_index, active_companion_id, companion_custom_name, equipped_head_id, equipped_body_id, equipped_hand_id, last_synced_at, claimed, active_days, commit_level_counts'
 
 async function fetchTreeGiftCounts(
   adminClient: ReturnType<typeof createClient>,
@@ -187,7 +188,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const usernameLower = cleanUsername.toLowerCase()
-    const targetYear = resolveContributionYear(payload.year)
+    const targetYear = resolveContributionYear()
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -259,7 +260,18 @@ Deno.serve(async (req: Request) => {
       }),
     ])
 
-    if (ipAllowedRes.data === false || globalAllowedRes.data === false) {
+    if (
+      ipAllowedRes.error ||
+      globalAllowedRes.error ||
+      ipAllowedRes.data !== true ||
+      globalAllowedRes.data !== true
+    ) {
+      if (ipAllowedRes.error || globalAllowedRes.error) {
+        console.error(
+          '[resolve-github-tree] Rate limit RPC error:',
+          ipAllowedRes.error?.message ?? globalAllowedRes.error?.message,
+        )
+      }
       return jsonResponse(
         {
           error: 'Too many new GitHub lookups right now. Please wait a minute and try again.',

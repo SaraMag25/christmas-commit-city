@@ -31,7 +31,14 @@ import {
 } from '../i18n/translations'
 
 export function TreeProfilePage() {
-  const { trees, currentUserTree, isSupabaseReady, isLoadingTrees, discoverGitHubTree } = useCity()
+  const {
+    trees,
+    currentUserTree,
+    isSupabaseReady,
+    isLoadingTrees,
+    discoverGitHubTree,
+    ensureTreeCalendarLoaded,
+  } = useCity()
   const { language, t } = useLocale()
   const { username = '' } = useParams<{ username: string }>()
   const [showGiftModal, setShowGiftModal] = useState(false)
@@ -50,6 +57,13 @@ export function TreeProfilePage() {
   const isResolvingProfile = Boolean(
     cleanParamKey && !tree && !isLoadingTrees && isSupabaseReady && resolvedAttemptKey !== cleanParamKey,
   )
+
+  const hasCalendarWeeks = (tree?.stats?.calendarWeeks?.length ?? 0) > 0
+  useEffect(() => {
+    if (tree && isSupabaseReady && !tree.isDecorative && tree.contribution_count > 0 && !hasCalendarWeeks) {
+      void ensureTreeCalendarLoaded(tree.id)
+    }
+  }, [tree, isSupabaseReady, hasCalendarWeeks, ensureTreeCalendarLoaded])
 
   useEffect(() => {
     if (!cleanParamUsername || !cleanParamKey || tree || isLoadingTrees || !isSupabaseReady) return

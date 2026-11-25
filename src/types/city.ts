@@ -87,6 +87,8 @@ export interface CityTree {
   tree_position: TreePosition
   plotIndex?: number
   claimed?: boolean
+  activeDays?: number
+  commitLevelCounts?: readonly [number, number, number, number]
   isDecorative?: boolean
   gifts: TreeGiftSummary[]
   companion?: TreeCompanionState
@@ -101,7 +103,7 @@ export interface VillagePropDialogue {
   text: string
   titleEn?: string
   textEn?: string
-  action?: 'open-shop'
+  action?: 'open-shop' | 'connect-github'
 }
 
 export interface PixCampaignConfig {

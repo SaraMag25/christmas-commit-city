@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 import { normalizeGiftSlug } from '../../config/gifts'
-import { extractCommitOrnamentEntries } from '../../services/githubSyncService'
+import {
+  classifyGitHubContributionLevel,
+  type GitHubContributionLevel,
+} from '../../services/githubSyncService'
 import type { GitHubContributionWeek, TreeGiftSummary, TreeLevelId } from '../../types/city'
+import { getContinentRegionAtWorld, gridToWorldCoords } from '../layout/continentGeography'
 import { getToonGradientMap } from './voxelMaterials'
 
 export type TreeThemeId =
@@ -35,12 +39,14 @@ export interface VoxelTreeBuildOptions {
   isScenicLandmark?: boolean
   isCreatorSpecial?: boolean
   contributionCount?: number
+  activeDays?: number
+  commitLevelCounts?: readonly [number, number, number, number]
   calendarWeeks?: GitHubContributionWeek[]
   /** World azimuth toward viewer so featured gifts face camera without colliding with companion corner */
   frontYaw?: number
   /** When true, keep random tree rotation on group while counter-rotating directional gifts toward frontYaw */
   preserveFrontOrientation?: boolean
-  /** When true, baubles are returned as instance data so City3DCanvas batches all trees into global InstancedMeshes */
+  /** Kept for API compatibility */
   separateBaubles?: boolean
 }
 
@@ -55,14 +61,6 @@ export interface BuiltVoxelTree {
   outerRadius: number
   themeLabel: string
   rotationY: number
-}
-
-interface CanopyNode {
-  x: number
-  y: number
-  z: number
-  angle: number
-  tier: number
 }
 
 interface TierPlacementRing {
@@ -82,7 +80,7 @@ interface Point3D {
   z: number
 }
 
-interface ColoredBox {
+export interface ColoredBox {
   x: number
   y: number
   z: number
@@ -103,73 +101,54 @@ type TreeArchetype =
 
 interface ThemePalette {
   label: string
-  deep: string
-  mid: string
-  bright: string
-  snowRate: number // 2: rich, 3: heavy arctic snow
+  snowRatio: number
 }
 
 /**
- * Deep bluish-spruce / arctic-teal evergreen palettes so official GitHub green
- * commit baubles (#0e4429..#9be9a8) stand out crisply against foliage and white snow.
+ * Rich evergreen pine base shades (fake AO darker underside -> lush mid -> sunlit outer tips).
  */
+export const PINE_FOLIAGE_SHADES = {
+  deep: '#133c2b',
+  mid: '#184a34',
+  bright: '#1d543b',
+} as const
+
+/**
+ * Harmonious luminous GitHub contribution green palette mapped directly onto
+ * exterior cubic canopy voxels (levels 1..4).
+ */
+export const GITHUB_COMMIT_CUBE_COLORS = {
+  1: '#1b7a43',
+  2: '#26a641',
+  3: '#39d353',
+  4: '#5ee87a',
+} as const
+
+export const GITHUB_BAUBLE_COLORS = {
+  1: [GITHUB_COMMIT_CUBE_COLORS[1]] as const,
+  2: [GITHUB_COMMIT_CUBE_COLORS[2]] as const,
+  3: [GITHUB_COMMIT_CUBE_COLORS[3]] as const,
+  4: [GITHUB_COMMIT_CUBE_COLORS[4]] as const,
+}
+
+const HOLIDAY_MICRO_LIGHT_COLORS = ['#ffd166', '#ffbe55', '#e63946', '#ffd166'] as const
+
+const WARM_BARK_PALETTE = {
+  dark: '#5c371d',
+  mid: '#6b4226',
+  warm: '#7c4d2b',
+  light: '#8c5835',
+} as const
+
 const THEME_PALETTES: Record<TreeThemeId, ThemePalette> = {
-  'classic-pine': {
-    label: 'Pinheiro Ártico',
-    deep: '#061c24',
-    mid: '#0b2d38',
-    bright: '#124352',
-    snowRate: 2,
-  },
-  'snowy-pine': {
-    label: 'Pinheiro Nevado',
-    deep: '#072029',
-    mid: '#0d3340',
-    bright: '#154b5c',
-    snowRate: 3,
-  },
-  'golden-pine': {
-    label: 'Pinheiro Boreal',
-    deep: '#071f2b',
-    mid: '#0c3042',
-    bright: '#13465e',
-    snowRate: 2,
-  },
-  'frosted-blue': {
-    label: 'Pinheiro Glacial',
-    deep: '#082233',
-    mid: '#0f364f',
-    bright: '#184e70',
-    snowRate: 3,
-  },
-  'crimson-autumn': {
-    label: 'Pinheiro da Tundra',
-    deep: '#061a24',
-    mid: '#0b2a38',
-    bright: '#113f52',
-    snowRate: 2,
-  },
-  'sakura-winter': {
-    label: 'Pinheiro Prateado',
-    deep: '#0a222b',
-    mid: '#123642',
-    bright: '#1c4d5c',
-    snowRate: 3,
-  },
-  'arcane-violet': {
-    label: 'Pinheiro Polar',
-    deep: '#081d2b',
-    mid: '#0e2f44',
-    bright: '#164460',
-    snowRate: 2,
-  },
-  'grand-elder': {
-    label: 'Pinheiro Ancião do Norte',
-    deep: '#051a24',
-    mid: '#0a2b3b',
-    bright: '#124257',
-    snowRate: 3,
-  },
+  'classic-pine': { label: 'Pinheiro Clássico', snowRatio: 0.28 },
+  'snowy-pine': { label: 'Pinheiro Nevado', snowRatio: 0.38 },
+  'golden-pine': { label: 'Pinheiro Boreal', snowRatio: 0.25 },
+  'frosted-blue': { label: 'Pinheiro Glacial', snowRatio: 0.36 },
+  'crimson-autumn': { label: 'Pinheiro da Tundra', snowRatio: 0.27 },
+  'sakura-winter': { label: 'Pinheiro Prateado', snowRatio: 0.35 },
+  'arcane-violet': { label: 'Pinheiro Polar', snowRatio: 0.31 },
+  'grand-elder': { label: 'Pinheiro Ancião do Norte', snowRatio: 0.33 },
 }
 
 const ARCHETYPES: readonly TreeArchetype[] = [
@@ -182,20 +161,6 @@ const ARCHETYPES: readonly TreeArchetype[] = [
   'frosted-spruce',
 ]
 
-const BARK_PALETTES: readonly { dark: string; mid: string; light: string }[] = [
-  { dark: '#4a2914', mid: '#7c4d2b', light: '#a66b41' },
-  { dark: '#3b2217', mid: '#633c2a', light: '#8a5840' },
-  { dark: '#64748b', mid: '#94a3b8', light: '#cbd5e1' },
-]
-
-// Official GitHub Contribution Graph Greens mapped to levels 1..4
-const GITHUB_BAUBLE_COLORS = {
-  1: ['#0e4429', '#216e39'] as const,
-  2: ['#006d32', '#30a14e'] as const,
-  3: ['#26a641', '#40c463'] as const,
-  4: ['#39d353', '#9be9a8'] as const,
-}
-
 const baseBox = new THREE.BoxGeometry(1, 1, 1)
 const basePos = baseBox.getAttribute('position') as THREE.BufferAttribute
 const baseNorm = baseBox.getAttribute('normal') as THREE.BufferAttribute
@@ -203,60 +168,115 @@ const baseIdx = baseBox.getIndex() as THREE.BufferAttribute
 
 const gradientMap = getToonGradientMap()
 
-// Materials for merged-mesh trees (TreePixelCanvas & distant landmark)
+// Subtle pulsing glow uniform shared across all luminous commit cubes, stars, and holiday micro-lights
+const commitEmissiveGlowUniform = { value: 0.44 }
+
+function createFoliageStandardMaterial(vertexColors: boolean): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.92,
+    metalness: 0.0,
+    vertexColors,
+  })
+  mat.customProgramCacheKey = () => `voxel-pine-foliage-v1-${vertexColors ? 'vc' : 'inst'}`
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+       float commitGreenBoost = smoothstep(0.08, 0.28, diffuseColor.g - max(diffuseColor.r, diffuseColor.b));
+       totalEmissiveRadiance += diffuseColor.rgb * (commitGreenBoost * 0.20);`,
+    )
+  }
+  return mat
+}
+
+function createLuminousStandardMaterial(vertexColors: boolean): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.88,
+    metalness: 0.0,
+    vertexColors,
+  })
+  mat.customProgramCacheKey = () => `voxel-pine-emissive-v1-${vertexColors ? 'vc' : 'inst'}`
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uCommitGlow = commitEmissiveGlowUniform
+    shader.fragmentShader = `uniform float uCommitGlow;\n${shader.fragmentShader}`
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+       totalEmissiveRadiance += diffuseColor.rgb * uCommitGlow;`,
+    )
+  }
+  return mat
+}
+
+/**
+ * Shared crisp matte PBR materials for global InstancedMesh layers in City3DCanvas.
+ */
+export const sharedTreeInstancedMaterials = {
+  shadowPad: new THREE.MeshStandardMaterial({
+    color: '#a3b6dc',
+    roughness: 0.96,
+    metalness: 0.0,
+  }),
+  trunk: new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.95,
+    metalness: 0.0,
+  }),
+  foliage: createFoliageStandardMaterial(false),
+  emissive: createLuminousStandardMaterial(false),
+  snow: new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.9,
+    metalness: 0.0,
+  }),
+}
+
+// Merged-mesh materials for single-tree TreePixelCanvas previews and gift overlays
+const trunkMergedMat = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.95,
+  metalness: 0.0,
+})
+const foliageMergedMat = createFoliageStandardMaterial(true)
+const emissiveMergedMat = createLuminousStandardMaterial(true)
+const snowMergedMat = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.9,
+  metalness: 0.0,
+})
+
+// Community gift showcase materials (preserved for crisp retro PC / baubles / bells animations)
 const staticMat = new THREE.MeshToonMaterial({
   vertexColors: true,
   gradientMap,
 })
-
-const l12MergedMat = new THREE.MeshToonMaterial({
-  vertexColors: true,
-  gradientMap,
-  emissive: new THREE.Color('#0c3b20'),
-  emissiveIntensity: 0.28,
-})
-
-const l3MergedMat = new THREE.MeshToonMaterial({
-  vertexColors: true,
-  gradientMap,
-  emissive: new THREE.Color('#26a641'),
-  emissiveIntensity: 0.55,
-})
-
 const l4PhaseAMergedMat = new THREE.MeshBasicMaterial({ vertexColors: true })
 const l4PhaseBMergedMat = new THREE.MeshBasicMaterial({ vertexColors: true })
 
-// Shared materials for global InstancedMesh bauble batches in City3DCanvas
 export const instancedBaubleMaterials = {
-  l12: new THREE.MeshToonMaterial({
-    color: 0xffffff,
-    gradientMap,
-    emissive: new THREE.Color('#0c3b20'),
-    emissiveIntensity: 0.28,
-  }),
-  l3: new THREE.MeshToonMaterial({
-    color: 0xffffff,
-    gradientMap,
-    emissive: new THREE.Color('#26a641'),
-    emissiveIntensity: 0.55,
-  }),
-  l4a: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-  l4b: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  l12: sharedTreeInstancedMaterials.foliage,
+  l3: sharedTreeInstancedMaterials.emissive,
+  l4a: l4PhaseAMergedMat,
+  l4b: l4PhaseBMergedMat,
 }
 
-export function updateCommitLightsTwinkle(timeSec: number): void {
-  // Subtle warm-green pulse for GitHub Level 3 baubles
-  const l3Pulse = 0.48 + 0.24 * (0.5 + 0.5 * Math.sin(timeSec * 2.1))
-  l3MergedMat.emissiveIntensity = l3Pulse
-  instancedBaubleMaterials.l3.emissiveIntensity = l3Pulse
+export function updateCommitLightsTwinkle(timeSec: number, animate = true): void {
+  if (!animate) {
+    commitEmissiveGlowUniform.value = 0.44
+    l4PhaseAMergedMat.color.setRGB(0.95, 0.95, 0.95)
+    l4PhaseBMergedMat.color.setRGB(0.95, 0.95, 0.95)
+    return
+  }
 
-  // Strong alternating twinkle for GitHub Level 4 peak baubles (#39d353 / #9be9a8)
-  const bA = 0.74 + 0.26 * (0.5 + 0.5 * Math.sin(timeSec * 3.1))
-  const bB = 0.74 + 0.26 * (0.5 + 0.5 * Math.sin(timeSec * 3.1 + Math.PI))
+  // Smooth breathing glow across Level 3/4 commit cubes, star, and warm holiday micro-lights
+  commitEmissiveGlowUniform.value = 0.39 + 0.13 * (0.5 + 0.5 * Math.sin(timeSec * 2.1))
+
+  const bA = 0.8 + 0.2 * (0.5 + 0.5 * Math.sin(timeSec * 3.1))
+  const bB = 0.8 + 0.2 * (0.5 + 0.5 * Math.sin(timeSec * 3.1 + Math.PI))
   l4PhaseAMergedMat.color.setRGB(bA, bA, bA)
   l4PhaseBMergedMat.color.setRGB(bB, bB, bB)
-  instancedBaubleMaterials.l4a.color.setRGB(bA, bA, bA)
-  instancedBaubleMaterials.l4b.color.setRGB(bB, bB, bB)
 }
 
 function mergeColoredBoxes(boxes: ColoredBox[], material: THREE.Material): THREE.Mesh {
@@ -307,7 +327,7 @@ function mergeColoredBoxes(boxes: ColoredBox[], material: THREE.Material): THREE
   return new THREE.Mesh(geom, material)
 }
 
-function mixSeed(seed: number, salt: number): number {
+export function mixSeed(seed: number, salt: number): number {
   let h = (seed ^ Math.imul(salt, 2654435761)) >>> 0
   h ^= h >>> 16
   h = Math.imul(h, 2246822519) >>> 0
@@ -315,94 +335,58 @@ function mixSeed(seed: number, salt: number): number {
   return h >>> 0
 }
 
-export function resolveTreeTheme(
-  seed: number,
-  gridX = 24,
-  gridY = 18,
-  level: TreeLevelId = 0,
-): { themeId: TreeThemeId; label: string; regionName: string } {
-  const hTheme = mixSeed(seed, 37) % 100
-
-  let regionName: string
-  let themeId: TreeThemeId
-
-  if (gridY <= 8) {
-    regionName = 'Montanhas Geladas'
-    themeId = hTheme < 48 ? 'snowy-pine' : hTheme < 82 ? 'frosted-blue' : 'classic-pine'
-  } else if (gridX <= 13 && gridY >= 24) {
-    regionName = 'Lago Congelado'
-    themeId = hTheme < 55 ? 'frosted-blue' : hTheme < 85 ? 'snowy-pine' : 'sakura-winter'
-  } else if (gridX >= 30 && gridY <= 17) {
-    regionName = 'Oficina do Norte'
-    themeId =
-      hTheme < 36
-        ? 'classic-pine'
-        : hTheme < 68
-          ? 'golden-pine'
-          : 'snowy-pine'
-  } else if (gridX >= 27 && gridY >= 20) {
-    regionName = 'Bosque Boreal'
-    themeId =
-      hTheme < 34
-        ? 'golden-pine'
-        : hTheme < 64
-          ? 'crimson-autumn'
-          : hTheme < 84
-            ? 'snowy-pine'
-            : 'classic-pine'
-  } else if (Math.abs(gridX - 24) <= 4 || Math.abs(gridY - 18) <= 3) {
-    regionName = 'Marco do Polo Norte'
-    themeId = hTheme < 40 ? 'classic-pine' : hTheme < 72 ? 'golden-pine' : 'snowy-pine'
-  } else {
-    regionName = 'Floresta Polar'
-    themeId = hTheme < 45 ? 'classic-pine' : hTheme < 78 ? 'snowy-pine' : 'frosted-blue'
-  }
-
-  if (level >= 6 && hTheme % 3 === 0) {
-    themeId = 'grand-elder'
-  }
-
-  return {
-    themeId,
-    label: THEME_PALETTES[themeId].label,
-    regionName,
-  }
+export interface TreeVisualSpec {
+  themeId: TreeThemeId
+  themeLabel: string
+  palette: ThemePalette
+  archetype: TreeArchetype
+  hDecor: number
+  scaleBoost: number
+  organicScale: number
+  voxelSize: number
+  trunkExposedVoxels: number
+  trunkW: number
+  tierRadii: number[]
+  spireY: number
+  tierRings: TierPlacementRing[]
+  topY: number
+  starY: number
+  starScale: number
+  outerRadius: number
+  rotationY: number
 }
 
-/**
- * Builds a 3D voxel Christmas tree with deep bluish-pine foliage, crisp white
- * snow ledges on branch tips, and official GitHub contribution green baubles.
- */
-export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxelTree {
+const TIER_RADII_BY_LEVEL: Record<TreeLevelId, readonly number[]> = {
+  0: [2.0, 1.3],
+  1: [2.5, 1.8, 1.1],
+  2: [2.9, 2.2, 1.4],
+  3: [3.3, 2.6, 1.9, 1.2],
+  4: [3.7, 3.0, 2.3, 1.7, 1.1],
+  5: [4.0, 3.4, 2.8, 2.2, 1.6, 1.0],
+  6: [4.3, 3.7, 3.1, 2.5, 2.0, 1.5, 1.0],
+}
+
+export function computeTreeVisualSpec(opts: {
+  level: TreeLevelId
+  seed: number
+  gridX?: number
+  gridY?: number
+  isScenicLandmark?: boolean
+  isCreatorSpecial?: boolean
+  contributionCount?: number
+}): TreeVisualSpec {
   const {
     level,
     seed,
     gridX = 24,
     gridY = 18,
-    gifts = [],
-    giftCount = 0,
     isScenicLandmark = false,
+    isCreatorSpecial = false,
     contributionCount = 0,
-    calendarWeeks,
-    frontYaw = 0,
-    preserveFrontOrientation = false,
-    separateBaubles = false,
   } = opts
-
-  const group = new THREE.Group()
-  const staticBoxes: ColoredBox[] = []
-  const l12Boxes: ColoredBox[] = []
-  const l3Boxes: ColoredBox[] = []
-  const l4aBoxes: ColoredBox[] = []
-  const l4bBoxes: ColoredBox[] = []
-  const phaseAMeshes: THREE.Mesh[] = []
-  const phaseBMeshes: THREE.Mesh[] = []
-  const starMeshes: THREE.Mesh[] = []
-  const baubleInstances: BaubleInstanceData[] = []
 
   const hArch = mixSeed(seed, 11)
   const hDecor = mixSeed(seed, 71)
-  const hBark = mixSeed(seed, 97)
 
   const resolved = isScenicLandmark
     ? { themeId: 'grand-elder' as TreeThemeId, label: 'Árvore Lendária do Polo Norte' }
@@ -414,298 +398,1107 @@ export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxel
       ? 'voluminous-cedar'
       : ARCHETYPES[hArch % ARCHETYPES.length]
 
-  const isPaleBarkTheme =
-    resolved.themeId === 'sakura-winter' || resolved.themeId === 'arcane-violet'
-  const bark = isPaleBarkTheme ? BARK_PALETTES[2] : BARK_PALETTES[hBark % 2]
-  const snowColor = '#f4f8ff'
-  const snowEdgeColor = '#dbeafe'
+  const scaleBoost = isScenicLandmark ? 1.45 : 1.0
+  const organicScale = isScenicLandmark ? 1.0 : 0.9 + (mixSeed(seed, 53) % 20) * 0.01
+  const voxelSize = Number((0.43 * scaleBoost * organicScale).toFixed(4))
 
-  // Cool lavender-indigo shadow beneath tree on bright snow
-  const padScale = isScenicLandmark ? 5.0 : 2.45
-  staticBoxes.push({
-    x: 0,
-    y: 0.03,
-    z: 0,
-    sx: padScale,
-    sy: 0.06,
-    sz: padScale,
-    color: '#a3b6dc',
-  })
-
-  const scaleBoost = isScenicLandmark ? 1.55 : 1.0
-  const organicScale = isScenicLandmark ? 1.0 : 0.94 + (mixSeed(seed, 53) % 13) * 0.01
   const widthFactor =
-    (archetype === 'alpine-spire'
-      ? 0.74
-      : archetype === 'broad-nordic'
-        ? 1.08
-        : archetype === 'voluminous-cedar'
-          ? 1.06
-          : archetype === 'dense-cypress'
-            ? 0.85
-            : archetype === 'spaced-tier'
-              ? 1.0
-              : 0.96) *
-    scaleBoost *
-    organicScale
-
-  const heightFactor =
-    (archetype === 'alpine-spire'
-      ? 1.22
-      : archetype === 'broad-nordic'
-        ? 0.88
-        : archetype === 'spaced-tier'
-          ? 1.14
-          : archetype === 'dense-cypress'
-            ? 1.08
-            : 1.0) *
-    scaleBoost *
-    organicScale
-
-  const baseTrunkH = level === 0 ? 0.95 : level <= 2 ? 1.32 : level <= 4 ? 1.72 : 2.1
-  const trunkH =
-    baseTrunkH *
-    (archetype === 'spaced-tier' ? 1.2 : archetype === 'broad-nordic' ? 0.82 : 1.0) *
-    scaleBoost
-  const trunkW = (level >= 5 ? 0.9 : level >= 3 ? 0.74 : 0.54) * scaleBoost
-
-  const fullTrunkHeight =
-    archetype === 'spaced-tier' ? trunkH + (level + 2) * 0.65 * scaleBoost : trunkH + 0.6
-  staticBoxes.push({
-    x: 0,
-    y: fullTrunkHeight / 2,
-    z: 0,
-    sx: trunkW,
-    sy: fullTrunkHeight,
-    sz: trunkW,
-    color: bark.mid,
-  })
-  staticBoxes.push({
-    x: -trunkW * 0.25,
-    y: trunkH / 2,
-    z: trunkW * 0.25,
-    sx: trunkW * 0.42,
-    sy: trunkH,
-    sz: trunkW * 0.42,
-    color: bark.light,
-  })
-
-  if (level >= 3 || isScenicLandmark) {
-    const rOff = trunkW * 0.62
-    staticBoxes.push({ x: rOff, y: 0.2, z: 0, sx: 0.42, sy: 0.38, sz: 0.42, color: bark.dark })
-    staticBoxes.push({ x: -rOff, y: 0.2, z: 0, sx: 0.42, sy: 0.38, sz: 0.42, color: bark.dark })
-    staticBoxes.push({ x: 0, y: 0.2, z: rOff, sx: 0.42, sy: 0.38, sz: 0.42, color: bark.dark })
-    staticBoxes.push({ x: 0, y: 0.2, z: -rOff, sx: 0.42, sy: 0.38, sz: 0.42, color: bark.dark })
-  }
-
-  // Small wooden nameplate kept close beside trunk (clear of front gift & companion zones)
-  if (!isScenicLandmark) {
-    staticBoxes.push({ x: -0.74, y: 0.3, z: -0.74, sx: 0.14, sy: 0.6, sz: 0.14, color: '#6b4226' })
-    staticBoxes.push({ x: -0.74, y: 0.54, z: -0.74, sx: 0.54, sy: 0.26, sz: 0.14, color: '#a66b41' })
-  }
-
-  const tiersByLevel: Record<TreeLevelId, number> = {
-    0: 2,
-    1: 3,
-    2: 4,
-    3: 5,
-    4: 6,
-    5: 7,
-    6: 8,
-  }
-  const radiusByLevel: Record<TreeLevelId, number> = {
-    0: 1.02,
-    1: 1.42,
-    2: 1.72,
-    3: 1.98,
-    4: 2.22,
-    5: 2.46,
-    6: 2.66,
-  }
-
-  const extraSkyHeight = Math.min(2.0, Math.max(0, contributionCount - 300) / 480)
-  const tierDelta = archetype === 'spaced-tier' ? -1 : archetype === 'voluminous-cedar' ? 1 : 0
-  const tiers = Math.max(2, tiersByLevel[level] + tierDelta + (contributionCount >= 800 ? 1 : 0))
-  const maxRadius = radiusByLevel[level] * widthFactor
-  const tierStepY =
-    ((level === 0 ? 0.78 : 0.92) + extraSkyHeight * 0.12) * heightFactor
-  const layersPerTier = archetype === 'voluminous-cedar' ? 3 : archetype === 'spaced-tier' ? 1 : 2
-  const voxelSize = (archetype === 'voluminous-cedar' ? 0.66 : 0.6) * (isScenicLandmark ? 1.18 : 1)
-  const boxHeight = (archetype === 'voluminous-cedar' ? 0.54 : 0.48) * (isScenicLandmark ? 1.15 : 1)
-  const lobeCount =
     archetype === 'alpine-spire'
-      ? 4
+      ? 0.9
       : archetype === 'broad-nordic'
-        ? 6
-        : archetype === 'dense-cypress'
-          ? 8
-          : 5
+        ? 1.05
+        : archetype === 'voluminous-cedar'
+          ? 1.04
+          : archetype === 'dense-cypress'
+            ? 0.93
+            : 1.0
 
-  const canopyNodes: CanopyNode[] = []
+  const trunkExposedVoxels = level <= 1 ? 2 : 3
+  const baseRadii = [...TIER_RADII_BY_LEVEL[level]]
+  if ((contributionCount >= 800 || isScenicLandmark) && level >= 5) {
+    baseRadii.unshift(4.5)
+  }
+
+  const tierRadii = baseRadii.map((r, idx) =>
+    idx === 0 || r > 1.5 ? Number((r * widthFactor).toFixed(3)) : r,
+  )
+
+  const trunkW =
+    (level <= 1 ? 1.08 : level <= 3 ? 1.24 : 1.42) * voxelSize
+
   const tierRings: TierPlacementRing[] = []
-  let topY = trunkH
+  let maxRingReach = 1.0
 
-  for (let t = 0; t < tiers; t += 1) {
-    const progress = t / Math.max(1, tiers - 1)
-    const tierBaseY = trunkH + t * tierStepY
-    const profilePower =
-      archetype === 'dense-cypress' ? 0.65 : archetype === 'broad-nordic' ? 0.82 : 0.76
-    const tierRadius = Math.max(0.58, maxRadius * (1 - Math.pow(progress, 1.05) * profilePower))
-
-    const leanAmp = archetype === 'irregular-wild' ? 0.3 : 0.08
-    const tierOffsetX = Math.sin(t * 2.1 + seed * 0.13) * leanAmp
-    const tierOffsetZ = Math.cos(t * 1.7 + seed * 0.19) * leanAmp
-    const waveAmp =
-      archetype === 'dense-cypress'
-        ? 0.08
-        : archetype === 'irregular-wild'
-          ? 0.24
-          : 0.16
+  for (let t = 0; t < tierRadii.length; t += 1) {
+    const r = tierRadii[t]
+    const yIdx = trunkExposedVoxels + t * 2
+    const phase = (t + (seed % 2)) % 2 === 0 ? 0 : Math.PI
+    const amp = r >= 2.8 ? 0.22 : r >= 1.8 ? 0.19 : 0.12
+    const baseRadiusWorld = r * 0.84 * voxelSize
+    const maxTierReach = r * (0.84 + amp) * voxelSize + voxelSize * 0.55
+    if (maxTierReach > maxRingReach) maxRingReach = maxTierReach
 
     tierRings.push({
       tier: t,
-      y: tierBaseY,
-      baseRadius: tierRadius,
-      offsetX: tierOffsetX,
-      offsetZ: tierOffsetZ,
-      lobeCount,
-      waveAmp,
-      phaseShift: t * 1.25 + seed * 0.03,
+      y: (yIdx + 0.5) * voxelSize,
+      baseRadius: baseRadiusWorld,
+      offsetX: 0,
+      offsetZ: 0,
+      lobeCount: 4,
+      waveAmp: amp,
+      phaseShift: phase,
     })
+  }
 
-    for (let layer = 0; layer < layersPerTier; layer += 1) {
-      const y = tierBaseY + layer * (archetype === 'voluminous-cedar' ? 0.4 : 0.46) * scaleBoost
-      topY = Math.max(topY, y + 0.4)
-      const layerShrink =
-        layersPerTier === 1 ? 0 : layer * (archetype === 'voluminous-cedar' ? 0.16 : 0.28)
-      const layerRadius = Math.max(0.42, tierRadius * (1 - layerShrink))
-      const gridRange = Math.ceil(layerRadius / voxelSize) + 1
+  const spireY = trunkExposedVoxels + tierRadii.length * 2
+  const topY = (spireY + 1) * voxelSize
+  const starScale =
+    isCreatorSpecial || isScenicLandmark
+      ? 1.3
+      : level >= 5
+        ? 1.12
+        : level >= 3
+          ? 0.96
+          : 0.8
+  const starY = topY + 0.62 * voxelSize * starScale
 
-      for (let gx = -gridRange; gx <= gridRange; gx += 1) {
-        for (let gz = -gridRange; gz <= gridRange; gz += 1) {
-          const lx = gx * voxelSize
-          const lz = gz * voxelSize
-          const dist = Math.hypot(lx, lz)
-          const angle = Math.atan2(lz, lx)
+  return {
+    themeId: resolved.themeId,
+    themeLabel: resolved.label,
+    palette,
+    archetype,
+    hDecor,
+    scaleBoost,
+    organicScale,
+    voxelSize,
+    trunkExposedVoxels,
+    trunkW,
+    tierRadii,
+    spireY,
+    tierRings,
+    topY,
+    starY,
+    starScale,
+    outerRadius: Math.max(1.05, Math.min(2.38 * scaleBoost, maxRingReach)),
+    rotationY:
+      (mixSeed(seed, 31) % 4) * (Math.PI * 0.5) +
+      (((mixSeed(seed, 97) % 11) - 5) / 5) * 0.28,
+  }
+}
 
-          const branchWave = 1 + waveAmp * Math.cos(angle * lobeCount + t * 1.25 + seed * 0.03)
-          const effectiveRadius = layerRadius * branchWave
+interface GridCellMeta {
+  ix: number
+  iy: number
+  iz: number
+  tier: number
+  rNorm: number
+}
 
-          if (dist > effectiveRadius) continue
+interface CandidateCommitSlot {
+  ix: number
+  iy: number
+  iz: number
+  tier: number
+  angle: number
+  rNorm: number
+  hasAbove: boolean
+  hasBelow: boolean
+  exposedSides: number
+  exposedDirs: Array<[number, number]>
+}
 
-          const cellHash = Math.abs(gx * 73 + gz * 139 + t * 31 + layer * 17 + seed) % 16
-          if (archetype === 'irregular-wild' && dist > effectiveRadius * 0.78 && cellHash === 0) {
+export interface VoxelTreeGeometryData {
+  spec: TreeVisualSpec
+  shadowPad: { sx: number; sy: number; sz: number }
+  trunkBoxes: ColoredBox[]
+  foliageBoxes: ColoredBox[]
+  emissiveBoxes: ColoredBox[]
+  snowBoxes: ColoredBox[]
+  height: number
+  outerRadius: number
+}
+
+function cellKey(ix: number, iy: number, iz: number): string {
+  return `${ix},${iy},${iz}`
+}
+
+function buildGoldenStarVoxels(
+  cx: number,
+  starY: number,
+  cz: number,
+  u: number,
+  starScale: number,
+  isGrand: boolean,
+  target: ColoredBox[],
+): void {
+  const s = u * starScale
+  // Stem collar connecting crown tip to star
+  target.push({
+    x: cx,
+    y: starY - 0.44 * s,
+    z: cz,
+    sx: 0.24 * s,
+    sy: 0.34 * s,
+    sz: 0.24 * s,
+    color: '#ffd166',
+  })
+  // Warm bright star core
+  target.push({
+    x: cx,
+    y: starY,
+    z: cz,
+    sx: 0.56 * s,
+    sy: 0.56 * s,
+    sz: 0.38 * s,
+    color: '#fffbeb',
+  })
+  // Crisp sculpted 4-point rays (vertical, horizontal, depth)
+  target.push({
+    x: cx,
+    y: starY + 0.42 * s,
+    z: cz,
+    sx: 0.26 * s,
+    sy: 0.42 * s,
+    sz: 0.26 * s,
+    color: '#ffd166',
+  })
+  target.push({
+    x: cx - 0.42 * s,
+    y: starY,
+    z: cz,
+    sx: 0.42 * s,
+    sy: 0.26 * s,
+    sz: 0.26 * s,
+    color: '#ffd166',
+  })
+  target.push({
+    x: cx + 0.42 * s,
+    y: starY,
+    z: cz,
+    sx: 0.42 * s,
+    sy: 0.26 * s,
+    sz: 0.26 * s,
+    color: '#ffd166',
+  })
+  target.push({
+    x: cx,
+    y: starY,
+    z: cz,
+    sx: 0.26 * s,
+    sy: 0.26 * s,
+    sz: 0.72 * s,
+    color: '#ffbe55',
+  })
+
+  // Subtle diagonal shoulder voxels & discrete warm halo glints
+  if (isGrand) {
+    target.push(
+      {
+        x: cx - 0.26 * s,
+        y: starY + 0.24 * s,
+        z: cz,
+        sx: 0.18 * s,
+        sy: 0.18 * s,
+        sz: 0.18 * s,
+        color: '#ffbe55',
+      },
+      {
+        x: cx + 0.26 * s,
+        y: starY + 0.24 * s,
+        z: cz,
+        sx: 0.18 * s,
+        sy: 0.18 * s,
+        sz: 0.18 * s,
+        color: '#ffbe55',
+      },
+      {
+        x: cx - 0.68 * s,
+        y: starY + 0.26 * s,
+        z: cz + 0.18 * s,
+        sx: 0.15 * s,
+        sy: 0.15 * s,
+        sz: 0.15 * s,
+        color: '#ffd166',
+      },
+      {
+        x: cx + 0.68 * s,
+        y: starY + 0.26 * s,
+        z: cz - 0.18 * s,
+        sx: 0.15 * s,
+        sy: 0.15 * s,
+        sz: 0.15 * s,
+        color: '#ffd166',
+      },
+    )
+  } else {
+    target.push(
+      {
+        x: cx - 0.56 * s,
+        y: starY + 0.24 * s,
+        z: cz + 0.14 * s,
+        sx: 0.14 * s,
+        sy: 0.14 * s,
+        sz: 0.14 * s,
+        color: '#ffbe55',
+      },
+      {
+        x: cx + 0.56 * s,
+        y: starY + 0.24 * s,
+        z: cz - 0.14 * s,
+        sx: 0.14 * s,
+        sy: 0.14 * s,
+        sz: 0.14 * s,
+        color: '#ffbe55',
+      },
+    )
+  }
+}
+
+/**
+ * Generates the unified 3D cubic-grid voxel pine tree shared by both the
+ * global `InstancedMesh` city layer and single-tree `TreePixelCanvas` previews.
+ */
+export function generateVoxelTreeGeometryData(opts: {
+  level: TreeLevelId
+  seed: number
+  gridX?: number
+  gridY?: number
+  isScenicLandmark?: boolean
+  isCreatorSpecial?: boolean
+  contributionCount?: number
+  activeDays?: number
+  commitLevelCounts?: readonly [number, number, number, number]
+  calendarWeeks?: GitHubContributionWeek[]
+  skipBaseStar?: boolean
+}): VoxelTreeGeometryData {
+  const {
+    level,
+    seed,
+    gridX = 24,
+    gridY = 18,
+    isScenicLandmark = false,
+    isCreatorSpecial = false,
+    contributionCount = 0,
+    activeDays,
+    commitLevelCounts,
+    calendarWeeks,
+    skipBaseStar = false,
+  } = opts
+
+  const spec = computeTreeVisualSpec({
+    level,
+    seed,
+    gridX,
+    gridY,
+    isScenicLandmark,
+    isCreatorSpecial,
+    contributionCount,
+  })
+  const u = spec.voxelSize
+
+  const trunkBoxes: ColoredBox[] = []
+  const foliageBoxes: ColoredBox[] = []
+  const emissiveBoxes: ColoredBox[] = []
+  const snowBoxes: ColoredBox[] = []
+
+  // 1. Visible warm brown trunk (2–3 voxels tall) + sculpted wooden roots + base snow cushion
+  const trunkW = spec.trunkW
+  for (let iy = 0; iy < spec.trunkExposedVoxels; iy += 1) {
+    const color =
+      iy === 0
+        ? WARM_BARK_PALETTE.mid
+        : iy % 2 === 1
+          ? WARM_BARK_PALETTE.warm
+          : WARM_BARK_PALETTE.mid
+    trunkBoxes.push({
+      x: 0,
+      y: (iy + 0.5) * u,
+      z: 0,
+      sx: trunkW,
+      sy: u,
+      sz: trunkW,
+      color,
+    })
+  }
+  // Subtle sunlit bark edge highlight on lower exposed trunk
+  trunkBoxes.push({
+    x: -trunkW * 0.24,
+    y: spec.trunkExposedVoxels * u * 0.48,
+    z: trunkW * 0.24,
+    sx: trunkW * 0.44,
+    sy: spec.trunkExposedVoxels * u * 0.92,
+    sz: trunkW * 0.44,
+    color: WARM_BARK_PALETTE.light,
+  })
+  // Internal trunk core spine rising partway inside canopy so no gaps show from below
+  const innerSpineVoxels = Math.max(2, Math.floor(spec.tierRadii.length * 1.1))
+  trunkBoxes.push({
+    x: 0,
+    y: (spec.trunkExposedVoxels + innerSpineVoxels * 0.5) * u,
+    z: 0,
+    sx: trunkW * 0.86,
+    sy: innerSpineVoxels * u,
+    sz: trunkW * 0.86,
+    color: WARM_BARK_PALETTE.dark,
+  })
+
+  // Sculpted wooden root flares & compact snow pillows at the base
+  const rootDist = trunkW * 0.52
+  const rootH = u * 0.52
+  const rootS = u * 0.5
+  const rootDirs: Array<[number, number]> = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ]
+  for (let r = 0; r < rootDirs.length; r += 1) {
+    const [dx, dz] = rootDirs[r]
+    trunkBoxes.push({
+      x: dx * rootDist,
+      y: rootH * 0.5,
+      z: dz * rootDist,
+      sx: rootS,
+      sy: rootH,
+      sz: rootS,
+      color: r % 2 === 0 ? WARM_BARK_PALETTE.dark : WARM_BARK_PALETTE.mid,
+    })
+  }
+
+  // Compact snow drift tufts nestled in root corners
+  const baseSnowOffset = trunkW * 0.62
+  const baseSnowDirs: Array<[number, number]> = [
+    [1, 1],
+    [-1, 1],
+    [-1, -1],
+    [1, -1],
+  ]
+  for (let b = 0; b < baseSnowDirs.length; b += 1) {
+    if ((seed + b) % 3 === 0 && b > 1) continue
+    const [dx, dz] = baseSnowDirs[b]
+    snowBoxes.push({
+      x: dx * baseSnowOffset,
+      y: u * 0.14,
+      z: dz * baseSnowOffset,
+      sx: u * 0.72,
+      sy: u * 0.28,
+      sz: u * 0.72,
+      color: b % 2 === 0 ? '#f4f8ff' : '#e1ecfe',
+    })
+  }
+
+  // 2. Sculpted 3D cubic-grid pine canopy (octagonal / cruciform alternating boughs)
+  const occupied = new Set<string>()
+  const cellMeta = new Map<string, GridCellMeta>()
+
+  const putCell = (ix: number, iy: number, iz: number, tier: number, rNorm: number) => {
+    const k = cellKey(ix, iy, iz)
+    occupied.add(k)
+    const prev = cellMeta.get(k)
+    if (!prev || rNorm > prev.rNorm) {
+      cellMeta.set(k, { ix, iy, iz, tier, rNorm })
+    }
+  }
+
+  for (let t = 0; t < spec.tierRadii.length; t += 1) {
+    const r = spec.tierRadii[t]
+    const y0 = spec.trunkExposedVoxels + t * 2
+    const phase0 = (t + (seed % 2)) % 2 === 0 ? 0 : Math.PI
+    const phase1 = phase0 === 0 ? Math.PI : 0
+
+    const addBoughLayer = (
+      iy: number,
+      rad: number,
+      phase: number,
+      ampFactor: number,
+      allowDroop: boolean,
+    ) => {
+      const bound = Math.ceil(rad + 1)
+      for (let ix = -bound; ix <= bound; ix += 1) {
+        for (let iz = -bound; iz <= bound; iz += 1) {
+          const d = Math.hypot(ix, iz)
+          if (d === 0) {
+            putCell(ix, iy, iz, t, 0)
             continue
           }
+          const theta = Math.atan2(iz, ix)
+          const jitter =
+            ((mixSeed(seed + ix * 41 + iz * 83, iy * 13 + t) % 100) / 100 - 0.5) * 0.13
+          const amp = (rad >= 2.8 ? 0.22 : rad >= 1.8 ? 0.19 : 0.12) * ampFactor
+          const effR =
+            rad <= 1.25
+              ? rad
+              : rad * (0.83 + amp * Math.cos(4 * theta + phase) + jitter * (d > 1.4 ? 1 : 0))
 
-          const wx = lx + tierOffsetX
-          const wz = lz + tierOffsetZ
-          const isOuter = dist >= effectiveRadius - voxelSize * 0.95
-          const color =
-            layer === 0 && !isOuter
-              ? palette.deep
-              : isOuter && cellHash >= 9
-                ? palette.bright
-                : palette.mid
-
-          staticBoxes.push({
-            x: wx,
-            y,
-            z: wz,
-            sx: voxelSize,
-            sy: boxHeight,
-            sz: voxelSize,
-            color,
-          })
-
-          // Distinct fluffy white snow shelves on outer branch layers varying organically per tree
-          const isTopLayer = layer === layersPerTier - 1
-          const snowBias = (seed + t + layer) % 3
-          if (isOuter && (isTopLayer || (layer === 0 && dist >= effectiveRadius - voxelSize * 0.6))) {
-            const snowThreshold = palette.snowRate === 3 ? 3 : 2
-            if ((Math.abs(gx * 3 + gz * 5 + t) + seed) % 4 < snowThreshold || t === tiers - 1 || t === 0) {
-              staticBoxes.push({
-                x: wx,
-                y: y + boxHeight * 0.5 + 0.08,
-                z: wz,
-                sx: voxelSize * (0.9 + snowBias * 0.04),
-                sy: 0.16 + snowBias * 0.035,
-                sz: voxelSize * (0.9 + snowBias * 0.04),
-                color: cellHash % 4 === 0 ? snowEdgeColor : snowColor,
-              })
+          if (d <= effR + 0.13) {
+            const rNorm = Math.min(1, d / Math.max(0.8, effR))
+            putCell(ix, iy, iz, t, rNorm)
+            if (allowDroop && rad >= 2.6 && d >= effR - 0.42 && iy - 1 >= spec.trunkExposedVoxels) {
+              if (mixSeed(seed + ix * 31 + iz * 97, t + 1) % 3 !== 0) {
+                putCell(ix, iy - 1, iz, t, 1)
+              }
             }
-          }
-
-          if (isOuter && dist > 0.25) {
-            canopyNodes.push({
-              x: wx,
-              y,
-              z: wz,
-              angle: Math.atan2(wz, wx),
-              tier: t,
-            })
           }
         }
       }
     }
+
+    // Main sculpted tier skirt
+    addBoughLayer(y0, r, phase0, 1.0, t > 0)
+    // Tucked upper neck layer for clear layered branch separation
+    const rNeck = r >= 2.2 ? r * 0.6 : Math.max(0.85, r * 0.58)
+    addBoughLayer(y0 + 1, rNeck, phase1, 0.72, false)
   }
 
-  // Crown tip with crisp white snow cap
-  const crownOffsetX = archetype === 'irregular-wild' ? Math.sin(tiers + seed) * 0.14 : 0
-  staticBoxes.push({
-    x: crownOffsetX,
-    y: topY + 0.22,
-    z: 0,
-    sx: 0.46 * scaleBoost,
-    sy: (archetype === 'alpine-spire' ? 0.76 : 0.54) * scaleBoost,
-    sz: 0.46 * scaleBoost,
-    color: palette.bright,
-  })
-  staticBoxes.push({
-    x: crownOffsetX,
-    y: topY + (archetype === 'alpine-spire' ? 0.64 : 0.52) * scaleBoost,
-    z: 0,
-    sx: 0.4 * scaleBoost,
-    sy: 0.16 * scaleBoost,
-    sz: 0.4 * scaleBoost,
-    color: snowColor,
-  })
+  // Sharp crown spire tip voxel
+  putCell(0, spec.spireY, 0, spec.tierRadii.length, 1)
 
-  const outerRadius = canopyNodes.reduce(
-    (maxR, node) => Math.max(maxR, Math.hypot(node.x, node.z) + voxelSize * 0.45),
-    maxRadius,
-  )
+  // 3. Cull fully interior voxels & collect exterior surface slots + snow tips
+  const surfaceCells: Array<{
+    meta: GridCellMeta
+    hasAbove: boolean
+    hasBelow: boolean
+    exposedSides: number
+    exposedDirs: Array<[number, number]>
+    slotIndex: number
+  }> = []
+  const candidateSlots: CandidateCommitSlot[] = []
+  const candidateSnowTips: GridCellMeta[] = []
+  let maxGridReach = 0
 
-  const rotationY = ((seed % 360) * Math.PI) / 180
-  const usedGroundSlots = new Set<number>()
-  const activeGifts = gifts.filter((g) => Boolean(g && g.gift_slug))
+  for (const meta of cellMeta.values()) {
+    const { ix, iy, iz } = meta
+    const hasAbove = occupied.has(cellKey(ix, iy + 1, iz))
+    const hasBelow = occupied.has(cellKey(ix, iy - 1, iz))
+    const exposedDirs: Array<[number, number]> = []
+    if (!occupied.has(cellKey(ix + 1, iy, iz))) exposedDirs.push([1, 0])
+    if (!occupied.has(cellKey(ix - 1, iy, iz))) exposedDirs.push([-1, 0])
+    if (!occupied.has(cellKey(ix, iy, iz + 1))) exposedDirs.push([0, 1])
+    if (!occupied.has(cellKey(ix, iy, iz - 1))) exposedDirs.push([0, -1])
 
-  // Build real GitHub contribution baubles first so community gifts never cover or replace them
-  const githubBaublePositions = buildGitHubBaubles({
+    const exposedSides = exposedDirs.length
+    if (exposedSides === 0 && hasAbove && hasBelow) continue
+
+    const reach = (Math.hypot(ix, iz) + 0.5) * u
+    if (reach > maxGridReach) maxGridReach = reach
+
+    let slotIndex = -1
+    if (exposedSides > 0) {
+      slotIndex = candidateSlots.length
+      candidateSlots.push({
+        ix,
+        iy,
+        iz,
+        tier: meta.tier,
+        angle: Math.atan2(iz, ix),
+        rNorm: meta.rNorm,
+        hasAbove,
+        hasBelow,
+        exposedSides,
+        exposedDirs,
+      })
+
+      if (!hasAbove && exposedSides >= 2 && iy < spec.spireY) {
+        candidateSnowTips.push(meta)
+      }
+    }
+
+    surfaceCells.push({
+      meta,
+      hasAbove,
+      hasBelow,
+      exposedSides,
+      exposedDirs,
+      slotIndex,
+    })
+  }
+
+  // Sort slot indices bottom-to-top along a spiral so calendar slices wrap naturally around the tree
+  const spiralSlotOrder = candidateSlots
+    .map((slot, idx) => ({
+      idx,
+      iy: slot.iy,
+      wrappedAngle: ((slot.angle + slot.tier * 1.15) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2),
+    }))
+    .sort((a, b) => a.iy - b.iy || a.wrappedAngle - b.wrappedAngle)
+    .map((item) => item.idx)
+
+  // 4. Map real contribution calendar / activeDays strictly onto exterior foliage voxels
+  const slotCommitLevel = new Map<number, GitHubContributionLevel>()
+  const effectiveContrib = isScenicLandmark ? Math.max(950, contributionCount) : contributionCount
+  if (
+    spiralSlotOrder.length > 0 &&
+    (effectiveContrib > 0 || (typeof activeDays === 'number' && activeDays > 0) || Boolean(calendarWeeks?.length))
+  ) {
+    assignProportionalCommitLevels({
+      seed,
+      contributionCount: effectiveContrib,
+      activeDays,
+      commitLevelCounts,
+      calendarWeeks,
+      candidateSlots,
+      spiralSlotOrder,
+      outLevels: slotCommitLevel,
+    })
+  }
+
+  // 5. Emit foliage & commit cubes (all on exact uniform u x u x u cubic grid)
+  for (let s = 0; s < surfaceCells.length; s += 1) {
+    const cell = surfaceCells[s]
+    const { ix, iy, iz } = cell.meta
+    const wx = ix * u
+    const wy = (iy + 0.5) * u
+    const wz = iz * u
+
+    const commitLvl = cell.slotIndex >= 0 ? slotCommitLevel.get(cell.slotIndex) : undefined
+    if (commitLvl) {
+      const color = GITHUB_COMMIT_CUBE_COLORS[commitLvl]
+      const target = commitLvl >= 3 ? emissiveBoxes : foliageBoxes
+      target.push({ x: wx, y: wy, z: wz, sx: u, sy: u, sz: u, color })
+      continue
+    }
+
+    // Fake AO shading across rich evergreen pine shades (#133c2b, #184a34, #1d543b)
+    const isUnderside = cell.hasAbove && !cell.hasBelow
+    const isSunlitTip = !cell.hasAbove && cell.exposedSides >= 2
+    const pineColor =
+      isUnderside || (cell.hasAbove && cell.exposedSides <= 1)
+        ? PINE_FOLIAGE_SHADES.deep
+        : isSunlitTip || iy >= spec.spireY - 2
+          ? PINE_FOLIAGE_SHADES.bright
+          : PINE_FOLIAGE_SHADES.mid
+
+    foliageBoxes.push({ x: wx, y: wy, z: wz, sx: u, sy: u, sz: u, color: pineColor })
+  }
+
+  // 6. Asymmetric delicate snow touches on selected outer upper branch tips (no white rings!)
+  const snowThreshold = Math.round(spec.palette.snowRatio * 100)
+  const snowH = u * 0.34
+  const snowS = u * 0.94
+  for (let i = 0; i < candidateSnowTips.length; i += 1) {
+    const tip = candidateSnowTips[i]
+    const roll = mixSeed(seed + tip.ix * 19 + tip.iz * 53, tip.iy + 7) % 100
+    if (roll >= snowThreshold) continue
+    snowBoxes.push({
+      x: tip.ix * u,
+      y: (tip.iy + 1) * u + snowH * 0.5,
+      z: tip.iz * u,
+      sx: snowS,
+      sy: snowH,
+      sz: snowS,
+      color: roll % 4 === 0 ? '#e1ecfe' : '#f4f8ff',
+    })
+  }
+
+  // 7. Add 4..8 subtle warm Christmas micro-lights embedded flush on exterior faces
+  const targetLights = level <= 1 ? 4 : level <= 3 ? 6 : 8
+  const unlitMicroCandidates: number[] = []
+  const fallbackMicroCandidates: number[] = []
+  for (let i = 0; i < spiralSlotOrder.length; i += 1) {
+    const slotIdx = spiralSlotOrder[i]
+    const slot = candidateSlots[slotIdx]
+    if (slot.exposedDirs.length === 0 || slot.iy >= spec.spireY) continue
+    if (!slotCommitLevel.has(slotIdx)) {
+      unlitMicroCandidates.push(slotIdx)
+    } else {
+      fallbackMicroCandidates.push(slotIdx)
+    }
+  }
+
+  const lightPool =
+    unlitMicroCandidates.length >= targetLights
+      ? unlitMicroCandidates
+      : [...unlitMicroCandidates, ...fallbackMicroCandidates]
+
+  if (lightPool.length > 0) {
+    const pickedLightIndices: number[] = []
+    const goldenAngle = 2.39996323
+    const baseTheta = ((seed % 360) * Math.PI) / 180
+    const lightSize = u * 0.34
+    const lightCount = Math.min(targetLights, lightPool.length)
+
+    for (let l = 0; l < lightCount; l += 1) {
+      const targetTierFrac = (l + 0.5) / lightCount
+      const targetTheta = baseTheta + l * goldenAngle
+      let bestIdx = -1
+      let bestScore = -Infinity
+
+      for (let p = 0; p < lightPool.length; p += 1) {
+        const slotIdx = lightPool[p]
+        if (pickedLightIndices.includes(slotIdx)) continue
+        const slot = candidateSlots[slotIdx]
+        const tierFrac = (slot.iy - spec.trunkExposedVoxels) / Math.max(1, spec.spireY - spec.trunkExposedVoxels)
+        let dTheta = Math.abs((slot.angle - targetTheta) % (Math.PI * 2))
+        if (dTheta > Math.PI) dTheta = Math.PI * 2 - dTheta
+
+        // Prefer spacing well apart from already placed lights
+        let minNeighborDist = 99
+        for (let q = 0; q < pickedLightIndices.length; q += 1) {
+          const prev = candidateSlots[pickedLightIndices[q]]
+          const dist = Math.hypot(slot.ix - prev.ix, slot.iy - prev.iy, slot.iz - prev.iz)
+          if (dist < minNeighborDist) minNeighborDist = dist
+        }
+        const spacingBonus = Math.min(2.5, minNeighborDist * 0.7)
+        const unlitBonus = slotCommitLevel.has(slotIdx) ? 0 : 1.5
+        const score =
+          unlitBonus + spacingBonus - Math.abs(tierFrac - targetTierFrac) * 2.2 - dTheta * 0.45
+
+        if (score > bestScore) {
+          bestScore = score
+          bestIdx = slotIdx
+        }
+      }
+
+      if (bestIdx < 0) break
+      pickedLightIndices.push(bestIdx)
+      const slot = candidateSlots[bestIdx]
+      const dir = slot.exposedDirs[(seed + l) % slot.exposedDirs.length]
+      emissiveBoxes.push({
+        x: (slot.ix + dir[0] * 0.53) * u,
+        y: (slot.iy + 0.52) * u,
+        z: (slot.iz + dir[1] * 0.53) * u,
+        sx: lightSize,
+        sy: lightSize,
+        sz: lightSize,
+        color: HOLIDAY_MICRO_LIGHT_COLORS[(seed + l) % HOLIDAY_MICRO_LIGHT_COLORS.length],
+      })
+    }
+  }
+
+  // 8. Sculpted golden voxel star with subtle warm halo on top
+  if (!skipBaseStar) {
+    buildGoldenStarVoxels(
+      0,
+      spec.starY,
+      0,
+      u,
+      spec.starScale,
+      level >= 5 || isCreatorSpecial || isScenicLandmark,
+      emissiveBoxes,
+    )
+  }
+
+  const finalOuterRadius = Math.max(spec.outerRadius, maxGridReach)
+  const padSpan = Math.min(3.4 * spec.scaleBoost, Math.max(1.75, finalOuterRadius * 1.32))
+  const totalHeight = spec.starY + 0.75 * u * spec.starScale
+
+  return {
+    spec: { ...spec, outerRadius: finalOuterRadius },
+    shadowPad: { sx: padSpan, sy: 0.06, sz: padSpan },
+    trunkBoxes,
+    foliageBoxes,
+    emissiveBoxes,
+    snowBoxes,
+    height: totalHeight,
+    outerRadius: finalOuterRadius,
+  }
+}
+
+function assignProportionalCommitLevels(opts: {
+  seed: number
+  contributionCount: number
+  activeDays?: number
+  commitLevelCounts?: readonly [number, number, number, number]
+  calendarWeeks?: GitHubContributionWeek[]
+  candidateSlots: readonly CandidateCommitSlot[]
+  spiralSlotOrder: readonly number[]
+  outLevels: Map<number, GitHubContributionLevel>
+}): void {
+  const {
+    seed,
+    contributionCount,
+    activeDays,
+    commitLevelCounts,
+    calendarWeeks,
+    candidateSlots,
+    spiralSlotOrder,
+    outLevels,
+  } = opts
+  const totalSlots = spiralSlotOrder.length
+  if (totalSlots === 0) return
+
+  // Path A: Full GitHub contribution_calendar available
+  if (Array.isArray(calendarWeeks) && calendarWeeks.length > 0) {
+    const dayCounts: number[] = []
+    let maxDayCount = 0
+    let activeDayCount = 0
+
+    for (let w = 0; w < calendarWeeks.length; w += 1) {
+      const days = calendarWeeks[w]?.contributionDays
+      if (!Array.isArray(days)) continue
+      for (let d = 0; d < days.length; d += 1) {
+        const count = Math.max(0, Math.floor(Number(days[d]?.contributionCount ?? 0)))
+        dayCounts.push(count)
+        if (count > 0) {
+          activeDayCount += 1
+          if (count > maxDayCount) maxDayCount = count
+        }
+      }
+    }
+
+    const totalDays = dayCounts.length
+    if (totalDays > 0) {
+      if (activeDayCount === 0) return
+
+      const dayLevels: Array<0 | GitHubContributionLevel> = new Array(totalDays)
+      const allActiveLevels: GitHubContributionLevel[] = []
+      for (let d = 0; d < totalDays; d += 1) {
+        const c = dayCounts[d]
+        if (c <= 0) {
+          dayLevels[d] = 0
+        } else {
+          const lvl = classifyGitHubContributionLevel(c, maxDayCount)
+          dayLevels[d] = lvl
+          allActiveLevels.push(lvl)
+        }
+      }
+
+      const targetLit = Math.min(
+        totalSlots,
+        Math.max(1, Math.round((activeDayCount / totalDays) * totalSlots)),
+      )
+
+      const windowDensities: number[] = new Array(totalSlots)
+      const windowLevels: GitHubContributionLevel[][] = new Array(totalSlots)
+      for (let pos = 0; pos < totalSlots; pos += 1) {
+        const startD = Math.floor((pos * totalDays) / totalSlots)
+        const endD = Math.max(startD + 1, Math.floor(((pos + 1) * totalDays) / totalSlots))
+        const levelsHere: GitHubContributionLevel[] = []
+        for (let d = startD; d < endD; d += 1) {
+          const lvl = dayLevels[d]
+          if (lvl !== 0) levelsHere.push(lvl)
+        }
+        windowLevels[pos] = levelsHere
+        windowDensities[pos] = levelsHere.length / (endD - startD)
+      }
+
+      const ranked: Array<{ pos: number; slotIdx: number; score: number }> = new Array(totalSlots)
+      for (let pos = 0; pos < totalSlots; pos += 1) {
+        const slotIdx = spiralSlotOrder[pos]
+        const slot = candidateSlots[slotIdx]
+        const dHere = windowDensities[pos]
+        const prevD = pos > 0 ? windowDensities[pos - 1] : 0
+        const nextD = pos + 1 < totalSlots ? windowDensities[pos + 1] : 0
+        const neighborDensity = (prevD + nextD) * 0.5
+        const jitter = (mixSeed(seed + pos * 29, totalDays + totalSlots) % 1000) / 1000
+        // Slight outer/sunlit preference keeps deep under-bough crevices pine-shaded on busy trees
+        const visualSurfaceBias = slot.rNorm * 0.16 + (slot.hasAbove ? 0 : 0.12)
+        const score =
+          (dHere > 0 ? 10 + dHere + jitter * 0.35 : neighborDensity * 2 + jitter * 0.5) +
+          visualSurfaceBias
+        ranked[pos] = { pos, slotIdx, score }
+      }
+      ranked.sort((a, b) => b.score - a.score)
+
+      for (let r = 0; r < targetLit; r += 1) {
+        const { pos, slotIdx } = ranked[r]
+        const levelsHere = windowLevels[pos]
+        const level =
+          levelsHere.length > 0
+            ? levelsHere[mixSeed(seed + pos * 41, totalSlots) % levelsHere.length]
+            : allActiveLevels[mixSeed(seed + pos * 43, totalSlots) % allActiveLevels.length]
+        outLevels.set(slotIdx, level)
+      }
+      return
+    }
+  }
+
+  // Path B: Summary metadata (`activeDays / 365` & `commitLevelCounts`) or fallback contribution count
+  const commits = Math.max(0, contributionCount)
+  const resolvedActiveDays =
+    typeof activeDays === 'number' && activeDays >= 0
+      ? Math.min(365, activeDays)
+      : commits > 0
+        ? Math.min(365, Math.round(Math.pow(commits, 0.65) * 1.6))
+        : 0
+
+  if (resolvedActiveDays <= 0) return
+
+  const activeRatio = THREE.MathUtils.clamp(resolvedActiveDays / 365, 0, 1)
+  const targetLit = Math.min(totalSlots, Math.max(1, Math.round(activeRatio * totalSlots)))
+
+  let w1 = commitLevelCounts?.[0] ?? 0
+  let w2 = commitLevelCounts?.[1] ?? 0
+  let w3 = commitLevelCounts?.[2] ?? 0
+  let w4 = commitLevelCounts?.[3] ?? 0
+  const rawTotal = w1 + w2 + w3 + w4
+
+  if (rawTotal <= 0) {
+    w1 = 0.42
+    w2 = 0.32
+    w3 = 0.17
+    w4 = 0.09
+  } else {
+    w1 /= rawTotal
+    w2 /= rawTotal
+    w3 /= rawTotal
+    w4 /= rawTotal
+  }
+
+  const norm = w1 + w2 + w3 + w4 || 1
+  const c1 = w1 / norm
+  const c2 = c1 + w2 / norm
+  const c3 = c2 + w3 / norm
+
+  const ranked: Array<{ pos: number; slotIdx: number; score: number }> = new Array(totalSlots)
+  for (let pos = 0; pos < totalSlots; pos += 1) {
+    const slotIdx = spiralSlotOrder[pos]
+    const slot = candidateSlots[slotIdx]
+    const patchWave =
+      0.5 + 0.5 * Math.sin(slot.tier * 1.85 + slot.angle * 2.1 + (seed % 97) * 0.19)
+    const jitter = (mixSeed(seed + pos * 31, totalSlots + 17) % 1000) / 1000
+    const visualSurfaceBias = slot.rNorm * 0.16 + (slot.hasAbove ? 0 : 0.12)
+    ranked[pos] = {
+      pos,
+      slotIdx,
+      score: patchWave * 0.55 + jitter * 0.45 + visualSurfaceBias,
+    }
+  }
+  ranked.sort((a, b) => b.score - a.score)
+
+  for (let r = 0; r < targetLit; r += 1) {
+    const { pos, slotIdx } = ranked[r]
+    const colorRoll = (mixSeed(seed + pos * 47, totalSlots + 73) % 1000) / 1000
+    const level: GitHubContributionLevel =
+      colorRoll < c1 ? 1 : colorRoll < c2 ? 2 : colorRoll < c3 ? 3 : 4
+    outLevels.set(slotIdx, level)
+  }
+}
+
+/**
+ * Builds ONLY the community gifts & gifted golden-star upgrade for a tree whose
+ * base trunk/canopy/snow/commits/star are already rendered in InstancedMesh layers.
+ */
+export function buildTreeGiftsAndStarOverlay(opts: {
+  level: TreeLevelId
+  seed: number
+  gridX?: number
+  gridY?: number
+  gifts: readonly TreeGiftSummary[]
+  contributionCount?: number
+  frontYaw?: number
+  preserveFrontOrientation?: boolean
+}): { group: THREE.Group; height: number; outerRadius: number } {
+  const {
     level,
     seed,
-    contributionCount: isScenicLandmark ? 950 : contributionCount,
-    calendarWeeks,
-    canopyNodes,
-    staticBoxes,
-    l12Boxes,
-    l3Boxes,
-    l4aBoxes,
-    l4bBoxes,
-    baubleInstances,
-    separateBaubles,
+    gridX = 24,
+    gridY = 18,
+    gifts,
+    contributionCount = 0,
+    frontYaw = 0,
+    preserveFrontOrientation = true,
+  } = opts
+
+  const spec = computeTreeVisualSpec({
+    level,
+    seed,
+    gridX,
+    gridY,
+    contributionCount,
   })
 
-  // Build authentic 3D voxel models for every gift received by this tree in 360° without overwriting commits
+  const group = new THREE.Group()
+  const activeGifts = gifts.filter((g) => Boolean(g && g.gift_slug))
+  const staticBoxes: ColoredBox[] = []
+  const l4aBoxes: ColoredBox[] = []
+  const l4bBoxes: ColoredBox[] = []
+  const phaseAMeshes: THREE.Mesh[] = []
+  const phaseBMeshes: THREE.Mesh[] = []
+  const usedGroundSlots = new Set<number>()
+
   if (activeGifts.length > 0) {
     buildCommunityGiftsShowcase({
       gifts: activeGifts,
       seed,
-      outerRadius,
-      tierRings,
-      githubBaublePositions,
+      outerRadius: spec.outerRadius,
+      tierRings: spec.tierRings,
+      githubBaublePositions: [],
       frontYaw,
-      rotationY,
+      rotationY: spec.rotationY,
+      preserveFrontOrientation,
+      parentGroup: group,
+      staticBoxes,
+      l4aBoxes,
+      l4bBoxes,
+      phaseAMeshes,
+      phaseBMeshes,
+      usedGroundSlots,
+    })
+  }
+
+  if (staticBoxes.length > 0) group.add(mergeColoredBoxes(staticBoxes, staticMat))
+  if (l4aBoxes.length > 0) group.add(mergeColoredBoxes(l4aBoxes, l4PhaseAMergedMat))
+  if (l4bBoxes.length > 0) group.add(mergeColoredBoxes(l4bBoxes, l4PhaseBMergedMat))
+
+  const hasStarGift = activeGifts.some((g) => normalizeGiftSlug(g.gift_slug) === 'golden-star')
+  if (hasStarGift) {
+    const s = spec.voxelSize * Math.max(1.22, spec.starScale)
+    group.add(
+      mergeColoredBoxes(
+        [
+          { x: 0, y: spec.starY, z: 0, sx: 0.28 * s, sy: 1.12 * s, sz: 0.28 * s, color: '#fffbeb' },
+          { x: 0, y: spec.starY, z: 0, sx: 1.12 * s, sy: 0.28 * s, sz: 0.28 * s, color: '#fde047' },
+          { x: 0, y: spec.starY, z: 0, sx: 0.28 * s, sy: 0.28 * s, sz: 0.94 * s, color: '#fde047' },
+          { x: -0.64 * s, y: spec.starY + 0.26 * s, z: 0.16 * s, sx: 0.16 * s, sy: 0.16 * s, sz: 0.16 * s, color: '#ffd166' },
+          { x: 0.64 * s, y: spec.starY + 0.26 * s, z: -0.16 * s, sx: 0.16 * s, sy: 0.16 * s, sz: 0.16 * s, color: '#ffd166' },
+        ],
+        l4PhaseAMergedMat,
+      ),
+    )
+  }
+
+  group.rotation.y = spec.rotationY
+  return {
+    group,
+    height: spec.starY + 0.85 * spec.voxelSize * spec.starScale,
+    outerRadius: spec.outerRadius,
+  }
+}
+
+export function resolveTreeTheme(
+  seed: number,
+  gridX = 24,
+  gridY = 18,
+  level: TreeLevelId = 0,
+): { themeId: TreeThemeId; label: string; regionName: string; regionNameEn: string } {
+  const hTheme = mixSeed(seed, 37) % 100
+  const world = gridToWorldCoords(gridX, gridY)
+  const region = getContinentRegionAtWorld(world.x, world.z)
+
+  let themeId: TreeThemeId
+  if (region.id === 'ilha-norte') {
+    themeId =
+      hTheme < 45
+        ? 'frosted-blue'
+        : hTheme < 78
+          ? 'snowy-pine'
+          : hTheme < 92
+            ? 'classic-pine'
+            : 'arcane-violet'
+  } else if (region.id === 'bosque-aurora') {
+    themeId =
+      hTheme < 40
+        ? 'snowy-pine'
+        : hTheme < 74
+          ? 'classic-pine'
+          : hTheme < 90
+            ? 'frosted-blue'
+            : 'sakura-winter'
+  } else if (region.id === 'vale-commits') {
+    themeId =
+      hTheme < 36
+        ? 'golden-pine'
+        : hTheme < 68
+          ? 'classic-pine'
+          : hTheme < 86
+            ? 'crimson-autumn'
+            : 'snowy-pine'
+  } else if (region.id === 'porto-glacial') {
+    themeId = hTheme < 48 ? 'frosted-blue' : hTheme < 82 ? 'snowy-pine' : 'classic-pine'
+  } else {
+    themeId =
+      hTheme < 42
+        ? 'classic-pine'
+        : hTheme < 72
+          ? 'golden-pine'
+          : hTheme < 90
+            ? 'snowy-pine'
+            : 'crimson-autumn'
+  }
+
+  if (level >= 6 && hTheme % 3 === 0) {
+    themeId = 'grand-elder'
+  }
+
+  return {
+    themeId,
+    label: THEME_PALETTES[themeId].label,
+    regionName: region.namePt,
+    regionNameEn: region.nameEn,
+  }
+}
+
+/**
+ * Builds a complete single 3D voxel Christmas tree (for TreePixelCanvas / profile views)
+ * using the exact same cubic-grid voxel geometry and palette as the city InstancedMesh layer.
+ */
+export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxelTree {
+  const {
+    level,
+    seed,
+    gridX = 24,
+    gridY = 18,
+    gifts = [],
+    giftCount = 0,
+    isScenicLandmark = false,
+    isCreatorSpecial = false,
+    contributionCount = 0,
+    activeDays,
+    commitLevelCounts,
+    calendarWeeks,
+    frontYaw = 0,
+    preserveFrontOrientation = false,
+  } = opts
+
+  const activeGifts = gifts.filter((g) => Boolean(g && g.gift_slug))
+  const hasStarGift = activeGifts.some((g) => normalizeGiftSlug(g.gift_slug) === 'golden-star')
+
+  const data = generateVoxelTreeGeometryData({
+    level,
+    seed,
+    gridX,
+    gridY,
+    isScenicLandmark,
+    isCreatorSpecial,
+    contributionCount,
+    activeDays,
+    commitLevelCounts,
+    calendarWeeks,
+    skipBaseStar: hasStarGift,
+  })
+
+  const group = new THREE.Group()
+  const staticBoxes: ColoredBox[] = []
+  const l4aBoxes: ColoredBox[] = []
+  const l4bBoxes: ColoredBox[] = []
+  const phaseAMeshes: THREE.Mesh[] = []
+  const phaseBMeshes: THREE.Mesh[] = []
+  const starMeshes: THREE.Mesh[] = []
+  const usedGroundSlots = new Set<number>()
+
+  // Ground shadow pad under tree
+  const shadowBox: ColoredBox = {
+    x: 0,
+    y: 0.03,
+    z: 0,
+    sx: data.shadowPad.sx,
+    sy: data.shadowPad.sy,
+    sz: data.shadowPad.sz,
+    color: '#a3b6dc',
+  }
+
+  if (data.trunkBoxes.length > 0) {
+    group.add(mergeColoredBoxes(data.trunkBoxes, trunkMergedMat))
+  }
+  if (data.foliageBoxes.length > 0) {
+    group.add(mergeColoredBoxes(data.foliageBoxes, foliageMergedMat))
+  }
+  if (data.emissiveBoxes.length > 0) {
+    group.add(mergeColoredBoxes(data.emissiveBoxes, emissiveMergedMat))
+  }
+  group.add(mergeColoredBoxes([shadowBox, ...data.snowBoxes], snowMergedMat))
+
+  // Community gifts showcase (without replacing commit cubes)
+  if (activeGifts.length > 0) {
+    buildCommunityGiftsShowcase({
+      gifts: activeGifts,
+      seed,
+      outerRadius: data.outerRadius,
+      tierRings: data.spec.tierRings,
+      githubBaublePositions: [],
+      frontYaw,
+      rotationY: data.spec.rotationY,
       preserveFrontOrientation,
       parentGroup: group,
       staticBoxes,
@@ -716,95 +1509,60 @@ export function buildVoxelChristmasTree(opts: VoxelTreeBuildOptions): BuiltVoxel
       usedGroundSlots,
     })
   } else if (level >= 5 || giftCount > 0 || isScenicLandmark) {
-    // Scenic / veteran evergreen gift boxes placed neatly away from reserved companion corner
     const giftPalettes = [
       ['#dc2626', '#fbbf24'],
       ['#2563eb', '#f8fafc'],
     ]
     const g1 = giftPalettes[seed % giftPalettes.length]
-    addGiftBoxes(staticBoxes, -0.92 * scaleBoost, 0, -0.78 * scaleBoost, 0.56, 0.46, 0.56, g1[0], g1[1])
+    const sBoost = data.spec.scaleBoost
+    addGiftBoxes(staticBoxes, -0.92 * sBoost, 0, -0.78 * sBoost, 0.56, 0.46, 0.56, g1[0], g1[1])
     if (level >= 6 || giftCount >= 2 || isScenicLandmark) {
       const g2 = giftPalettes[(seed + 1) % giftPalettes.length]
-      addGiftBoxes(staticBoxes, -1.02 * scaleBoost, 0, 0.62 * scaleBoost, 0.52, 0.44, 0.52, g2[0], g2[1])
+      addGiftBoxes(staticBoxes, -1.02 * sBoost, 0, 0.62 * sBoost, 0.52, 0.44, 0.52, g2[0], g2[1])
     }
   }
 
-  group.add(mergeColoredBoxes(staticBoxes, staticMat))
-
-  if (!separateBaubles) {
-    if (l12Boxes.length > 0) {
-      group.add(mergeColoredBoxes(l12Boxes, l12MergedMat))
-    }
-    if (l3Boxes.length > 0) {
-      group.add(mergeColoredBoxes(l3Boxes, l3MergedMat))
-    }
-    if (l4aBoxes.length > 0) {
-      const meshA = mergeColoredBoxes(l4aBoxes, l4PhaseAMergedMat)
-      group.add(meshA)
-      phaseAMeshes.push(meshA)
-    }
-    if (l4bBoxes.length > 0) {
-      const meshB = mergeColoredBoxes(l4bBoxes, l4PhaseBMergedMat)
-      group.add(meshB)
-      phaseBMeshes.push(meshB)
-    }
+  if (staticBoxes.length > 0) group.add(mergeColoredBoxes(staticBoxes, staticMat))
+  if (l4aBoxes.length > 0) {
+    const meshA = mergeColoredBoxes(l4aBoxes, l4PhaseAMergedMat)
+    group.add(meshA)
+    phaseAMeshes.push(meshA)
+  }
+  if (l4bBoxes.length > 0) {
+    const meshB = mergeColoredBoxes(l4bBoxes, l4PhaseBMergedMat)
+    group.add(meshB)
+    phaseBMeshes.push(meshB)
   }
 
-  // Golden topper star unlocked by stage level (or upgraded if gifted golden-star)
-  const hasStarGift = activeGifts.some((g) => normalizeGiftSlug(g.gift_slug) === 'golden-star')
   if (hasStarGift) {
-    const starY =
-      topY + (archetype === 'alpine-spire' ? 1.04 : 0.92) * (isScenicLandmark ? 1.15 : 1)
-    const sScale = (level >= 5 || isScenicLandmark ? 1.32 : 1.05) * (isScenicLandmark ? 1.18 : 1)
-    const giftStar = mergeColoredBoxes(
-      [
-        { x: crownOffsetX, y: starY, z: 0, sx: 0.56 * sScale, sy: 0.56 * sScale, sz: 0.56 * sScale, color: '#fde047' },
-        { x: crownOffsetX, y: starY, z: 0, sx: 0.24 * sScale, sy: 1.2 * sScale, sz: 0.24 * sScale, color: '#fffbeb' },
-        { x: crownOffsetX, y: starY, z: 0, sx: 1.2 * sScale, sy: 0.24 * sScale, sz: 0.24 * sScale, color: '#fffbeb' },
-        { x: crownOffsetX, y: starY, z: 0, sx: 0.24 * sScale, sy: 0.24 * sScale, sz: 0.94 * sScale, color: '#fffbeb' },
-        { x: crownOffsetX - 0.62 * sScale, y: starY + 0.14, z: 0.2, sx: 0.16, sy: 0.16, sz: 0.16, color: '#fde047' },
-        { x: crownOffsetX + 0.62 * sScale, y: starY + 0.14, z: -0.2, sx: 0.16, sy: 0.16, sz: 0.16, color: '#fde047' },
-      ],
-      l4PhaseAMergedMat,
+    const upgradedStarBoxes: ColoredBox[] = []
+    buildGoldenStarVoxels(
+      0,
+      data.spec.starY,
+      0,
+      data.spec.voxelSize,
+      Math.max(1.32, data.spec.starScale * 1.15),
+      true,
+      upgradedStarBoxes,
     )
-    group.add(giftStar)
-    starMeshes.push(giftStar)
-  } else if ((level >= 3 && level <= 4 && hDecor % 2 === 0) || resolved.themeId === 'arcane-violet') {
-    const tip = mergeColoredBoxes(
-      [{ x: crownOffsetX, y: topY + 0.72, z: 0, sx: 0.34, sy: 0.42, sz: 0.34, color: '#fbbf24' }],
-      l4PhaseAMergedMat,
-    )
-    group.add(tip)
-    starMeshes.push(tip)
-  } else if (level >= 5 || isScenicLandmark) {
-    const starY = topY + (archetype === 'alpine-spire' ? 1.0 : 0.86) * (isScenicLandmark ? 1.15 : 1)
-    const starColor = isScenicLandmark ? '#fef08a' : '#fbbf24'
-    const sScale = isScenicLandmark ? 1.45 : 1.05
-    const starMesh = mergeColoredBoxes(
-      [
-        { x: crownOffsetX, y: starY, z: 0, sx: 0.5 * sScale, sy: 0.5 * sScale, sz: 0.32 * sScale, color: starColor },
-        { x: crownOffsetX, y: starY, z: 0, sx: 0.22 * sScale, sy: 1.04 * sScale, sz: 0.22 * sScale, color: '#fffbeb' },
-        { x: crownOffsetX, y: starY, z: 0, sx: 1.04 * sScale, sy: 0.22 * sScale, sz: 0.22 * sScale, color: '#fffbeb' },
-      ],
-      l4PhaseAMergedMat,
-    )
-    group.add(starMesh)
-    starMeshes.push(starMesh)
+    const giftStarMesh = mergeColoredBoxes(upgradedStarBoxes, emissiveMergedMat)
+    group.add(giftStarMesh)
+    starMeshes.push(giftStarMesh)
   }
 
-  group.rotation.y = rotationY
+  group.rotation.y = data.spec.rotationY
 
   return {
     group,
     phaseAMeshes,
     phaseBMeshes,
     starMeshes,
-    baubleInstances,
+    baubleInstances: [],
     auraMesh: null,
-    height: topY + (level >= 5 || hasStarGift ? 1.65 : 0.85),
-    outerRadius,
-    themeLabel: palette.label,
-    rotationY,
+    height: data.height,
+    outerRadius: data.outerRadius,
+    themeLabel: data.spec.themeLabel,
+    rotationY: data.spec.rotationY,
   }
 }
 
@@ -1285,218 +2043,4 @@ function buildCommunityGiftsShowcase(opts: {
   if (giftFrontGroup.children.length > 0) {
     parentGroup.add(giftFrontGroup)
   }
-}
-
-function computeTargetBaubleCount(
-  level: TreeLevelId,
-  contributionCount: number,
-  maxSlots: number,
-): number {
-  if (level === 0 || contributionCount <= 0 || maxSlots <= 0) return 0
-
-  let desired: number
-  if (level === 1) {
-    desired = Math.min(10, Math.max(1, contributionCount))
-  } else if (level === 2) {
-    desired = 11 + Math.round(((Math.min(50, contributionCount) - 11) / 39) * 15)
-  } else if (level === 3) {
-    desired = 27 + Math.round(((Math.min(100, contributionCount) - 51) / 49) * 15)
-  } else if (level === 4) {
-    desired = 43 + Math.round(((Math.min(300, contributionCount) - 101) / 199) * 23)
-  } else if (level === 5) {
-    desired = 67 + Math.round(((Math.min(500, contributionCount) - 301) / 199) * 23)
-  } else {
-    desired = 91 + Math.round(Math.min(1, Math.max(0, contributionCount - 501) / 700) * 37)
-  }
-
-  return Math.min(maxSlots, Math.max(1, desired))
-}
-
-function angularDelta(a: number, b: number): number {
-  let d = (a - b) % (Math.PI * 2)
-  if (d > Math.PI) d -= Math.PI * 2
-  if (d < -Math.PI) d += Math.PI * 2
-  return Math.abs(d)
-}
-
-function buildGitHubBaubles(opts: {
-  level: TreeLevelId
-  seed: number
-  contributionCount: number
-  calendarWeeks?: GitHubContributionWeek[]
-  canopyNodes: CanopyNode[]
-  staticBoxes: ColoredBox[]
-  l12Boxes: ColoredBox[]
-  l3Boxes: ColoredBox[]
-  l4aBoxes: ColoredBox[]
-  l4bBoxes: ColoredBox[]
-  baubleInstances: BaubleInstanceData[]
-  separateBaubles: boolean
-}): Point3D[] {
-  const {
-    level,
-    seed,
-    contributionCount,
-    calendarWeeks,
-    canopyNodes,
-    staticBoxes,
-    l12Boxes,
-    l3Boxes,
-    l4aBoxes,
-    l4bBoxes,
-    baubleInstances,
-    separateBaubles,
-  } = opts
-
-  const placedPositions: Point3D[] = []
-  if (canopyNodes.length === 0 || level === 0 || contributionCount <= 0) return placedPositions
-
-  const rawEntries = extractCommitOrnamentEntries({
-    contributionCount,
-    calendarWeeks,
-  })
-  if (rawEntries.length === 0) return placedPositions
-
-  const targetCount = computeTargetBaubleCount(level, contributionCount, canopyNodes.length)
-  if (targetCount <= 0) return placedPositions
-
-  // Bucket chronologically preserving peak days, or expand burst days to match annual volume
-  const sampledEntries = (() => {
-    if (rawEntries.length > targetCount) {
-      const buckets: typeof rawEntries = []
-      for (let i = 0; i < targetCount; i += 1) {
-        const start = Math.floor((i * rawEntries.length) / targetCount)
-        const end = Math.max(start + 1, Math.floor(((i + 1) * rawEntries.length) / targetCount))
-        let best = rawEntries[start]
-        for (let k = start + 1; k < end; k += 1) {
-          if (rawEntries[k].count > best.count) {
-            best = rawEntries[k]
-          }
-        }
-        buckets.push(best)
-      }
-      return buckets
-    }
-
-    if (rawEntries.length < targetCount && contributionCount > rawEntries.length) {
-      const expanded = [...rawEntries]
-      const cap = Math.min(targetCount, contributionCount)
-      let cursor = 0
-      while (expanded.length < cap && cursor < expanded.length * 3) {
-        const candidate = rawEntries[cursor % rawEntries.length]
-        if (candidate.count > 1) {
-          expanded.push(candidate)
-        }
-        cursor += 1
-      }
-      expanded.sort((a, b) => a.weekIndex - b.weekIndex || a.dayOfWeek - b.dayOfWeek)
-      return expanded.slice(0, cap)
-    }
-
-    return rawEntries
-  })()
-
-  // Group outer branch nodes by height tier for chronological bottom-to-top spiral layout
-  const tiersMap = new Map<number, CanopyNode[]>()
-  for (const node of canopyNodes) {
-    const list = tiersMap.get(node.tier)
-    if (list) list.push(node)
-    else tiersMap.set(node.tier, [node])
-  }
-  const tierKeys = Array.from(tiersMap.keys()).sort((a, b) => a - b)
-  const usedNodes = new Set<CanopyNode>()
-
-  const goldenAngle = 2.39996323
-  const baseTheta = ((seed % 360) * Math.PI) / 180
-
-  for (let i = 0; i < sampledEntries.length; i += 1) {
-    const entry = sampledEntries[i]
-    const progress = sampledEntries.length === 1 ? 0.5 : i / (sampledEntries.length - 1)
-    const idealTierPos = Math.min(tierKeys.length - 1, Math.floor(progress * tierKeys.length))
-    const targetTheta = baseTheta + i * goldenAngle
-
-    let chosen: CanopyNode | null = null
-    let bestScore = Infinity
-
-    for (let tierOffset = 0; tierOffset < tierKeys.length && !chosen; tierOffset += 1) {
-      const candidateTiers =
-        tierOffset === 0
-          ? [idealTierPos]
-          : [idealTierPos - tierOffset, idealTierPos + tierOffset].filter(
-              (idx) => idx >= 0 && idx < tierKeys.length,
-            )
-
-      for (const tIdx of candidateTiers) {
-        const bucket = tiersMap.get(tierKeys[tIdx]) ?? []
-        for (const node of bucket) {
-          if (usedNodes.has(node)) continue
-          const dTheta = angularDelta(node.angle, targetTheta)
-          if (dTheta < bestScore) {
-            bestScore = dTheta
-            chosen = node
-          }
-        }
-      }
-    }
-
-    if (!chosen) break
-    usedNodes.add(chosen)
-
-    const chosenR = Math.max(0.25, Math.hypot(chosen.x, chosen.z))
-    const radialPush = Math.max(chosenR * 1.13, chosenR + 0.26)
-    const bx = (chosen.x / chosenR) * radialPush
-    const by = chosen.y - 0.14
-    const bz = (chosen.z / chosenR) * radialPush
-    placedPositions.push({ x: bx, y: by, z: bz })
-
-    const variantHash = mixSeed(seed + i * 17, entry.weekIndex * 7 + entry.dayOfWeek + 1)
-    const colors = GITHUB_BAUBLE_COLORS[entry.level]
-    const color = colors[variantHash % colors.length]
-
-    // ~28–32% larger GitHub commit baubles so commit activity stands out crisply even alongside gifts
-    const size =
-      entry.level === 4 ? 0.41 : entry.level === 3 ? 0.35 : entry.level === 2 ? 0.32 : 0.29
-
-    // Bright gold/silver ornament hanger cap merged into static tree mesh for crisp contrast
-    staticBoxes.push({
-      x: bx,
-      y: by + size * 0.54,
-      z: bz,
-      sx: size * 0.42,
-      sy: 0.09,
-      sz: size * 0.42,
-      color: entry.level >= 3 ? '#fde047' : '#f4f8ff',
-    })
-
-    if (entry.level === 4) {
-      const bucketKey: BaubleBucket = i % 2 === 0 ? 'l4a' : 'l4b'
-      const hx = bx + (bx >= 0 ? 0.1 : -0.1)
-      const hy = by + 0.1
-      const hz = bz + (bz >= 0 ? 0.1 : -0.1)
-
-      if (separateBaubles) {
-        baubleInstances.push({ x: bx, y: by, z: bz, size, color, bucket: bucketKey })
-        baubleInstances.push({ x: hx, y: hy, z: hz, size: 0.17, color: '#ecfdf5', bucket: bucketKey })
-      } else {
-        const target = bucketKey === 'l4a' ? l4aBoxes : l4bBoxes
-        target.push({ x: bx, y: by, z: bz, sx: size, sy: size, sz: size, color })
-        target.push({ x: hx, y: hy, z: hz, sx: 0.17, sy: 0.17, sz: 0.17, color: '#ecfdf5' })
-      }
-    } else if (entry.level === 3) {
-      if (separateBaubles) {
-        baubleInstances.push({ x: bx, y: by, z: bz, size, color, bucket: 'l3' })
-      } else {
-        l3Boxes.push({ x: bx, y: by, z: bz, sx: size, sy: size, sz: size, color })
-      }
-    } else {
-      const bucketKey: BaubleBucket = entry.level === 2 ? 'l2' : 'l1'
-      if (separateBaubles) {
-        baubleInstances.push({ x: bx, y: by, z: bz, size, color, bucket: bucketKey })
-      } else {
-        l12Boxes.push({ x: bx, y: by, z: bz, sx: size, sy: size, sz: size, color })
-      }
-    }
-  }
-
-  return placedPositions
 }
