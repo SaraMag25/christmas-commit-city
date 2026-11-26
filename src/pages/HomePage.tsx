@@ -54,6 +54,7 @@ export function HomePage() {
   const focusParam = searchParams.get('focus')
   const searchParam = searchParams.get('search')
   const paymentParam = searchParams.get('payment')
+  const paymentTypeParam = searchParams.get('payment_type')
   const orderIdParam = searchParams.get('order_id')
 
   const [paymentBanner, setPaymentBanner] = useState<{
@@ -62,6 +63,9 @@ export function HomePage() {
   } | null>(() => {
     if (paymentParam === 'cancelled') {
       return { kind: 'cancelled', message: t.home.paymentCancelledBanner }
+    }
+    if (paymentParam === 'success' && paymentTypeParam === 'support_donation') {
+      return { kind: 'success', message: t.home.donationSuccessBanner }
     }
     if (paymentParam === 'success') {
       return { kind: 'pending', message: t.home.paymentPendingBanner }
@@ -158,6 +162,7 @@ export function HomePage() {
 
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('payment')
+    nextParams.delete('payment_type')
     nextParams.delete('order_id')
     setSearchParams(nextParams, { replace: true })
 
@@ -169,13 +174,24 @@ export function HomePage() {
 
     const verifyPaid = async () => {
       if (orderIdParam) {
-        for (let attempt = 0; attempt < 6; attempt += 1) {
+        const maxAttempts = paymentTypeParam === 'support_donation' ? 2 : 6
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           const record = await fetchMyPaymentOrderStatus(orderIdParam)
           if (!active) return
           if (record?.status === 'paid') {
-            await refreshCityState()
+            const isDonation =
+              paymentTypeParam === 'support_donation' ||
+              record.metadata?.type === 'support_donation'
+            if (!isDonation) {
+              await refreshCityState()
+            }
             if (active) {
-              setPaymentBanner({ kind: 'success', message: t.home.paymentSuccessBanner })
+              setPaymentBanner({
+                kind: 'success',
+                message: isDonation
+                  ? t.home.donationSuccessBanner
+                  : t.home.paymentSuccessBanner,
+              })
             }
             return
           }
@@ -186,7 +202,9 @@ export function HomePage() {
           await new Promise((r) => window.setTimeout(r, 2000))
         }
       }
-      await refreshCityState()
+      if (paymentTypeParam !== 'support_donation') {
+        await refreshCityState()
+      }
     }
     void verifyPaid()
 
@@ -195,10 +213,12 @@ export function HomePage() {
     }
   }, [
     paymentParam,
+    paymentTypeParam,
     orderIdParam,
     searchParams,
     setSearchParams,
     refreshCityState,
+    t.home.donationSuccessBanner,
     t.home.paymentSuccessBanner,
     t.shop.pixExpiredOrFailed,
   ])

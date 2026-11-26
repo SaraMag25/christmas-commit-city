@@ -1,5 +1,6 @@
 import type { PixCampaignConfig } from '../types/city'
 import type { SupportCurrency, SupporterBundleConfig } from '../types/companion'
+import { toSafeHttpUrl } from '../utils/urlSafety'
 
 export { STANDARD_CONTRIBUTION_YEAR } from './githubPeriod'
 
@@ -45,12 +46,16 @@ export const SUPPORTER_BUNDLE: SupporterBundleConfig = {
 }
 
 export function getInternationalCheckoutUrl(): string | null {
-  const raw =
-    import.meta.env.VITE_STRIPE_CHECKOUT_URL?.trim() ||
-    import.meta.env.VITE_KOFI_URL?.trim() ||
-    import.meta.env.VITE_SUPPORT_USD_URL?.trim() ||
-    ''
-  return raw.length > 0 ? raw : null
+  const candidates = [
+    import.meta.env.VITE_SUPPORT_USD_URL,
+    import.meta.env.VITE_KOFI_URL,
+    import.meta.env.VITE_STRIPE_CHECKOUT_URL,
+  ]
+  for (const candidate of candidates) {
+    const safeUrl = toSafeHttpUrl(candidate)
+    if (safeUrl) return safeUrl
+  }
+  return null
 }
 
 export function formatBrlPrice(amount: number): string {

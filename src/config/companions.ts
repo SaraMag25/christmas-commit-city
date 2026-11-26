@@ -1,4 +1,3 @@
-import { GIFTS_CATALOG } from './gifts'
 import type {
   AccessorySlot,
   CompanionAccessoryId,
@@ -365,6 +364,101 @@ export const COMPANION_ACCESSORIES_CATALOG: readonly CompanionAccessoryItem[] = 
     pixOnly: true,
     accentColor: '#a855f7',
   },
+
+  // Novos Itens, Roupas e Acessórios Extras
+  {
+    id: 'candy_cane',
+    slot: 'hand',
+    name: 'Bengala Doce Natalina',
+    description: 'Bengala doce listrada em vermelho e branco clássico para acompanhar os commits de dezembro.',
+    priceCommits: 85,
+    priceBrl: 1.5,
+    priceUsd: 1.0,
+    accentColor: '#fb7185',
+  },
+  {
+    id: 'reindeer_antlers',
+    slot: 'head',
+    name: 'Tiara de Rena Natalina',
+    description: 'Tiara festiva com chifres de rena em chocolate, sininhos dourados e folhinha natalina.',
+    priceCommits: 115,
+    priceBrl: 1.5,
+    priceUsd: 1.0,
+    accentColor: '#d97706',
+  },
+  {
+    id: 'pixel_sunglasses',
+    slot: 'body',
+    name: 'Óculos Pixelados "Deal With It"',
+    description: 'Óculos escuros em pixel art com reflexo branco de mestre quando o deploy sobe limpo.',
+    priceCommits: 135,
+    priceBrl: 2.0,
+    priceUsd: 1.5,
+    accentColor: '#f43f5e',
+  },
+  {
+    id: 'bubble_tea',
+    slot: 'hand',
+    name: 'Copo de Boba Tea',
+    description: 'Milk tea cremoso de morango e taro com pérolas de tapioca e canudo roxo gigante.',
+    priceCommits: 145,
+    priceBrl: 2.0,
+    priceUsd: 1.5,
+    accentColor: '#f472b6',
+  },
+  {
+    id: 'santa_coat',
+    slot: 'body',
+    name: 'Casaco do Papai Noel',
+    description: 'Casaco vermelho quentinho com gola/barra de neve fofa, cinto preto e fivela dourada.',
+    priceCommits: 170,
+    priceBrl: 2.0,
+    priceUsd: 1.5,
+    accentColor: '#ef4444',
+  },
+  {
+    id: 'halo_crown',
+    slot: 'head',
+    name: 'Coroa Dourada Real',
+    description: 'Coroa voxel dourada cravejada com joias rubi, esmeralda e safira.',
+    priceCommits: 190,
+    priceBrl: 3.0,
+    priceUsd: 2.0,
+    accentColor: '#facc15',
+  },
+  {
+    id: 'astronaut_helmet',
+    slot: 'head',
+    name: 'Capacete Espacial Voxel',
+    description: 'Capacete espacial branco com aro ciano luminoso, visor azulado e antena lateral.',
+    priceCommits: null,
+    priceBrl: 4.5,
+    priceUsd: 2.5,
+    pixOnly: true,
+    accentColor: '#38bdf8',
+  },
+  {
+    id: 'angel_wings',
+    slot: 'body',
+    name: 'Asinhas de Anjo Luminosas',
+    description: 'Par de asas brancas em voxel com pontinhas douradas brilhando atrás do companheiro.',
+    priceCommits: null,
+    priceBrl: 4.5,
+    priceUsd: 2.5,
+    pixOnly: true,
+    accentColor: '#fde047',
+  },
+  {
+    id: 'pixel_sword',
+    slot: 'hand',
+    name: 'Espada Pixel Encantada',
+    description: 'Lâmina cristalina ciano e violeta encantada para cortar bugs em produção.',
+    priceCommits: null,
+    priceBrl: 4.0,
+    priceUsd: 2.0,
+    pixOnly: true,
+    accentColor: '#22d3ee',
+  },
 ] as const
 
 export const ACCESSORY_SLOT_LABELS: Record<AccessorySlot, string> = {
@@ -454,34 +548,4 @@ export function createEmptyCompanionLoadout(): UserCompanionLoadout {
 
 export function computeAvailableCommits(totalCommits: number, spentCommits: number): number {
   return Math.max(0, Math.floor(totalCommits) - Math.max(0, Math.floor(spentCommits)))
-}
-
-export function withCreatorFullUnlock(
-  username: string | null | undefined,
-  loadout: UserCompanionLoadout,
-): UserCompanionLoadout {
-  if (!isCreatorGithubUsername(username)) {
-    return loadout
-  }
-
-  const pixUnlockKeys = [
-    'bundle:supporter-bundle',
-    ...COMPANION_SPECIES_CATALOG.filter((s) => s.pixOnly).map((s) => `species:${s.id}`),
-    ...COMPANION_ACCESSORIES_CATALOG.filter((a) => a.pixOnly).map((a) => `accessory:${a.id}`),
-  ]
-
-  return {
-    ...loadout,
-    unlockedSpecies: Array.from(
-      new Set([...loadout.unlockedSpecies, ...COMPANION_SPECIES_CATALOG.map((s) => s.id)]),
-    ),
-    unlockedAccessories: Array.from(
-      new Set([...loadout.unlockedAccessories, ...COMPANION_ACCESSORIES_CATALOG.map((a) => a.id)]),
-    ),
-    unlockedGifts: Array.from(
-      new Set([...(loadout.unlockedGifts ?? []), ...GIFTS_CATALOG.map((g) => g.id)]),
-    ),
-    supporterBundleUnlocked: true,
-    unlockedViaPixIds: Array.from(new Set([...loadout.unlockedViaPixIds, ...pixUnlockKeys])),
-  }
 }

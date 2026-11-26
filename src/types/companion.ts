@@ -19,6 +19,9 @@ export type HeadAccessoryId =
   | 'snow_globe'
   | 'dev_headset'
   | 'rubber_duck'
+  | 'reindeer_antlers'
+  | 'halo_crown'
+  | 'astronaut_helmet'
 
 export type BodyAccessoryId =
   | 'wizard-cloak'
@@ -28,6 +31,9 @@ export type BodyAccessoryId =
   | 'code_visor'
   | 'binary_sweater'
   | 'programmer_tshirt'
+  | 'santa_coat'
+  | 'pixel_sunglasses'
+  | 'angel_wings'
 
 export type HandAccessoryId =
   | 'glow-lantern'
@@ -36,6 +42,9 @@ export type HandAccessoryId =
   | 'white-fish'
   | 'mini_laptop'
   | 'mechanical_keyboard'
+  | 'candy_cane'
+  | 'bubble_tea'
+  | 'pixel_sword'
 
 export type CompanionAccessoryId = HeadAccessoryId | BodyAccessoryId | HandAccessoryId
 

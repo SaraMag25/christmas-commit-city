@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { Check, CreditCard, Eye, Gift, Loader2, QrCode, Sparkles, X } from 'lucide-react'
-import { isCreatorGithubUsername } from '../../config/companions'
 import { normalizeGiftSlug, resolveGiftUsdPrice } from '../../config/gifts'
 import { formatCurrencyPrice } from '../../config/supportCampaign'
 import { useCity } from '../../context/cityContextStore'
@@ -83,8 +82,7 @@ export function GiftCatalogPreviewModal({
   const viewerLoadout = viewerUsername ? getCompanionLoadout(viewerUsername) : null
   const isGiftUnlocked = (gift: GiftItem): boolean =>
     gift.category === 'free' ||
-    Boolean(viewerLoadout?.unlockedGifts?.includes(gift.id)) ||
-    (isSupabaseReady ? isCreatorGithubUsername(viewerUsername) : !isSupabaseReady && isOwnTree && isCreatorGithubUsername(recipientUsername))
+    Boolean(viewerLoadout?.unlockedGifts?.includes(gift.id))
   const selectedGiftUnlocked = isGiftUnlocked(selectedGift)
 
   // Inject the selected item temporarily into a derived tree object without mutating CityProvider state
@@ -316,7 +314,8 @@ export function GiftCatalogPreviewModal({
                     </span>
                   ) : selectedGift.pixOnly ? (
                     <span className="shrink-0 rounded-sm border border-emerald-400/50 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-300">
-                      {t.giftModal.pixOnlyBadge} · {selectedFormattedPrice}
+                      {currency === 'USD' ? t.giftModal.cardOnlyBadge : t.giftModal.pixOnlyBadge} ·{' '}
+                      {selectedFormattedPrice}
                     </span>
                   ) : (
                     <span
@@ -362,7 +361,9 @@ export function GiftCatalogPreviewModal({
                   <p className="rounded-sm border border-sky-400/35 bg-[#0d1833]/80 p-2 text-[11px] leading-snug text-sky-100">
                     {selectedGiftUnlocked
                       ? t.giftModal.loginRequiredFree
-                      : t.giftModal.loginRequiredPaid}
+                      : currency === 'USD'
+                        ? t.giftModal.loginRequiredPaidUsd
+                        : t.giftModal.loginRequiredPaid}
                   </p>
                   <button
                     type="button"
@@ -457,7 +458,10 @@ export function GiftCatalogPreviewModal({
                           </span>
                         ) : gift.pixOnly ? (
                           <span className="rounded-sm border border-emerald-400/50 bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-300">
-                            {t.giftModal.pixOnlyBadge} ·{' '}
+                            {currency === 'USD'
+                              ? t.giftModal.cardOnlyBadge
+                              : t.giftModal.pixOnlyBadge}{' '}
+                            ·{' '}
                             {formatCurrencyPrice(
                               currency === 'BRL' ? gift.price : usdApprox,
                               currency,

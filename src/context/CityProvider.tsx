@@ -10,9 +10,7 @@ import {
   getAccessoryById,
   getSpeciesById,
   isCatalogItemUnlocked,
-  isCreatorGithubUsername,
   sanitizeCompanionName,
-  withCreatorFullUnlock,
 } from '../config/companions'
 import { GIFTS_CATALOG, normalizeTreeGiftSummary } from '../config/gifts'
 import { SUPPORTER_BUNDLE } from '../config/supportCampaign'
@@ -214,7 +212,7 @@ function buildSeededLoadoutFromTree(tree: CityTree): UserCompanionLoadout | null
     transactions,
     updatedAt: tree.last_synced_at,
   }
-  return withCreatorFullUnlock(tree.profile.github_username, seededLoadout)
+  return seededLoadout
 }
 
 function migrateStoredSpeciesId(raw: string | null | undefined): CompanionSpeciesId | null {
@@ -306,11 +304,7 @@ function buildInitialMockLoadouts(): Record<string, UserCompanionLoadout> {
     }
   }
   const stored = readStoredLoadouts()
-  const merged = { ...initial, ...stored }
-  for (const [key, value] of Object.entries(merged)) {
-    merged[key] = withCreatorFullUnlock(key, value)
-  }
-  return merged
+  return { ...initial, ...stored }
 }
 
 function toTreeCompanionState(loadout: UserCompanionLoadout | undefined): TreeCompanionState | undefined {
@@ -657,10 +651,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const applyOfflineLoadoutUpdate = useCallback(
     (username: string, nextLoadout: UserCompanionLoadout) => {
       const key = username.trim().toLowerCase()
-      const hydrated = withCreatorFullUnlock(username, {
+      const hydrated: UserCompanionLoadout = {
         ...nextLoadout,
         updatedAt: new Date().toISOString(),
-      })
+      }
       const nextMap = {
         ...loadoutsRef.current,
         [key]: hydrated,
@@ -686,12 +680,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const getCompanionLoadout = useCallback(
     (username: string): UserCompanionLoadout => {
       const key = username.trim().toLowerCase()
-      const existing = loadoutsByUsername[key]
-      if (existing) return existing
-      if (!isSupabaseConfigured && isCreatorGithubUsername(key)) {
-        return withCreatorFullUnlock(key, DEFAULT_EMPTY_LOADOUT)
-      }
-      return DEFAULT_EMPTY_LOADOUT
+      return loadoutsByUsername[key] ?? DEFAULT_EMPTY_LOADOUT
     },
     [loadoutsByUsername],
   )
@@ -1233,8 +1222,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         const viewerLoadout = viewerKey ? loadoutsRef.current[viewerKey] : undefined
         const hasUnlockedGift =
           gift.category === 'free' ||
-          Boolean(viewerLoadout?.unlockedGifts?.includes(gift.id)) ||
-          isCreatorGithubUsername(authenticatedUsername)
+          Boolean(viewerLoadout?.unlockedGifts?.includes(gift.id))
 
         if (!hasUnlockedGift) {
           return {

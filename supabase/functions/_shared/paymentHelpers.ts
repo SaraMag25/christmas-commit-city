@@ -1,6 +1,11 @@
 import { createClient, type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://christmas-commit-city.pages.dev',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]
+const LOCALHOST_ORIGIN_RE = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/
 
 export function getAllowedOrigins(): string[] {
   const raw = Deno.env.get('ALLOWED_ORIGINS')?.trim()
@@ -12,17 +17,30 @@ export function getAllowedOrigins(): string[] {
   return parsed.length > 0 ? parsed : DEFAULT_ALLOWED_ORIGINS
 }
 
+export function isOriginAllowed(origin: string): boolean {
+  const normalized = origin.trim().replace(/\/+$/, '')
+  if (!normalized) return false
+  if (LOCALHOST_ORIGIN_RE.test(normalized)) return true
+  if (normalized === 'https://christmas-commit-city.pages.dev') return true
+  return getAllowedOrigins().includes(normalized)
+}
+
 export function resolveSafeReturnOrigin(req: Request, requestedOrigin?: string): string {
-  const allowed = getAllowedOrigins()
-  const normalizedRequested = requestedOrigin?.trim().replace(/\/+$/, '') ?? ''
-  if (normalizedRequested && allowed.includes(normalizedRequested)) {
-    return normalizedRequested
+  const candidates = [requestedOrigin, req.headers.get('Origin') ?? undefined]
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim()
+    if (!trimmed) continue
+    try {
+      const parsed = new URL(trimmed)
+      if (isOriginAllowed(parsed.origin)) {
+        return parsed.origin
+      }
+    } catch {
+      // Reject malformed origin candidates to prevent open redirects.
+    }
   }
-  const reqOrigin = req.headers.get('Origin')?.trim().replace(/\/+$/, '') ?? ''
-  if (reqOrigin && allowed.includes(reqOrigin)) {
-    return reqOrigin
-  }
-  return allowed[0]
+  const configured = getAllowedOrigins().find((origin) => origin.startsWith('https://'))
+  return configured ?? DEFAULT_ALLOWED_ORIGINS[0]
 }
 
 export function buildCorsHeaders(req: Request): { headers: Record<string, string>; allowed: boolean } {
@@ -41,7 +59,7 @@ export function buildCorsHeaders(req: Request): { headers: Record<string, string
     }
   }
 
-  const isAllowed = allowedOrigins.includes(requestOrigin)
+  const isAllowed = isOriginAllowed(requestOrigin)
   return {
     allowed: isAllowed,
     headers: {
@@ -80,6 +98,12 @@ export function createServiceAdminClient(): {
 export interface AuthenticatedCallerContext {
   supabaseUrl: string
   user: User
+  adminClient: SupabaseClient
+}
+
+export interface OptionalCallerContext {
+  supabaseUrl: string
+  user: User | null
   adminClient: SupabaseClient
 }
 
@@ -140,6 +164,85 @@ export async function authenticateCaller(
   })
 
   return { supabaseUrl, user, adminClient }
+}
+
+export async function authenticateOptionalCaller(
+  req: Request,
+  corsHeaders: Record<string, string>,
+): Promise<OptionalCallerContext | Response> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim() ?? ''
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')?.trim() ?? ''
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim() ?? ''
+
+  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
+    return jsonResponse(
+      { error: 'Server configuration error.', code: 'SERVER_CONFIG_ERROR' },
+      500,
+      corsHeaders,
+    )
+  }
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  const authHeader = req.headers.get('Authorization')?.trim() ?? ''
+  if (!authHeader.startsWith('Bearer ')) {
+    return { supabaseUrl, user: null, adminClient }
+  }
+
+  const token = authHeader.slice('Bearer '.length).trim()
+  if (!token || token === supabaseAnonKey) {
+    return { supabaseUrl, user: null, adminClient }
+  }
+
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  })
+
+  const {
+    data: { user },
+  } = await userClient.auth.getUser(token)
+
+  return { supabaseUrl, user: user ?? null, adminClient }
+}
+
+export async function resolveSenderUsername(
+  adminClient: SupabaseClient,
+  user: User | null,
+  fallback = 'Apoiador Internacional',
+): Promise<string> {
+  if (!user) return fallback
+
+  const { data: senderTree } = await adminClient
+    .from('trees')
+    .select('github_username')
+    .eq('user_id', user.id)
+    .maybeSingle<{ github_username: string }>()
+
+  const githubIdentity = user.identities?.find((id) => id.provider === 'github')
+  const identityData = (githubIdentity?.identity_data ?? {}) as Record<string, unknown>
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>
+
+  const rawSenderUsername =
+    senderTree?.github_username?.trim() ||
+    (typeof identityData.user_name === 'string' && identityData.user_name.trim()) ||
+    (typeof identityData.preferred_username === 'string' &&
+      identityData.preferred_username.trim()) ||
+    (typeof meta.user_name === 'string' && meta.user_name.trim()) ||
+    (typeof meta.preferred_username === 'string' && meta.preferred_username.trim()) ||
+    fallback
+
+  return (
+    Array.from(rawSenderUsername)
+      .filter((ch) => {
+        const code = ch.charCodeAt(0)
+        return code >= 32 && code !== 127 && ch !== '<' && ch !== '>'
+      })
+      .join('')
+      .trim()
+      .slice(0, 39) || fallback
+  )
 }
 
 export interface ShopCatalogRow {
@@ -298,34 +401,7 @@ export async function validateOrderCreationInput(params: {
     )
   }
 
-  const { data: senderTree } = await adminClient
-    .from('trees')
-    .select('github_username')
-    .eq('user_id', user.id)
-    .maybeSingle<{ github_username: string }>()
-
-  const githubIdentity = user.identities?.find((id) => id.provider === 'github')
-  const identityData = (githubIdentity?.identity_data ?? {}) as Record<string, unknown>
-  const meta = (user.user_metadata ?? {}) as Record<string, unknown>
-
-  const rawSenderUsername =
-    senderTree?.github_username?.trim() ||
-    (typeof identityData.user_name === 'string' && identityData.user_name.trim()) ||
-    (typeof identityData.preferred_username === 'string' &&
-      identityData.preferred_username.trim()) ||
-    (typeof meta.user_name === 'string' && meta.user_name.trim()) ||
-    (typeof meta.preferred_username === 'string' && meta.preferred_username.trim()) ||
-    'github-dev'
-
-  const senderUsername =
-    Array.from(rawSenderUsername)
-      .filter((ch) => {
-        const code = ch.charCodeAt(0)
-        return code >= 32 && code !== 127 && ch !== '<' && ch !== '>'
-      })
-      .join('')
-      .trim()
-      .slice(0, 39) || 'github-dev'
+  const senderUsername = await resolveSenderUsername(adminClient, user, 'github-dev')
 
   return {
     shopItem,
@@ -372,5 +448,6 @@ export interface PaymentOrderRow {
   status: string
   external_reference: string | null
   provider_payment_id: string | null
+  payment_intent_id?: string | null
   metadata: Record<string, unknown> | null
 }

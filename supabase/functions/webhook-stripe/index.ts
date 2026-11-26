@@ -1,26 +1,26 @@
+import Stripe from 'npm:stripe@^17.7.0'
 import {
-  computeHmacSha256Hex,
   createServiceAdminClient,
   jsonResponse,
-  timingSafeEqualHex,
   type PaymentOrderRow,
 } from '../_shared/paymentHelpers.ts'
 
-const MAX_STRIPE_TIMESTAMP_DRIFT_SEC = 300
+const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
-function parseStripeSignatureHeader(header: string): { timestamp: string; signatures: string[] } | null {
-  let timestamp = ''
-  const signatures: string[] = []
-  for (const part of header.split(',')) {
-    const eqIndex = part.indexOf('=')
-    if (eqIndex <= 0) continue
-    const key = part.slice(0, eqIndex).trim()
-    const val = part.slice(eqIndex + 1).trim()
-    if (key === 't') timestamp = val
-    else if (key === 'v1' && val) signatures.push(val)
+function extractPaymentIntentId(rawIntent: unknown): string | null {
+  if (typeof rawIntent === 'string' && rawIntent.trim()) {
+    return rawIntent.trim()
   }
-  if (!timestamp || signatures.length === 0) return null
-  return { timestamp, signatures }
+  if (
+    rawIntent &&
+    typeof rawIntent === 'object' &&
+    'id' in rawIntent &&
+    typeof (rawIntent as { id?: unknown }).id === 'string'
+  ) {
+    const id = (rawIntent as { id: string }).id.trim()
+    return id || null
+  }
+  return null
 }
 
 Deno.serve(async (req: Request) => {
@@ -38,61 +38,37 @@ Deno.serve(async (req: Request) => {
     }
 
     const sigHeader = req.headers.get('stripe-signature')?.trim() ?? ''
-    const parsedSig = parseStripeSignatureHeader(sigHeader)
-    if (!parsedSig) {
-      return jsonResponse({ error: 'Missing or malformed stripe-signature header.' }, 400)
-    }
-
-    const timestampSec = Number(parsedSig.timestamp)
-    const nowSec = Math.floor(Date.now() / 1000)
-    if (
-      !Number.isFinite(timestampSec) ||
-      Math.abs(nowSec - timestampSec) > MAX_STRIPE_TIMESTAMP_DRIFT_SEC
-    ) {
-      return jsonResponse({ error: 'Expired Stripe webhook timestamp.' }, 400)
+    if (!sigHeader) {
+      return jsonResponse({ error: 'Missing stripe-signature header.' }, 400)
     }
 
     const rawBody = await req.text()
-    const expectedHex = await computeHmacSha256Hex(
-      stripeWebhookSecret,
-      `${parsedSig.timestamp}.${rawBody}`,
-    )
+    const stripe = new Stripe(stripeSecretKey, {
+      httpClient: Stripe.createFetchHttpClient(),
+    })
 
-    const validSignature = parsedSig.signatures.some((sig) =>
-      timingSafeEqualHex(expectedHex, sig),
-    )
-    if (!validSignature) {
+    let event: Stripe.Event
+    try {
+      event = await stripe.webhooks.constructEventAsync(
+        rawBody,
+        sigHeader,
+        stripeWebhookSecret,
+        undefined,
+        cryptoProvider,
+      )
+    } catch {
       console.error('[webhook-stripe] Signature verification failed.')
-      return jsonResponse({ error: 'Invalid Stripe webhook signature.' }, 401)
-    }
-
-    const event = JSON.parse(rawBody) as {
-      type?: string
-      data?: {
-        object?: {
-          id?: string
-          client_reference_id?: string | null
-          payment_status?: string
-          metadata?: Record<string, string>
-        }
-      }
-    }
-
-    const eventType = event.type ?? ''
-    const sessionObj = event.data?.object
-    const sessionId = sessionObj?.id?.trim() ?? ''
-
-    if (!sessionId) {
-      return jsonResponse({ received: true, ignored: 'missing_session_id' }, 200)
+      return jsonResponse({ error: 'Invalid Stripe webhook signature.' }, 400)
     }
 
     if (
-      eventType === 'checkout.session.expired' ||
-      eventType === 'checkout.session.async_payment_failed'
+      event.type === 'checkout.session.expired' ||
+      event.type === 'checkout.session.async_payment_failed'
     ) {
+      const sessionObj = event.data.object as Stripe.Checkout.Session
       const ref =
-        sessionObj?.client_reference_id?.trim() ||
-        sessionObj?.metadata?.external_reference?.trim() ||
+        sessionObj.client_reference_id?.trim() ||
+        sessionObj.metadata?.external_reference?.trim() ||
         ''
       if (ref) {
         await service.adminClient
@@ -105,34 +81,25 @@ Deno.serve(async (req: Request) => {
     }
 
     if (
-      eventType !== 'checkout.session.completed' &&
-      eventType !== 'checkout.session.async_payment_succeeded'
+      event.type !== 'checkout.session.completed' &&
+      event.type !== 'checkout.session.async_payment_succeeded'
     ) {
-      return jsonResponse({ received: true, ignoredEvent: eventType }, 200)
+      return jsonResponse({ received: true, ignoredEvent: event.type }, 200)
     }
 
-    // Re-fetch session from Stripe API (defense in depth alongside HMAC verification)
-    const stripeRes = await fetch(
-      `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
-      {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${stripeSecretKey}` },
-      },
-    )
+    const eventSession = event.data.object as Stripe.Checkout.Session
+    const sessionId = eventSession.id?.trim() ?? ''
+    if (!sessionId) {
+      return jsonResponse({ received: true, ignored: 'missing_session_id' }, 200)
+    }
 
-    if (!stripeRes.ok) {
-      const errText = await stripeRes.text().catch(() => '')
-      console.error('[webhook-stripe] Failed retrieving session:', stripeRes.status, errText.slice(0, 200))
+    // Re-fetch session from Stripe API (defense in depth alongside signature verification)
+    let verifiedSession: Stripe.Checkout.Session
+    try {
+      verifiedSession = await stripe.checkout.sessions.retrieve(sessionId)
+    } catch {
+      console.error('[webhook-stripe] Failed retrieving session from Stripe API.')
       return jsonResponse({ error: 'Failed verifying Checkout Session with Stripe.' }, 502)
-    }
-
-    const verifiedSession = (await stripeRes.json()) as {
-      id: string
-      payment_status?: string
-      currency?: string | null
-      amount_total?: number | null
-      client_reference_id?: string | null
-      metadata?: Record<string, string> | null
     }
 
     if (verifiedSession.payment_status !== 'paid') {
@@ -142,6 +109,7 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    const paymentIntentId = extractPaymentIntentId(verifiedSession.payment_intent)
     const externalReference =
       verifiedSession.client_reference_id?.trim() ||
       verifiedSession.metadata?.external_reference?.trim() ||
@@ -151,19 +119,87 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ received: true, ignored: 'missing_external_reference' }, 200)
     }
 
-    const { data: order, error: orderErr } = await service.adminClient
+    const selectCols =
+      'id, buyer_user_id, target_tree_id, item_id, provider, currency, amount_cents, status, external_reference, provider_payment_id, payment_intent_id, metadata'
+
+    // Strict idempotency pre-check by session.id, payment_intent, or external_reference
+    const idempotencyFilters = [
+      `external_reference.eq.${externalReference}`,
+      `provider_payment_id.eq.${verifiedSession.id}`,
+      ...(paymentIntentId ? [`payment_intent_id.eq.${paymentIntentId}`] : []),
+    ]
+
+    const { data: matchingOrders, error: orderErr } = await service.adminClient
       .from('payment_orders')
-      .select('id, buyer_user_id, target_tree_id, item_id, provider, currency, amount_cents, status, external_reference, provider_payment_id, metadata')
-      .eq('external_reference', externalReference)
-      .maybeSingle<PaymentOrderRow>()
+      .select(selectCols)
+      .or(idempotencyFilters.join(','))
+      .limit(5)
+      .returns<PaymentOrderRow[]>()
 
     if (orderErr) {
-      console.error('[webhook-stripe] Order lookup failed:', orderErr.code, orderErr.message)
+      console.error('[webhook-stripe] Order lookup failed:', orderErr.code)
       return jsonResponse({ error: 'Database lookup failed.' }, 500)
     }
 
+    const orders = matchingOrders ?? []
+    if (orders.some((row) => row.status === 'paid')) {
+      return jsonResponse({ received: true, alreadyProcessed: true }, 200)
+    }
+
+    const order =
+      orders.find((row) => row.external_reference === externalReference) ?? orders[0] ?? null
+
+    const amountTotal = Number(verifiedSession.amount_total ?? 0)
+    const sessionCurrency = verifiedSession.currency?.trim().toLowerCase() ?? ''
+
+    if (!Number.isFinite(amountTotal) || amountTotal <= 0 || sessionCurrency !== 'usd') {
+      console.error('[webhook-stripe] Invalid amount or non-USD currency on session.')
+      return jsonResponse({ error: 'Invalid session currency or amount.' }, 400)
+    }
+
+    const operationType =
+      verifiedSession.metadata?.type === 'support_donation' ||
+      order?.metadata?.type === 'support_donation' ||
+      (order && !order.item_id)
+        ? 'support_donation'
+        : 'store_item'
+
+    if (operationType === 'support_donation') {
+      if (order && (order.provider !== 'stripe' || order.currency !== 'USD' || amountTotal < order.amount_cents)) {
+        console.error('[webhook-stripe] Donation order mismatch:', order.id)
+        return jsonResponse({ error: 'Donation order verification mismatch.' }, 400)
+      }
+
+      const senderUsername =
+        typeof order?.metadata?.sender_username === 'string' && order.metadata.sender_username.trim()
+          ? order.metadata.sender_username.trim()
+          : 'Apoiador Internacional'
+
+      const { data: rpcResult, error: rpcErr } = await service.adminClient.rpc(
+        'fulfill_stripe_support_donation_internal',
+        {
+          p_buyer_user_id:
+            order?.buyer_user_id ?? verifiedSession.metadata?.buyer_user_id ?? null,
+          p_currency: 'USD',
+          p_amount_cents: amountTotal,
+          p_external_reference: externalReference,
+          p_session_id: verifiedSession.id,
+          p_payment_intent_id: paymentIntentId,
+          p_sender_username: senderUsername,
+        },
+      )
+
+      if (rpcErr) {
+        console.error('[webhook-stripe] Support donation RPC failed:', rpcErr.code)
+        return jsonResponse({ error: 'Failed to record support contribution.' }, 500)
+      }
+
+      return jsonResponse({ received: true, fulfillment: rpcResult }, 200)
+    }
+
+    // Store item purchase: order & item_id must exist with authoritative catalog amount
     if (!order || !order.item_id) {
-      return jsonResponse({ error: 'Matching payment order not found.' }, 404)
+      return jsonResponse({ error: 'Matching store order not found.' }, 404)
     }
 
     if (order.provider !== 'stripe') {
@@ -175,28 +211,24 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Session ID mismatch.' }, 400)
     }
 
-    if (order.status === 'paid') {
-      return jsonResponse({ received: true, alreadyProcessed: true }, 200)
+    if (order.amount_cents <= 0 || order.currency !== 'USD' || amountTotal < order.amount_cents) {
+      console.error('[webhook-stripe] Paid amount below catalog order:', order.id)
+      return jsonResponse({ error: 'Paid amount does not match catalog order.' }, 400)
     }
 
-    const amountTotal = Number(verifiedSession.amount_total ?? 0)
-    const sessionCurrency = verifiedSession.currency?.trim().toLowerCase() ?? ''
-
-    if (
-      !Number.isFinite(amountTotal) ||
-      amountTotal <= 0 ||
-      order.amount_cents <= 0 ||
-      order.currency !== 'USD' ||
-      sessionCurrency !== 'usd' ||
-      amountTotal < order.amount_cents
-    ) {
-      console.error('[webhook-stripe] Amount or currency mismatch:', {
-        orderId: order.id,
-        amountTotal,
-        expectedCents: order.amount_cents,
-        sessionCurrency,
+    // Persist verified Stripe IDs on order before fulfillment (protected by unique DB indexes)
+    const { error: idUpdateErr } = await service.adminClient
+      .from('payment_orders')
+      .update({
+        provider_payment_id: verifiedSession.id,
+        ...(paymentIntentId ? { payment_intent_id: paymentIntentId } : {}),
       })
-      return jsonResponse({ error: 'Paid amount does not match catalog order.' }, 400)
+      .eq('id', order.id)
+      .eq('status', 'pending')
+
+    if (idUpdateErr) {
+      console.error('[webhook-stripe] Failed storing Stripe identifiers:', idUpdateErr.code)
+      return jsonResponse({ error: 'Failed updating order tracking IDs.' }, 500)
     }
 
     const senderUsername =
@@ -219,13 +251,13 @@ Deno.serve(async (req: Request) => {
     )
 
     if (rpcErr) {
-      console.error('[webhook-stripe] Fulfillment RPC failed:', rpcErr.message)
+      console.error('[webhook-stripe] Fulfillment RPC failed:', rpcErr.code)
       return jsonResponse({ error: 'Failed to fulfill verified Stripe payment.' }, 500)
     }
 
     return jsonResponse({ received: true, fulfillment: rpcResult }, 200)
   } catch (err) {
-    console.error('[webhook-stripe] Unexpected error:', err)
+    console.error('[webhook-stripe] Unexpected error:', err instanceof Error ? err.message : 'unknown')
     return jsonResponse({ error: 'Unexpected server error.' }, 500)
   }
 })

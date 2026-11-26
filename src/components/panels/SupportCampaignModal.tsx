@@ -22,6 +22,7 @@ import { CAMPAIGN_COPY } from '../../i18n/translations'
 import {
   createPixPayment,
   createStripeCheckout,
+  createStripeSupportCheckout,
   type PixPaymentOrder,
 } from '../../services/paymentService'
 import { toSafeHttpUrl } from '../../utils/urlSafety'
@@ -32,6 +33,8 @@ interface SupportCampaignModalProps {
   targetUsername?: string
   onClose: () => void
 }
+
+const USD_SUPPORT_PRESETS = [3, 5, 10, 25] as const
 
 export function SupportCampaignModal({
   targetUsername = 'SaraMag25',
@@ -51,12 +54,29 @@ export function SupportCampaignModal({
   const [bundleError, setBundleError] = useState<string | null>(null)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const [pixOrder, setPixOrder] = useState<PixPaymentOrder | null>(null)
+  const [selectedUsdAmount, setSelectedUsdAmount] = useState<number>(5)
+  const [customUsdInput, setCustomUsdInput] = useState('')
+  const [isStartingUsdDonation, setIsStartingUsdDonation] = useState(false)
+  const [usdDonationError, setUsdDonationError] = useState<string | null>(null)
+  const [usdOfflineNotice, setUsdOfflineNotice] = useState<string | null>(null)
 
   const campaignCopy = CAMPAIGN_COPY[language]
   const loadout = getCompanionLoadout(targetUsername)
   const checkoutUrl = toSafeHttpUrl(getInternationalCheckoutUrl())
   const bundlePrice =
     currency === 'BRL' ? SUPPORTER_BUNDLE.priceBrl : SUPPORTER_BUNDLE.priceUsd
+  const parsedCustomUsd = customUsdInput.trim()
+    ? Number(customUsdInput.trim().replace(',', '.'))
+    : null
+  const activeUsdAmount =
+    parsedCustomUsd !== null ? parsedCustomUsd : selectedUsdAmount
+  const activeUsdCents = Number.isFinite(activeUsdAmount)
+    ? Math.round(activeUsdAmount * 100)
+    : NaN
+  const isValidUsdAmount =
+    Number.isInteger(activeUsdCents) &&
+    activeUsdCents >= 100 &&
+    activeUsdCents <= 50000
 
   const handleCopyValue = async (field: 'brcode' | 'key', value: string) => {
     try {
@@ -89,7 +109,13 @@ export function SupportCampaignModal({
           window.location.assign(stripe.checkoutUrl)
         }
       } catch (err) {
-        setBundleError(err instanceof Error ? err.message : 'Erro ao iniciar pagamento.')
+        setBundleError(
+          err instanceof Error
+            ? err.message
+            : currency === 'USD'
+              ? 'Unable to start payment.'
+              : 'Erro ao iniciar pagamento.',
+        )
       } finally {
         setIsStartingCheckout(false)
       }
@@ -108,6 +134,37 @@ export function SupportCampaignModal({
     await refreshCityState()
     setPixOrder(null)
     setBundleUnlockedMsg(t.shop.supporterUnlocked)
+  }
+
+  const handleStartUsdDonation = async () => {
+    setUsdDonationError(null)
+    setUsdOfflineNotice(null)
+
+    if (!isValidUsdAmount) {
+      setUsdDonationError(t.supportModal.usdInvalidAmount)
+      return
+    }
+
+    if (!isSupabaseReady) {
+      setUsdOfflineNotice(t.supportModal.usdOfflinePreviewNotice)
+      return
+    }
+
+    setIsStartingUsdDonation(true)
+    try {
+      const stripe = await createStripeSupportCheckout(activeUsdCents / 100)
+      window.location.assign(stripe.checkoutUrl)
+    } catch (err) {
+      setUsdDonationError(
+        err instanceof Error
+          ? err.message
+          : currency === 'USD'
+            ? 'Unable to start Stripe Checkout.'
+            : 'Erro ao iniciar Checkout Stripe.',
+      )
+    } finally {
+      setIsStartingUsdDonation(false)
+    }
   }
 
   return (
@@ -189,7 +246,7 @@ export function SupportCampaignModal({
             <span>{t.supportModal.supporterTitle}</span>
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
-            {t.supportModal.supporterDesc}
+            {currency === 'USD' ? t.supportModal.supporterDescUsd : t.supportModal.supporterDesc}
           </p>
 
           <div className="mt-3">
@@ -199,7 +256,9 @@ export function SupportCampaignModal({
               </span>
             ) : isSupabaseReady && !session ? (
               <div className="space-y-2">
-                <p className="text-[11px] text-sky-200">{t.shop.loginRequiredPaid}</p>
+                <p className="text-[11px] text-sky-200">
+                  {currency === 'USD' ? t.shop.loginRequiredCard : t.shop.loginRequiredPaid}
+                </p>
                 <button
                   type="button"
                   onClick={() => void connectWithGitHub()}
@@ -251,7 +310,9 @@ export function SupportCampaignModal({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-bold text-slate-100">{t.supportModal.directTitle}</p>
             <span className="inline-flex items-center rounded-sm border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-              {t.supportModal.directPixFreeBadge}
+              {currency === 'BRL'
+                ? t.supportModal.directPixFreeBadge
+                : t.supportModal.directUsdFreeBadge}
             </span>
           </div>
 
@@ -338,23 +399,96 @@ export function SupportCampaignModal({
               </p>
             </div>
           ) : (
-            <div className="mt-2 space-y-2">
-              <p className="text-[11px] text-slate-300">{t.supportModal.directUsdDesc}</p>
-              {checkoutUrl ? (
-                <a
-                  href={checkoutUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="pixel-btn pixel-btn-pine inline-flex rounded-sm px-4 py-2 text-xs font-bold"
-                >
-                  <span>{t.shop.openCheckout}</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              ) : (
-                <p className="rounded-sm border border-slate-800 bg-[#070d1f] p-2.5 text-[10px] text-sky-200">
-                  {t.shop.noCheckoutEnv}
+            <div className="mt-2.5 space-y-3">
+              <p className="text-[11px] leading-relaxed text-slate-300">
+                {t.supportModal.directUsdDesc}
+              </p>
+
+              <div className="space-y-2 rounded-sm border border-slate-800 bg-[#070d1f] p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  {t.supportModal.usdAmountLabel}
                 </p>
-              )}
+
+                <div className="grid grid-cols-5 gap-1.5">
+                  {USD_SUPPORT_PRESETS.map((preset) => {
+                    const isSelected = !customUsdInput.trim() && selectedUsdAmount === preset
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          setSelectedUsdAmount(preset)
+                          setCustomUsdInput('')
+                          setUsdDonationError(null)
+                          setUsdOfflineNotice(null)
+                        }}
+                        className={`rounded-sm border px-2 py-1.5 text-xs font-bold transition ${
+                          isSelected
+                            ? 'border-sky-400 bg-sky-500/20 text-sky-200'
+                            : 'border-slate-700 bg-[#040811] text-slate-300 hover:border-slate-500'
+                        }`}
+                      >
+                        ${preset}
+                      </button>
+                    )
+                  })}
+
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    step="0.50"
+                    inputMode="decimal"
+                    value={customUsdInput}
+                    onChange={(e) => {
+                      setCustomUsdInput(e.target.value)
+                      setUsdDonationError(null)
+                      setUsdOfflineNotice(null)
+                    }}
+                    placeholder={t.supportModal.usdCustomPlaceholder}
+                    aria-label={t.supportModal.usdCustomPlaceholder}
+                    className="w-full rounded-sm border border-slate-700 bg-[#040811] px-2 py-1.5 text-center text-xs text-slate-100 placeholder:text-[10px] placeholder:text-slate-500 focus:border-sky-400 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isStartingUsdDonation}
+                  onClick={() => void handleStartUsdDonation()}
+                  className="pixel-btn pixel-btn-pine inline-flex w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold disabled:opacity-60"
+                >
+                  {isStartingUsdDonation ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CreditCard className="h-3.5 w-3.5" />
+                  )}
+                  <span>
+                    {t.supportModal.openUsdSupportBtn}
+                    {isValidUsdAmount ? ` · ${formatCurrencyPrice(activeUsdCents / 100, 'USD')}` : ''}
+                  </span>
+                </button>
+
+                {usdDonationError && (
+                  <p className="text-[11px] text-rose-300">{usdDonationError}</p>
+                )}
+                {usdOfflineNotice && (
+                  <p className="text-[11px] text-sky-200">{usdOfflineNotice}</p>
+                )}
+
+                {checkoutUrl && (
+                  <div className="pt-1">
+                    <a
+                      href={checkoutUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] text-slate-300 underline decoration-slate-600 hover:text-white"
+                    >
+                      <span>{t.supportModal.usdExternalLinkLabel}</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

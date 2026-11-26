@@ -21,6 +21,7 @@ export interface StripeCheckoutOrder {
   checkoutUrl: string
   amountCents: number
   currency: 'USD'
+  type?: 'store_item' | 'support_donation'
 }
 
 export type PaymentOrderStatus = 'pending' | 'paid' | 'failed' | 'refunded'
@@ -33,6 +34,7 @@ export interface PaymentOrderStatusRecord {
   amount_cents: number
   status: PaymentOrderStatus
   paid_at: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 async function formatPaymentInvokeError(
@@ -115,25 +117,63 @@ export async function createPixPayment(params: {
   return data
 }
 
+async function getOptionalAccessToken(): Promise<string | null> {
+  if (!supabase || !isSupabaseConfigured) {
+    throw new Error('SUPABASE_NOT_CONFIGURED')
+  }
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token?.trim() || null
+}
+
 /**
- * Requests a server-priced Stripe Checkout Session for international USD card payments.
+ * Requests a server-priced Stripe Checkout Session for store items (`store_item`)
+ * or voluntary creator USD support (`support_donation`, validated $1-$500 server-side).
  */
-export async function createStripeCheckout(params: {
-  itemId: string
-  targetTreeId?: string
-}): Promise<StripeCheckoutOrder> {
-  const accessToken = await getActiveAccessToken()
+export async function createStripeCheckout(
+  params:
+    | {
+        type?: 'store_item'
+        itemId: string
+        targetTreeId?: string
+      }
+    | {
+        type: 'support_donation'
+        amountUsd: number
+      },
+): Promise<StripeCheckoutOrder> {
   if (!supabase) throw new Error('SUPABASE_NOT_CONFIGURED')
+
+  const isDonation = params.type === 'support_donation'
+  const accessToken = isDonation
+    ? await getOptionalAccessToken()
+    : await getActiveAccessToken()
+
+  if (isDonation) {
+    const amountCents = Math.round(params.amountUsd * 100)
+    if (!Number.isFinite(params.amountUsd) || amountCents < 100 || amountCents > 50000) {
+      throw new Error('Informe um valor válido entre $1.00 e $500.00 USD.')
+    }
+  }
+
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+  const body = isDonation
+    ? {
+        type: 'support_donation' as const,
+        amountUsd: Number(params.amountUsd.toFixed(2)),
+        returnUrl: window.location.origin,
+      }
+    : {
+        type: 'store_item' as const,
+        itemId: params.itemId,
+        targetTreeId: params.targetTreeId,
+        returnUrl: window.location.origin,
+      }
 
   const { data, error } = await supabase.functions.invoke<StripeCheckoutOrder>(
     'create-stripe-checkout',
     {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: {
-        itemId: params.itemId,
-        targetTreeId: params.targetTreeId,
-        returnUrl: window.location.origin,
-      },
+      headers,
+      body,
     },
   )
 
@@ -150,6 +190,13 @@ export async function createStripeCheckout(params: {
   }
 }
 
+export function createStripeSupportCheckout(amountUsd: number): Promise<StripeCheckoutOrder> {
+  return createStripeCheckout({
+    type: 'support_donation',
+    amountUsd,
+  })
+}
+
 /**
  * Reads the authenticated buyer's own payment order status via RLS-enforced SELECT.
  * Unlocks/gifts are NEVER granted on client call — only webhooks via `service_role` mark `paid`.
@@ -161,7 +208,7 @@ export async function fetchMyPaymentOrderStatus(
 
   const { data, error } = await supabase
     .from('payment_orders')
-    .select('id, item_id, target_tree_id, currency, amount_cents, status, paid_at')
+    .select('id, item_id, target_tree_id, currency, amount_cents, status, paid_at, metadata')
     .eq('id', orderId.trim())
     .maybeSingle<PaymentOrderStatusRecord>()
 

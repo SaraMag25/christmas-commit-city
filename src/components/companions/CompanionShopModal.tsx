@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   Coins,
@@ -22,7 +22,6 @@ import {
   getAccessoryById,
   getSpeciesById,
   isCatalogItemUnlocked,
-  isCreatorGithubUsername,
   resolveCompanionDisplayName,
 } from '../../config/companions'
 import {
@@ -165,7 +164,18 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const [pendingPayment, setPendingPayment] = useState<PendingPaymentItem | null>(null)
   const [pixOrder, setPixOrder] = useState<PixPaymentOrder | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [paymentError, setPaymentError] = useState<{
+    source: 'focused' | 'bundle'
+    message: string
+  } | null>(null)
+  const [mutatingSource, setMutatingSource] = useState<'focused' | 'bundle' | null>(null)
   const [isMutating, setIsMutating] = useState(false)
+  const paymentPanelRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!pendingPayment) return
+    paymentPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [pendingPayment])
 
   const focusedSpeciesId: CompanionSpeciesId = previewCompanionId
   const isPreviewingDifferentCompanion = previewCompanionId !== loadout.species
@@ -231,8 +241,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const isSceneGiftUnlocked = (giftId: string) =>
     Boolean(
       viewerUnlockedGifts?.includes(giftId) ||
-        loadout.unlockedGifts?.includes(giftId) ||
-        (!isSupabaseReady && isCreatorGithubUsername(username)),
+        loadout.unlockedGifts?.includes(giftId),
     )
 
   const unlockedSpeciesCount = COMPANION_SPECIES_CATALOG.filter((sp) =>
@@ -269,10 +278,15 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     }
   }, [tree, focusedSceneGift, username])
 
-  const handleSelectSpeciesCard = (item: CompanionSpeciesItem) => {
-    if (isMutating) return
+  const resetPaymentUi = () => {
     setPendingPayment(null)
     setPixOrder(null)
+    setPaymentError(null)
+  }
+
+  const handleSelectSpeciesCard = (item: CompanionSpeciesItem) => {
+    if (isMutating) return
+    resetPaymentUi()
     setFeedback(null)
     if (item.id !== previewCompanionId) {
       setPreviewAccessoryOverride({})
@@ -283,8 +297,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
   const handleSelectAccessoryCard = async (item: CompanionAccessoryItem) => {
     if (isMutating) return
     setFocusedAccessoryId(item.id)
-    setPendingPayment(null)
-    setPixOrder(null)
+    resetPaymentUi()
     setFeedback(null)
 
     if (isAccessoryUnlocked(item.id) && !isPreviewingDifferentCompanion) {
@@ -368,6 +381,58 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
     }
   }
 
+  const startDirectStripeCheckout = async (
+    target: PendingPaymentItem,
+    source: 'focused' | 'bundle',
+  ) => {
+    if (isMutating) return
+    setPaymentError(null)
+    setFeedback(null)
+
+    if (!session) {
+      const ok = await connectWithGitHub()
+      if (!ok) {
+        setPaymentError({ source, message: t.shop.loginRequiredCard })
+      }
+      return
+    }
+
+    const itemId = target.kind === 'bundle' ? SUPPORTER_BUNDLE.id : target.item.id
+    const targetTreeId = target.kind === 'gift' ? tree.id : undefined
+
+    setIsMutating(true)
+    setMutatingSource(source)
+    try {
+      const stripe = await createStripeCheckout({ itemId, targetTreeId })
+      window.location.assign(stripe.checkoutUrl)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t.shop.phase7Notice
+      setPaymentError({ source, message: msg })
+      setFeedback(msg)
+    } finally {
+      setIsMutating(false)
+      setMutatingSource(null)
+    }
+  }
+
+  const handleOpenOrStartPayment = (
+    target: PendingPaymentItem,
+    source: 'focused' | 'bundle',
+  ) => {
+    setPixOrder(null)
+    setPaymentError(null)
+    setFeedback(null)
+
+    // In USD mode with Supabase active, launch Stripe Checkout directly in 1 click
+    // instead of revealing a secondary panel below the catalog grid.
+    if (isSupabaseReady && currency === 'USD') {
+      void startDirectStripeCheckout(target, source)
+      return
+    }
+
+    setPendingPayment(target)
+  }
+
   const handleConfirmPaymentUnlock = async () => {
     if (!pendingPayment || isMutating) return
 
@@ -381,6 +446,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
       const targetTreeId = pendingPayment.kind === 'gift' ? tree.id : undefined
       setIsMutating(true)
       setFeedback(null)
+      setPaymentError(null)
       try {
         if (currency === 'BRL') {
           const order = await createPixPayment({ itemId, targetTreeId })
@@ -390,7 +456,12 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
           window.location.assign(stripe.checkoutUrl)
         }
       } catch (err) {
-        setFeedback(err instanceof Error ? err.message : t.shop.phase7Notice)
+        const msg = err instanceof Error ? err.message : t.shop.phase7Notice
+        setPaymentError({
+          source: pendingPayment.kind === 'bundle' ? 'bundle' : 'focused',
+          message: msg,
+        })
+        setFeedback(msg)
       } finally {
         setIsMutating(false)
       }
@@ -583,8 +654,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 type="button"
                 onClick={() => {
                   setCurrency('BRL')
-                  setPendingPayment(null)
-                  setPixOrder(null)
+                  resetPaymentUi()
                 }}
                 className={`rounded-[2px] px-2.5 py-1 font-semibold transition cursor-pointer ${
                   currency === 'BRL'
@@ -598,8 +668,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 type="button"
                 onClick={() => {
                   setCurrency('USD')
-                  setPendingPayment(null)
-                  setPixOrder(null)
+                  resetPaymentUi()
                 }}
                 className={`rounded-[2px] px-2.5 py-1 font-semibold transition cursor-pointer ${
                   currency === 'USD'
@@ -897,7 +966,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
 
                   {focusedIsPixOnly ? (
                     <p className="rounded-sm border border-emerald-400/35 bg-emerald-950/50 px-2.5 py-1.5 text-[10px] leading-snug text-emerald-200">
-                      {t.shop.pixOnlyNotice}
+                      {currency === 'USD' ? t.shop.cardOnlyNotice : t.shop.pixOnlyNotice}
                     </p>
                   ) : (
                     /* Primary green button: Adopt / Equip by commits (disabled with missing hint if insufficient) */
@@ -927,17 +996,18 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                   {/* Gold/highlighted button: Unlock / Place via Pix (BRL) or Card (USD) */}
                   <button
                     type="button"
+                    disabled={isMutating}
                     onClick={() => {
-                      setPixOrder(null)
-                      setPendingPayment(
+                      handleOpenOrStartPayment(
                         isViewingScene
                           ? { kind: 'gift', item: focusedSceneGift }
                           : isViewingSpecies
                             ? { kind: 'species', item: focusedSpecies }
                             : { kind: 'accessory', item: focusedAccessory },
+                        'focused',
                       )
                     }}
-                    className={`pixel-btn w-full rounded-sm px-3 py-2 text-xs font-bold ${
+                    className={`pixel-btn w-full rounded-sm px-3 py-2 text-xs font-bold disabled:opacity-60 ${
                       focusedIsPixOnly
                         ? 'pixel-btn-gold'
                         : missingCommits > 0
@@ -945,13 +1015,28 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                           : 'pixel-btn-gold'
                     }`}
                   >
-                    <Heart className="h-3.5 w-3.5" />
+                    {isMutating && mutatingSource === 'focused' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Heart className="h-3.5 w-3.5" />
+                    )}
                     <span>
-                      {isViewingScene
-                        ? `${t.giftModal.giftSpecialBtn} (${formatCurrencyPrice(focusedCurrencyPrice, currency)})`
-                        : `${currency === 'BRL' ? t.shop.unlockPix : t.shop.unlockCard} (${formatCurrencyPrice(focusedCurrencyPrice, currency)})`}
+                      {isMutating && mutatingSource === 'focused'
+                        ? t.shop.generatingCheckout
+                        : isViewingScene
+                          ? `${t.giftModal.giftSpecialBtn} (${formatCurrencyPrice(focusedCurrencyPrice, currency)})`
+                          : `${currency === 'BRL' ? t.shop.unlockPix : t.shop.unlockCard} (${formatCurrencyPrice(focusedCurrencyPrice, currency)})`}
                     </span>
                   </button>
+
+                  {paymentError?.source === 'focused' && (
+                    <p
+                      role="alert"
+                      className="rounded-sm border border-rose-500/50 bg-rose-950/75 px-2.5 py-1.5 text-[11px] leading-snug text-rose-200"
+                    >
+                      {paymentError.message}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1093,8 +1178,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 type="button"
                 onClick={() => {
                   setActiveTab('species')
-                  setPendingPayment(null)
-                  setPixOrder(null)
+                  resetPaymentUi()
                 }}
                 className={`pixel-btn rounded-sm px-3 py-2 text-xs font-bold ${
                   activeTab === 'species' ? 'pixel-btn-pine' : 'pixel-btn-wood'
@@ -1110,8 +1194,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 type="button"
                 onClick={() => {
                   setActiveTab('customize')
-                  setPendingPayment(null)
-                  setPixOrder(null)
+                  resetPaymentUi()
                 }}
                 className={`pixel-btn rounded-sm px-3 py-2 text-xs font-bold ${
                   activeTab === 'customize' ? 'pixel-btn-pine' : 'pixel-btn-wood'
@@ -1127,8 +1210,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 type="button"
                 onClick={() => {
                   setActiveTab('scene')
-                  setPendingPayment(null)
-                  setPixOrder(null)
+                  resetPaymentUi()
                 }}
                 className={`pixel-btn rounded-sm px-3 py-2 text-xs font-bold ${
                   activeTab === 'scene' ? 'pixel-btn-pine' : 'pixel-btn-wood'
@@ -1136,7 +1218,8 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
               >
                 <Rocket className="h-3.5 w-3.5 text-emerald-300" />
                 <span>
-                  {t.shop.tabSceneProps} ({sceneGifts.length})
+                  {currency === 'USD' ? t.shop.tabScenePropsUsd : t.shop.tabSceneProps} (
+                  {sceneGifts.length})
                 </span>
               </button>
             </div>
@@ -1195,7 +1278,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                         ) : isPixOnly ? (
                           <>
                             <span className="rounded-sm border border-emerald-400/45 bg-emerald-500/15 px-1.5 py-0.5 font-bold text-emerald-300">
-                              {t.shop.pixOnlyBadge}
+                              {currency === 'USD' ? t.shop.cardOnlyBadge : t.shop.pixOnlyBadge}
                             </span>
                             <span className="font-bold text-amber-300">{priceFiat}</span>
                           </>
@@ -1230,7 +1313,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                           (a) => a.slot === slot,
                         )
                         if (firstInSlot) setFocusedAccessoryId(firstInSlot.id)
-                        setPendingPayment(null)
+                        resetPaymentUi()
                       }}
                       className={`rounded-sm border px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer ${
                         activeSlot === slot
@@ -1307,7 +1390,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                           ) : isPixOnly ? (
                             <>
                               <span className="rounded-sm border border-emerald-400/45 bg-emerald-500/15 px-1.5 py-0.5 font-bold text-emerald-300">
-                                {t.shop.pixOnlyBadge}
+                                {currency === 'USD' ? t.shop.cardOnlyBadge : t.shop.pixOnlyBadge}
                               </span>
                               <span className="font-bold text-amber-300">{priceFiat}</span>
                             </>
@@ -1329,11 +1412,11 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
               </div>
             )}
 
-            {/* Tab 3: Exclusive 3D Scene Objects (Money / Pix Only) */}
+            {/* Tab 3: Exclusive 3D Scene Objects (Pix / Card Only) */}
             {activeTab === 'scene' && (
               <div className="mt-3 flex flex-col gap-3">
                 <p className="rounded-sm border border-emerald-400/35 bg-emerald-950/45 px-3 py-2 text-[11px] leading-snug text-emerald-200">
-                  {t.shop.pixOnlyNotice}
+                  {currency === 'USD' ? t.shop.cardOnlyNotice : t.shop.pixOnlyNotice}
                 </p>
 
                 <div className="grid gap-2.5 sm:grid-cols-2">
@@ -1354,8 +1437,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                         type="button"
                         onClick={() => {
                           setFocusedSceneGiftId(gift.id)
-                          setPendingPayment(null)
-                          setPixOrder(null)
+                          resetPaymentUi()
                           setFeedback(null)
                         }}
                         className={`flex flex-col justify-between rounded-sm border p-3.5 text-left transition cursor-pointer ${
@@ -1390,7 +1472,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                             </span>
                           ) : (
                             <span className="rounded-sm border border-emerald-400/45 bg-emerald-500/15 px-1.5 py-0.5 font-bold text-emerald-300">
-                              {t.shop.pixOnlyBadge}
+                              {currency === 'USD' ? t.shop.cardOnlyBadge : t.shop.pixOnlyBadge}
                             </span>
                           )}
                           <div className="flex items-center gap-2">
@@ -1431,21 +1513,39 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setPendingPayment({ kind: 'bundle' })}
-                    className="pixel-btn pixel-btn-gold shrink-0 rounded-sm px-3.5 py-2 text-xs font-bold"
+                    disabled={isMutating}
+                    onClick={() => handleOpenOrStartPayment({ kind: 'bundle' }, 'bundle')}
+                    className="pixel-btn pixel-btn-gold shrink-0 rounded-sm px-3.5 py-2 text-xs font-bold disabled:opacity-60"
                   >
-                    <Heart className="h-3.5 w-3.5" />
+                    {isMutating && mutatingSource === 'bundle' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Heart className="h-3.5 w-3.5" />
+                    )}
                     <span>
-                      {t.shop.supporterBtn} ({formatCurrencyPrice(bundlePrice, currency)})
+                      {isMutating && mutatingSource === 'bundle'
+                        ? t.shop.generatingCheckout
+                        : `${t.shop.supporterBtn} (${formatCurrencyPrice(bundlePrice, currency)})`}
                     </span>
                   </button>
                 )}
               </div>
+              {paymentError?.source === 'bundle' && (
+                <p
+                  role="alert"
+                  className="mt-2 rounded-sm border border-rose-500/50 bg-rose-950/75 px-2.5 py-1.5 text-[11px] leading-snug text-rose-200"
+                >
+                  {paymentError.message}
+                </p>
+              )}
             </div>
 
             {/* Dual Payment Panel (Real Mercado Pago Pix / Stripe Checkout in production, Local Preview offline) */}
             {pendingPayment && paymentPreview && (
-              <div className="mt-3 rounded-sm border-2 border-amber-400/55 bg-[#111c36] p-3.5">
+              <div
+                ref={paymentPanelRef}
+                className="mt-3 rounded-sm border-2 border-amber-400/55 bg-[#111c36] p-3.5"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
@@ -1479,7 +1579,7 @@ export function CompanionShopModal({ tree, onClose }: CompanionShopModalProps) {
                   !session ? (
                     <div className="mt-3 space-y-2">
                       <p className="rounded-sm border border-sky-400/35 bg-[#040811]/90 p-2.5 text-[11px] text-sky-100">
-                        {t.shop.loginRequiredPaid}
+                        {currency === 'USD' ? t.shop.loginRequiredCard : t.shop.loginRequiredPaid}
                       </p>
                       <button
                         type="button"

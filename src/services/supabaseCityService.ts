@@ -5,7 +5,6 @@ import {
   getAccessoryById,
   getSpeciesById,
   sanitizeCompanionName,
-  withCreatorFullUnlock,
 } from '../config/companions'
 import { MIN_TREE_SPACING_GRID } from '../config/cityMapConfig'
 import { GIFTS_CATALOG } from '../config/gifts'
@@ -579,8 +578,6 @@ export async function fetchOwnerPrivateState(userId: string): Promise<OwnerPriva
       }
     : null
   const loadout: UserCompanionLoadout | null = baseLoadout
-    ? withCreatorFullUnlock(treeRow?.github_username, baseLoadout)
-    : null
 
   const giftById = new Map(GIFTS_CATALOG.map((g) => [g.id, g]))
   const ownerGifts: TreeGiftSummary[] | null = giftRows

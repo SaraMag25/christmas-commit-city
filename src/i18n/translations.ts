@@ -468,6 +468,51 @@ export const ACCESSORY_COPY: Record<
       description:
         'Jaqueta estilosa preta cyber-invernal com capuz roxo elétrico, zíper metálico dourado e emblema </> em verde-esmeralda neon.',
     },
+    candy_cane: {
+      name: 'Bengala Doce Natalina',
+      description:
+        'Bengala doce listrada em vermelho e branco clássico para adoçar os commits de dezembro.',
+    },
+    reindeer_antlers: {
+      name: 'Tiara de Rena Natalina',
+      description:
+        'Tiara festiva com galhos de rena, sininhos dourados brilhantes e detalhe natalino.',
+    },
+    pixel_sunglasses: {
+      name: 'Óculos "Deal With It"',
+      description:
+        'Óculos escuros em pixel art com reflexo branco de mestre quando o deploy passa de primeira.',
+    },
+    bubble_tea: {
+      name: 'Copo de Boba Tea',
+      description:
+        'Milk tea cremoso de morango e taro com pérolas de tapioca e canudo roxo gigante.',
+    },
+    santa_coat: {
+      name: 'Casaco do Papai Noel',
+      description:
+        'Casaco vermelho quentinho com gola de pelúcia branca, cinto escuro e fivela dourada.',
+    },
+    halo_crown: {
+      name: 'Coroa Dourada Real',
+      description:
+        'Coroa voxel dourada de realeza dev cravejada com gemas rubi, esmeralda e safira.',
+    },
+    astronaut_helmet: {
+      name: 'Capacete Espacial Voxel',
+      description:
+        'Capacete espacial branco com visor ciano translúcido, LED frontal e antena lateral.',
+    },
+    angel_wings: {
+      name: 'Asinhas de Anjo Luminosas',
+      description:
+        'Par de asas voxel nevadas com bordas douradas emissivas flutuando nas costas do amigo.',
+    },
+    pixel_sword: {
+      name: 'Espada Pixel Encantada',
+      description:
+        'Espada cristalina de RPG em ciano e violeta brilhante para fatiar bugs em produção.',
+    },
   },
   en: {
     'leaf-scarf': {
@@ -560,6 +605,42 @@ export const ACCESSORY_COPY: Record<
       name: 'Cyber Neon Dev Jacket',
       description:
         'Flashy obsidian cyber-winter dev jacket with electric purple hood trim, golden center zipper, emerald cuffs, and glowing </> neon chest crest.',
+    },
+    candy_cane: {
+      name: 'Holiday Candy Cane',
+      description: 'Classic red-and-white peppermint candy cane for cozy December commits.',
+    },
+    reindeer_antlers: {
+      name: 'Reindeer Antlers Headband',
+      description: 'Festive headband with chocolate voxel antlers, gold jingle bells, and holly.',
+    },
+    pixel_sunglasses: {
+      name: 'Deal-With-It Pixel Shades',
+      description: 'Iconic dark pixel sunglasses with crisp white glare for clean production deploys.',
+    },
+    bubble_tea: {
+      name: 'Pixel Boba Tea',
+      description: 'Strawberry-taro milk tea cup packed with dark boba pearls and an oversized straw.',
+    },
+    santa_coat: {
+      name: 'Santa Holiday Coat',
+      description: 'Warm crimson coat trimmed with fluffy white cuffs, black belt, and gold buckle.',
+    },
+    halo_crown: {
+      name: 'Royal Golden Crown',
+      description: 'Regal voxel gold crown studded with ruby, emerald, and sapphire pixel gems.',
+    },
+    astronaut_helmet: {
+      name: 'Voxel Space Helmet',
+      description: 'Sleek white astronaut helmet crest with translucent cyan shield and comm antenna.',
+    },
+    angel_wings: {
+      name: 'Glowing Angel Wings',
+      description: 'Stepped snow-white voxel wings with warm glowing gold tips across the back.',
+    },
+    pixel_sword: {
+      name: 'Enchanted Pixel Sword',
+      description: 'Glowing cyan-and-violet RPG crystal blade ready to slice production bugs.',
     },
   },
 }
@@ -670,6 +751,8 @@ export const UI_TRANSLATIONS = {
       syncWarning: 'Aviso na sincronização GitHub',
       close: 'Fechar',
       paymentSuccessBanner: 'Pagamento confirmado! Seu item ou presente foi liberado.',
+      donationSuccessBanner:
+        'Muito obrigada pelo apoio em USD! Sua contribuição foi recebida com carinho.',
       paymentPendingBanner: 'Pagamento recebido — finalizando confirmação automática...',
       paymentCancelledBanner: 'Checkout cancelado. Nenhuma cobrança foi realizada.',
     },
@@ -740,6 +823,7 @@ export const UI_TRANSLATIONS = {
       subtitleOwn: 'Visualize presentes em 3D antes de colocá-los na sua árvore!',
       special: 'Especial',
       pixOnlyBadge: 'Exclusivo Pix',
+      cardOnlyBadge: 'Exclusivo Cartão',
       free: 'Gratuito',
       unlockedBadge: 'Desbloqueado',
       rarity: 'Raridade',
@@ -756,11 +840,15 @@ export const UI_TRANSLATIONS = {
       selectHint: 'Clique em um item do catálogo ao lado para visualizar na árvore 3D.',
       note: 'Presentes gratuitos são adicionados na hora; presentes especiais aparecem assim que o pagamento é confirmado.',
       phase7Notice:
-        'Selecione Pix (BRL) ou Cartão (USD) — o presente aparece na árvore logo após a confirmação do pagamento.',
+        'Pagamento via Pix (BRL) — o presente aparece na árvore logo após a confirmação do pagamento.',
+      phase7NoticeUsd:
+        'Cartão / Apple Pay / Google Pay via Stripe — o presente aparece na árvore logo após a confirmação do pagamento.',
       loginRequiredFree:
         'Conecte sua conta GitHub para enviar presentes gratuitos.',
       loginRequiredPaid:
-        'Conecte sua conta GitHub para enviar presentes especiais via Pix ou Cartão.',
+        'Conecte sua conta GitHub para enviar presentes especiais via Pix.',
+      loginRequiredPaidUsd:
+        'Conecte sua conta GitHub para enviar presentes especiais com Cartão via Stripe.',
       sendingBtn: 'Enviando...',
       back: 'Fechar',
     },
@@ -834,8 +922,11 @@ export const UI_TRANSLATIONS = {
       tabSpecies: 'Escolher Amigo',
       tabCustomize: 'Customizar',
       tabSceneProps: 'Cenário 3D (Pix)',
+      tabScenePropsUsd: 'Cenário 3D (Cartão)',
       pixOnlyBadge: 'Exclusivo Pix · Dinheiro',
-      pixOnlyNotice: 'Exclusivo de apoiador em dinheiro (Pix / Cartão) — não usa commits.',
+      cardOnlyBadge: 'Exclusivo Cartão',
+      pixOnlyNotice: 'Exclusivo de apoiador (Pix / BRL) — não usa commits.',
+      cardOnlyNotice: 'Exclusivo de apoiador (Cartão / Global) — não usa commits.',
       supporterExclusiveNote: 'Exclusivo Apoiador',
       activeOnTree: 'Ativo na árvore',
       unlockedClickEquip: 'Desbloqueado · Clique p/ equipar',
@@ -884,7 +975,9 @@ export const UI_TRANSLATIONS = {
       pixConfirmed: 'Pagamento Pix confirmado! Atualizando sua árvore...',
       pixExpiredOrFailed: 'Este Pix expirou ou foi cancelado. Gere um novo código se desejar.',
       loginRequiredPaid:
-        'Conecte sua conta GitHub para desbloquear via Pix ou Cartão com segurança.',
+        'Conecte sua conta GitHub para desbloquear via Pix com segurança.',
+      loginRequiredCard:
+        'Conecte sua conta GitHub para desbloquear com Cartão via Stripe com segurança.',
       paymentConfirmedUnlocked: 'Pagamento confirmado e desbloqueado na sua conta!',
       confirmPreview: 'Confirmar Desbloqueio (Prévia Local)',
       cancel: 'Cancelar',
@@ -900,10 +993,13 @@ export const UI_TRANSLATIONS = {
       supporterTitle: 'Pacote Apoiador (Pacote Clássico)',
       supporterDesc:
         `Desbloqueia os ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} companheiros clássicos e todos os ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} acessórios de commits de uma vez (não inclui exclusivos Pix).`,
+      supporterDescUsd:
+        `Desbloqueia os ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} companheiros clássicos e todos os ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} acessórios de commits de uma vez (não inclui exclusivos de apoio).`,
       supporterCta: 'Desbloquear Tudo por',
       supporterDone: 'Pacote Apoiador já desbloqueado nesta árvore!',
       directTitle: 'Apoio Voluntário',
       directPixFreeBadge: 'Qualquer valor · Pix',
+      directUsdFreeBadge: 'Qualquer valor · USD',
       directPixDesc:
         'Contribuição voluntária de qualquer valor via QR Code ou Pix Copia e Cola (sem vínculo com desbloqueios da loja).',
       directPixPhase7Note:
@@ -915,7 +1011,14 @@ export const UI_TRANSLATIONS = {
       pixRandomKeyLabel: 'Chave Aleatória',
       copyRandomKeyBtn: 'Copiar Chave Aleatória',
       directUsdDesc:
-        'Contribuição voluntária internacional via Cartão / Checkout em USD.',
+        'Contribuição voluntária em dólar (USD) com cartão via Stripe Checkout — segura e direta (sem vínculo com desbloqueios da loja).',
+      usdAmountLabel: 'Valor do apoio em USD ($1 a $500)',
+      usdCustomPlaceholder: 'Outro valor ($)',
+      usdInvalidAmount: 'Informe um valor entre $1.00 e $500.00 USD.',
+      openUsdSupportBtn: 'Apoiar via Stripe (USD)',
+      usdOfflinePreviewNotice:
+        'Prévia offline: em produção com Supabase ativo, este botão abre o Stripe Checkout em USD.',
+      usdExternalLinkLabel: 'Ou usar link externo em USD',
       close: 'Fechar',
     },
   },
@@ -994,6 +1097,8 @@ export const UI_TRANSLATIONS = {
       syncWarning: 'GitHub sync notice',
       close: 'Close',
       paymentSuccessBanner: 'Payment confirmed! Your item or gift has been unlocked.',
+      donationSuccessBanner:
+        'Thank you so much for your USD support! Your contribution is deeply appreciated.',
       paymentPendingBanner: 'Payment received — finalizing confirmation...',
       paymentCancelledBanner: 'Checkout cancelled. No charge was made.',
     },
@@ -1065,6 +1170,7 @@ export const UI_TRANSLATIONS = {
       special: 'Special',
       free: 'Free',
       pixOnlyBadge: 'Pix Exclusive',
+      cardOnlyBadge: 'Card Exclusive',
       unlockedBadge: 'Unlocked',
       rarity: 'Rarity',
       placeGiftBtn: 'Place on tree',
@@ -1080,11 +1186,15 @@ export const UI_TRANSLATIONS = {
       selectHint: 'Click any item in the catalog to preview it on the 3D tree.',
       note: 'Free gifts appear on the tree right away; special gifts are delivered as soon as payment is confirmed.',
       phase7Notice:
-        'Choose Pix (BRL) or Card (USD) — your gift appears on the tree as soon as payment is confirmed.',
+        'Pix (BRL) — your gift appears on the tree as soon as payment is confirmed.',
+      phase7NoticeUsd:
+        'Card / Apple Pay / Google Pay via Stripe — your gift appears on the tree as soon as payment is confirmed.',
       loginRequiredFree:
         'Connect your GitHub account to send free gifts.',
       loginRequiredPaid:
-        'Connect your GitHub account first to send special gifts via Pix or Card.',
+        'Connect your GitHub account first to send special gifts via Pix.',
+      loginRequiredPaidUsd:
+        'Connect your GitHub account first to send special gifts via Card.',
       sendingBtn: 'Sending...',
       back: 'Close',
     },
@@ -1157,9 +1267,12 @@ export const UI_TRANSLATIONS = {
       companionRemovedMsg: 'Companion removed from tree!',
       tabSpecies: 'Choose Companion',
       tabCustomize: 'Customize',
-      tabSceneProps: '3D Scene Props',
+      tabSceneProps: '3D Scene (Pix)',
+      tabScenePropsUsd: '3D Scene (Card)',
       pixOnlyBadge: 'Pix Exclusive · Money Only',
-      pixOnlyNotice: 'Money-only supporter exclusive (Pix / Card) — not purchasable with commits.',
+      cardOnlyBadge: 'Card Exclusive',
+      pixOnlyNotice: 'Supporter exclusive (Pix / BRL) — does not use commits.',
+      cardOnlyNotice: 'Supporter exclusive (Card / Global) — does not use commits.',
       supporterExclusiveNote: 'Supporter Exclusive',
       activeOnTree: 'Active on tree',
       unlockedClickEquip: 'Unlocked · Click to equip',
@@ -1171,14 +1284,14 @@ export const UI_TRANSLATIONS = {
       enoughBalance: 'Enough balance! You will have',
       enoughSuffix: 'commits left for accessories.',
       unlockPix: 'Unlock via Pix',
-      unlockCard: 'Unlock with Card',
+      unlockCard: 'Unlock via Card',
       unlockGlobal: 'Unlock Global',
-      supporterTitle: 'Full Supporter Pack (Classic Bundle)',
+      supporterTitle: 'Full Supporter Pack (Classics)',
       supporterDesc:
         `Unlock all ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} classic pets + ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} commit accessories at once.`,
       supporterUnlocked: 'Supporter Pack Active — Everything Unlocked!',
       supporterBtn: 'Unlock All',
-      petNameLabel: "Your companion's name",
+      petNameLabel: 'Companion name',
       petNamePlaceholder: 'e.g. Maria',
       saveNameBtn: 'Save',
       resetNameBtn: 'Default',
@@ -1208,7 +1321,9 @@ export const UI_TRANSLATIONS = {
       pixConfirmed: 'Pix payment confirmed! Updating your tree...',
       pixExpiredOrFailed: 'This Pix code expired or was cancelled. Generate a new one if needed.',
       loginRequiredPaid:
-        'Connect your GitHub account to unlock securely via Pix or Card.',
+        'Connect your GitHub account to unlock securely via Pix.',
+      loginRequiredCard:
+        'Connect your GitHub account to unlock securely via Card (Stripe).',
       paymentConfirmedUnlocked: 'Payment confirmed and unlocked on your account!',
       confirmPreview: 'Confirm Unlock (Local Preview)',
       cancel: 'Cancel',
@@ -1221,13 +1336,16 @@ export const UI_TRANSLATIONS = {
     supportModal: {
       title: 'Support Christmas Commit City',
       goal: 'Campaign goal',
-      supporterTitle: 'Supporter Bundle (Classic Pack)',
+      supporterTitle: 'Supporter Bundle (Classics)',
       supporterDesc:
-        `Unlocks all ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} classic companions and all ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} commit accessories at once (excludes Pix-only exclusives).`,
+        `Unlocks all ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} classic companions and all ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} commit accessories at once (excludes Pix exclusives).`,
+      supporterDescUsd:
+        `Unlocks all ${COMPANION_SPECIES_CATALOG.filter((s) => !s.pixOnly).length} classic companions and all ${COMPANION_ACCESSORIES_CATALOG.filter((a) => !a.pixOnly).length} commit accessories at once (excludes Card exclusives).`,
       supporterCta: 'Unlock Everything for',
       supporterDone: 'Supporter Bundle already unlocked on this tree!',
       directTitle: 'Voluntary Support',
       directPixFreeBadge: 'Any amount · Pix',
+      directUsdFreeBadge: 'Any amount · USD',
       directPixDesc:
         'Voluntary contribution of any amount via QR Code or Pix Copy & Paste (not tied to automatic shop unlocks).',
       directPixPhase7Note:
@@ -1238,7 +1356,15 @@ export const UI_TRANSLATIONS = {
       copyPixBrCodeBtn: 'Copy Pix BR Code',
       pixRandomKeyLabel: 'Random Pix Key',
       copyRandomKeyBtn: 'Copy Random Key',
-      directUsdDesc: 'Voluntary international contribution via Card / USD Checkout.',
+      directUsdDesc:
+        'Voluntary contribution in USD via Stripe Checkout (Card, Apple Pay, Google Pay) — direct and secure (not tied to shop unlocks).',
+      usdAmountLabel: 'Choose or enter USD amount ($1 – $500)',
+      usdCustomPlaceholder: 'Custom ($)',
+      usdInvalidAmount: 'Please enter an amount between $1.00 and $500.00 USD.',
+      openUsdSupportBtn: 'Support with Card (Stripe USD)',
+      usdOfflinePreviewNotice:
+        'Offline preview: with Supabase active, this opens Stripe Checkout in USD.',
+      usdExternalLinkLabel: 'Or use external USD support link',
       close: 'Close',
     },
   },
